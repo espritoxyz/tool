@@ -1,0 +1,4 @@
+[submodule "tvm-disasm"]
+	path = tvm-disasm
+	url = https://github.com/explyt/tvm-spec-example
+	branch = disasm-methods

@@ -1,0 +1,25 @@
+"Asm.fif" include
+// automatically generated from `/Users/damtev/work/ton/_tests/div-by-constant-zero/div_by_constant_zero.fc` incl:`/Users/damtev/work/ton/_tests/div-by-constant-zero/../imports/stdlib.fc` 
+PROGRAM{
+  DECLPROC divide
+  71076 DECLMETHOD divide_by_zero
+  DECLPROC recv_internal
+  divide PROC:<{
+    42 PUSHINT
+    SWAP
+    DIV
+  }>
+  divide_by_zero PROC:<{
+    0 PUSHINT
+    divide CALLDICT
+  }>
+  recv_internal PROC:<{
+    2 1 BLKDROP2
+    DUP
+    SEMPTY
+    NIP
+    IFJMP:<{
+    }>
+  }>
+}END>c
+2 boc+>B "/Users/damtev/work/ton/_tests/div-by-constant-zero/boc.txt" B>file
