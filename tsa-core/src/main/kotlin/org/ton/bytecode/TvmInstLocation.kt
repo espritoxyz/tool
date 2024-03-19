@@ -1,4 +1,4 @@
-package org.example.org.ton.bytecode
+package org.ton.bytecode
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable

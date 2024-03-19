@@ -9,15 +9,16 @@ interface TvmRegister<Value : TvmValue> {
     var value: Value
 }
 
+// TODO registers should contain symbolic values, not concrete?
 data class C0Register(override var value: TvmContinuationValue) : TvmRegister<TvmContinuationValue>
 data class C1Register(override var value: TvmContinuationValue) : TvmRegister<TvmContinuationValue>
 data class C2Register(override var value: TvmContinuationValue) : TvmRegister<TvmContinuationValue>
 data class C3Register(override var value: TvmContinuationValue) : TvmRegister<TvmContinuationValue>
 data class C4Register(override var value: TvmCellValue) : TvmRegister<TvmCellValue>
-data class C5Register(override var value: TvmCellValue = TvmCellValue.empty()) : TvmRegister<TvmCellValue>
+data class C5Register(override var value: TvmCellValue) : TvmRegister<TvmCellValue>
 data class C7Register(override var value: TvmTupleValue = TvmTupleValue.empty()) : TvmRegister<TvmTupleValue>
 
-// TODO amke them not-null
+// TODO make them not-null?
 data class TvmRegisters(
     var c0: C0Register? = null,
     var c1: C1Register? = null,

@@ -1,5 +1,3 @@
-package org.example
-
 import org.ton.bitstring.BitString
 import org.ton.boc.BagOfCells
 import java.nio.file.Files

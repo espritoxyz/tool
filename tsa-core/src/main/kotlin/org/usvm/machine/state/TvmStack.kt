@@ -1,28 +1,48 @@
 package org.usvm.machine.state
 
-import io.ksmt.utils.uncheckedCast
+import kotlinx.collections.immutable.PersistentList
+import kotlinx.collections.immutable.persistentListOf
+import org.ton.bytecode.TvmBoolType
+import org.ton.bytecode.TvmBuilderType
+import org.ton.bytecode.TvmCellArrayType
+import org.ton.bytecode.TvmCellType
+import org.ton.bytecode.TvmContinuationType
+import org.ton.bytecode.TvmContinuationValue
+import org.ton.bytecode.TvmIntegerType
+import org.ton.bytecode.TvmNullType
+import org.ton.bytecode.TvmSliceType
+import org.ton.bytecode.TvmTupleType
+import org.ton.bytecode.TvmType
+import org.usvm.UBvSort
 import org.usvm.UExpr
+import org.usvm.UHeapRef
 import org.usvm.USort
 import org.usvm.machine.TvmContext
 import kotlin.math.max
 
 class TvmStack(
     private val ctx: TvmContext,
-    private val stack: MutableList<UExpr<out USort>?> = mutableListOf(), // [n n-1 n-2 ... 2 1 0]
+    private var stack: PersistentList<TvmStackEntry> = persistentListOf(), // [n n-1 n-2 ... 2 1 0]
 ) {
-    private var stackElementIndex: Int = 0
+    private var inputElements: PersistentList<TvmInputStackEntry> = persistentListOf()
     private inline val size: Int get() = stack.size
 
-    fun <T : USort> removeLast(sort: T): UExpr<T> {
+    fun takeLast(expectedType: TvmType): TvmStackValue {
         extendStack(1)
 
-        val lastStackValue = stack.removeLast() ?: ctx.mkRegisterReading(stackElementIndex++, sort)
-        return lastStackValue.uncheckedCast()
+        val lastStackEntry = stack.last()
+        stack = stack.removeAt(size - 1)
+
+        return getStackValue(lastStackEntry, expectedType)
     }
 
-    operator fun plusAssign(value: UExpr<out USort>) {
+    fun add(value: UExpr<out USort>, type: TvmType) {
         // TODO check size 256?
-        stack += value
+        stack = stack.add(value.toStackValue(type).toStackEntry())
+    }
+
+    operator fun plusAssign(value: TvmContinuationValue) {
+        stack = stack.add(TvmStackContinuationValue(value).toStackEntry())
     }
 
     fun swap(first: Int, second: Int) {
@@ -40,15 +60,16 @@ class TvmStack(
         val newSize = i + j
         extendStack(newSize)
 
-        val topElements = mutableListOf<UExpr<out USort>?>()
+        val topElements = mutableListOf<TvmStackEntry>()
         for (k in 0 until newSize) {
-            val topElement = stack.removeLast()
+            val topElement = stack.last()
+            stack = stack.removeAt(size - 1)
             if (k < j) {
                 topElements += topElement
             }
         }
 
-        topElements.asReversed().forEach { stack += it }
+        topElements.asReversed().forEach { stack = stack.add(it) }
     }
 
     /**
@@ -58,8 +79,9 @@ class TvmStack(
         val newSize = i + 1
         extendStack(newSize)
 
+        // TODO should add copy, not the same ref
         val element = stack[stackIndex(i)]
-        stack += element
+        stack = stack.add(element)
     }
 
     /**
@@ -70,7 +92,7 @@ class TvmStack(
         val newSize = i + 1
         extendStack(newSize)
 
-        stack.removeAt(stackIndex(i))
+        stack = stack.removeAt(stackIndex(i))
     }
 
     private fun extendStack(newSize: Int) {
@@ -79,16 +101,90 @@ class TvmStack(
         }
 
         val newValuesSize = newSize - size
-        stack.addAll(0, List<UExpr<out USort>?>(newValuesSize) { null })
+        val newValues = List(newValuesSize) {
+            TvmInputStackEntry(id = inputElements.size + it, cell = null)
+        }
+        inputElements = inputElements.addAll(newValues)
+        stack = stack.addAll(0, newValues.asReversed()) // reversed because the "newest" values are at the beginning
     }
 
     private fun stackIndex(i: Int): Int = size - i - 1
 
     private fun swapImpl(first: Int, second: Int) {
         val tmp = stack[first]
-        stack[first] = stack[second]
-        stack[second] = tmp
+        stack = stack.set(first, stack[second])
+        stack = stack.set(second, tmp)
     }
 
-    fun clone(): TvmStack = TvmStack(ctx, stack.toMutableList())
+    fun clone(): TvmStack = TvmStack(ctx, stack)
+
+    // TODO continuations
+    sealed interface TvmStackValue {
+        val continuationValue: TvmContinuationValue get() = error("Cannot extract continuation from stack value $this")
+        val intValue: UExpr<UBvSort> get() = error("Cannot extract int from stack value $this")
+        val tupleValue: UHeapRef get() = error("Cannot extract tuple from stack value $this")
+        val cellValue: UHeapRef get() = error("Cannot extract cell from stack value $this")
+        val sliceValue: UHeapRef get() = error("Cannot extract slice from stack value $this")
+        val builderValue: UHeapRef get() = error("Cannot extract builder from stack value $this")
+    }
+    data class TvmStackContinuationValue(override val continuationValue: TvmContinuationValue) : TvmStackValue
+    data class TvmStackIntValue(override val intValue: UExpr<UBvSort>): TvmStackValue
+    data class TvmStackTupleValue(override val tupleValue: UHeapRef): TvmStackValue
+    data class TvmStackCellValue(override val cellValue: UHeapRef): TvmStackValue
+    /*data class TvmStackSliceValue(
+        val cell: UHeapRef,
+        val dataPos: Uvalue<USizeSort>,
+        val refPos: UExpr<USizeSort>,
+        val dataLength: UExpr<USizeSort>,
+        val refsLength: UExpr<USizeSort>,
+    ): TvmStackValue
+    data class TvmStackBuilderValue(
+        val data: UExpr<UBvSort>,
+        val refs: UHeapRef,
+        val dataLength: UExpr<USizeSort>,
+        val refsLength: UExpr<USizeSort>,
+    ): TvmStackValue*/
+    data class TvmStackSliceValue(override val sliceValue: UHeapRef): TvmStackValue
+    data class TvmStackBuilderValue(override val builderValue: UHeapRef): TvmStackValue
+///...
+
+    sealed interface TvmStackEntry
+    data class TvmConcreteStackEntry(val cell: TvmStackValue): TvmStackEntry
+    data class TvmInputStackEntry(val id: Int, var cell: TvmStackValue?): TvmStackEntry
+
+    private fun getStackValue(entry: TvmStackEntry, expectedType: TvmType): TvmStackValue {
+        val cell = when (entry) {
+            is TvmConcreteStackEntry -> entry.cell
+            is TvmInputStackEntry -> {
+                entry.cell ?: run {
+                    val expectedSort = expectedType.toSort(ctx)
+                    val inputCellValue = ctx.mkRegisterReading(entry.id, expectedSort)
+
+                    inputCellValue.toStackValue(expectedType).also { entry.cell = it }
+                }
+            }
+        }
+
+        return cell
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun UExpr<*>.toStackValue(expectedType: TvmType): TvmStackValue = when (expectedType) {
+        is TvmIntegerType -> TvmStackIntValue(this as UExpr<UBvSort>)
+        TvmBoolType -> TODO()
+        TvmBuilderType -> TvmStackBuilderValue(this as UHeapRef)
+        TvmCellArrayType -> TODO()
+        TvmCellType -> TvmStackCellValue(this as UHeapRef)
+        TvmContinuationType -> TODO()
+        TvmNullType -> TODO()
+        TvmSliceType -> TvmStackSliceValue(this as UHeapRef)
+        TvmTupleType -> TvmStackTupleValue(this as UHeapRef)
+    }
+
+    private fun TvmStackValue.toStackEntry(): TvmConcreteStackEntry = TvmConcreteStackEntry(this)
+}
+
+private fun TvmType.toSort(ctx: TvmContext): USort = when (this) {
+    TvmBoolType, TvmIntegerType -> ctx.mkBvSort(257u)
+    TvmBuilderType, TvmCellArrayType, TvmCellType, TvmContinuationType, TvmNullType, TvmSliceType, TvmTupleType -> ctx.addressSort
 }

@@ -1,7 +1,7 @@
 package org.ton.examples.division
 
-import org.example.org.usvm.machine.analyzeAllMethods
-import org.example.org.usvm.machine.state.TvmIntegerOverflow
+import org.usvm.machine.analyzeAllMethods
+import org.usvm.machine.state.TvmIntegerOverflow
 import kotlin.test.Test
 import kotlin.test.assertTrue
 

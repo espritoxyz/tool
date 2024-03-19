@@ -1,54 +1,46 @@
-package org.example.org.usvm.machine
+package org.usvm.machine
 
 import io.ksmt.solver.z3.KZ3Solver
+import org.ton.bytecode.TvmCellType
 import org.ton.bytecode.TvmType
 import org.usvm.*
-import org.usvm.machine.USizeSort
+import org.usvm.machine.TvmSizeSort
 import org.usvm.solver.USolverBase
 import org.usvm.solver.UTypeSolver
+import org.usvm.types.USingleTypeStream
 import org.usvm.types.UTypeStream
 import org.usvm.types.UTypeSystem
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
-class TvmTypeSystem() : UTypeSystem<TvmType> {
+class TvmTypeSystem : UTypeSystem<TvmType> {
     override val typeOperationsTimeout: Duration
         get() = TODO("Not yet implemented")
 
-    override fun findSubtypes(type: TvmType): Sequence<TvmType> {
-        TODO("Not yet implemented")
-    }
+    override fun findSubtypes(type: TvmType): Sequence<TvmType> = sequenceOf(type)
 
-    override fun hasCommonSubtype(type: TvmType, types: Collection<TvmType>): Boolean {
-        TODO("Not yet implemented")
-    }
+    override fun hasCommonSubtype(type: TvmType, types: Collection<TvmType>): Boolean = type in types
 
-    override fun isFinal(type: TvmType): Boolean {
-        TODO("Not yet implemented")
-    }
+    override fun isFinal(type: TvmType): Boolean = true
 
-    override fun isInstantiable(type: TvmType): Boolean {
-        TODO("Not yet implemented")
-    }
+    override fun isInstantiable(type: TvmType): Boolean = true
 
-    override fun isSupertype(supertype: TvmType, type: TvmType): Boolean {
-        TODO("Not yet implemented")
-    }
+    override fun isSupertype(supertype: TvmType, type: TvmType): Boolean = supertype == type
 
-    override fun topTypeStream(): UTypeStream<TvmType> {
-        TODO("Not yet implemented")
-    }
+    private val topTypeStream by lazy { USingleTypeStream(this, TvmCellType) }
+
+    override fun topTypeStream(): UTypeStream<TvmType> = topTypeStream
 }
 
-class TvmComponents : UComponents<TvmType, USizeSort> {
+class TvmComponents : UComponents<TvmType, TvmSizeSort> {
     override val useSolverForForks: Boolean
         get() = true
 
-    override fun <Context : UContext<USizeSort>> mkSizeExprProvider(ctx: Context): USizeExprProvider<USizeSort> {
+    override fun <Context : UContext<TvmSizeSort>> mkSizeExprProvider(ctx: Context): USizeExprProvider<TvmSizeSort> {
         return UBv32SizeExprProvider(ctx)
     }
 
-    override fun <Context : UContext<USizeSort>> mkSolver(ctx: Context): USolverBase<TvmType> {
+    override fun <Context : UContext<TvmSizeSort>> mkSolver(ctx: Context): USolverBase<TvmType> {
         val (translator, decoder) = buildTranslatorAndLazyDecoder(ctx)
 
         val solver = KZ3Solver(ctx)
@@ -56,7 +48,7 @@ class TvmComponents : UComponents<TvmType, USizeSort> {
         return USolverBase(ctx, solver, typeSolver, translator, decoder, 1000.milliseconds)
     }
 
-    override fun mkTypeSystem(ctx: UContext<USizeSort>): UTypeSystem<TvmType> {
+    override fun mkTypeSystem(ctx: UContext<TvmSizeSort>): UTypeSystem<TvmType> {
         return TvmTypeSystem()
     }
 }

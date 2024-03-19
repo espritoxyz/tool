@@ -4,6 +4,7 @@ import org.ton.bigint.BigInt
 import org.ton.cell.Cell
 import org.ton.cell.CellBuilder
 import org.ton.cell.CellSlice
+import org.usvm.UHeapRef
 import org.usvm.machine.state.TvmRegisters
 import org.usvm.machine.state.TvmStack
 
@@ -15,14 +16,8 @@ data class TvmIntegerValue(val value: BigInt) : TvmValue {
     override val type: TvmIntegerType = TvmIntegerType
 }
 
-data class TvmCellValue(val value: /*TvmCell*/Cell) : TvmValue {
+data class TvmCellValue(val value: UHeapRef) : TvmValue {
     override val type: TvmCellType = TvmCellType
-
-    companion object {
-        private val EMPTY = TvmCellValue(Cell.empty())
-
-        fun empty(): TvmCellValue = EMPTY.copy()
-    }
 }
 
 data class TvmTupleValue(val value: Array<out Any>) : TvmValue {
@@ -65,7 +60,7 @@ data class TvmBuilderValue(val value: CellBuilder) : TvmValue {
 // TODO how to represent a continuation value?
 data class TvmContinuationValue(
 //    val slice: TvmCellClice,
-    val method: TvmCodeBlock,
+    val codeBlock: TvmCodeBlock,
     val stack: TvmStack,
     val registers: TvmRegisters,
     // TODO codepage and nargs

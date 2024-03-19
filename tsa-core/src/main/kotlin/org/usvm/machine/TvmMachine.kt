@@ -1,8 +1,8 @@
 package org.usvm.machine
 
-import org.example.org.ton.bytecode.TvmContractCode
-import org.example.org.usvm.machine.TvmComponents
-import org.example.org.usvm.machine.state.TvmMethodResult
+import org.ton.bytecode.TvmContractCode
+import org.usvm.machine.TvmComponents
+import org.usvm.machine.state.TvmMethodResult
 import org.ton.bytecode.TvmInst
 import org.ton.bytecode.TvmCodeBlock
 import org.ton.cell.Cell

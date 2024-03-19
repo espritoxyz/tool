@@ -1,0 +1,36 @@
+#include "../imports/stdlib.fc";
+
+(cell) int_const_example() method_id {
+    int true_value = true;
+    int false_value = false;
+    int zero = 0;
+    int minus_one = -1;
+    int int4 = 10;
+    int int8 = 127;
+    int negative_int8 = -127;
+    int int16 = 65530;
+    int int_long = 1000000;
+    int very_long_int = 999999999999999999999999;
+    int negative_very_long_int = -999999999999999999999999;
+
+    return begin_cell()
+    .store_uint(true_value, 32)
+    .store_uint(false_value, 32)
+    .store_uint(zero, 32)
+    .store_uint(minus_one, 32)
+    .store_uint(int4, 32)
+    .store_uint(int8, 32)
+    .store_uint(negative_int8, 32)
+    .store_uint(int16, 32)
+    .store_uint(int_long, 32)
+    .store_uint(very_long_int, 256)
+    .store_uint(negative_very_long_int, 256)
+    .end_cell();
+}
+
+() recv_internal(int msg_value, cell in_msg, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) {
+        return ();
+    }
+    int op = in_msg_body~load_uint(32);
+}

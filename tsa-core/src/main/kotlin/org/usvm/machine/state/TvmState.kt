@@ -1,7 +1,11 @@
 package org.usvm.machine.state
 
-import org.example.org.usvm.machine.state.TvmMethodResult
-import org.ton.bytecode.*
+import kotlinx.collections.immutable.persistentListOf
+import org.usvm.machine.state.TvmMethodResult
+import org.ton.bytecode.TvmCodeBlock
+import org.ton.bytecode.TvmContinuationValue
+import org.ton.bytecode.TvmInst
+import org.ton.bytecode.TvmType
 import org.ton.targets.TvmTarget
 import org.usvm.PathNode
 import org.usvm.UCallStack
@@ -16,9 +20,9 @@ class TvmState(
     ctx: TvmContext,
     override val entrypoint: TvmCodeBlock,
 //    val registers: TvmRegisters, // TODO do we really need keep the registers this way?
-    val currentContinuation: TvmContinuationValue,
-    val stack: TvmStack = TvmStack(ctx, mutableListOf()),
-    val data: TvmCellValue,
+    var currentContinuation: TvmContinuationValue,
+    var stack: TvmStack = TvmStack(ctx, persistentListOf()),
+    var registers: TvmRegisters,
     // TODO codepage and gas
     callStack: UCallStack<TvmCodeBlock, TvmInst> = UCallStack(),
     pathConstraints: UPathConstraints<TvmType> = UPathConstraints(ctx),
@@ -48,7 +52,7 @@ class TvmState(
 //            registers, // TODO clone?
             currentContinuation, // TODO clone?
             stack.clone(), // TODO clone?
-            data.copy(),
+            registers.copy(),
             callStack.clone(),
             clonedConstraints,
             memory.clone(clonedConstraints.typeConstraints),

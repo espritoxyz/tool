@@ -1,13 +1,31 @@
-package org.example.org.usvm.machine
+package org.usvm.machine
 
-import org.example.org.ton.bytecode.TvmContractCode
-import org.ton.bytecode.TvmDictPushConst
+import org.ton.bytecode.TvmContractCode
+import org.ton.bytecode.TvmDictSpecialDictpushconstInst
 import org.ton.bytecode.TvmMethod
 import org.ton.cell.Cell
-import org.usvm.machine.TvmMachine
 import org.usvm.machine.state.TvmState
+import java.nio.file.Path
 import java.nio.file.Paths
 import java.util.concurrent.TimeUnit
+import kotlin.io.path.absolutePathString
+import kotlin.io.path.createTempFile
+import kotlin.io.path.deleteIfExists
+import kotlin.io.path.exists
+import kotlin.io.path.readBytes
+
+fun compileAndAnalyzeAllMethods(
+    funcSourcesPath: Path,
+    contractDataHex: String? = null
+): Map<TvmMethod, List<TvmState>> {
+    val tmpBocFile = createTempFile(suffix = ".boc")
+    try {
+        compileFuncSourceToBoc(funcSourcesPath, tmpBocFile)
+        return analyzeAllMethods(tmpBocFile.absolutePathString(), contractDataHex)
+    } finally {
+        tmpBocFile.deleteIfExists()
+    }
+}
 
 fun analyzeAllMethods(bytecodePath: String, contractDataHex: String? = null): Map<TvmMethod, List<TvmState>> {
     val contractData = Cell.Companion.of(contractDataHex ?: DEFAULT_CONTRAACT_DATA_HEX)
@@ -22,7 +40,7 @@ fun analyzeAllMethods(bytecodePath: String, contractDataHex: String? = null): Ma
     val contract = TvmContractCode.fromJson(bytecodeJson)
     val machine = TvmMachine()
     val methodsExceptDictPushConst = contract.methods.filterValues {
-        it.instList.none { inst -> inst is TvmDictPushConst }
+        it.instList.none { inst -> inst is TvmDictSpecialDictpushconstInst }
     }
     val methodStates = methodsExceptDictPushConst.values.associateWith { machine.analyze(contract, contractData, it.id) }
     methodStates.forEach {
@@ -36,7 +54,29 @@ fun analyzeAllMethods(bytecodePath: String, contractDataHex: String? = null): Ma
     return methodStates
 }
 
+fun compileFuncSourceToBoc(funcSourcesPath: Path, bocFilePath: Path) {
+    val funcCommand = "$FUNC_COMPILER_COMMAND -W ${bocFilePath.absolutePathString()} ${funcSourcesPath.fileName}"
+    val fiftCommand = "$FIFT_COMMAND -I $FIFT_STDLIB_RESOURCE"
+    val command = "$funcCommand | $fiftCommand"
+    val compilerProcess = ProcessBuilder(listOf("/bin/sh", "-c", command))
+        .directory(funcSourcesPath.parent.toFile())
+        .start()
+    compilerProcess.waitFor(COMPILER_TIMEOUT, TimeUnit.SECONDS)
+
+    check(bocFilePath.exists() && bocFilePath.readBytes().isNotEmpty()) {
+        "Compilation failed, error: ${compilerProcess.errorStream.bufferedReader().readText()}"
+    }
+}
+
 private const val DISASSEMBLER_PATH = "../tvm-disasm"
 private const val DISASSEMBLER_RUN_COMMAND = "node dist/index.js"
 private const val DISASSEMBLER_TIMEOUT = 5.toLong() // seconds
 private const val DEFAULT_CONTRAACT_DATA_HEX = "b5ee9c7241010101000a00001000000185d258f59ccfc59500"
+
+private const val COMPILER_TIMEOUT = 5.toLong() // seconds
+private const val FUNC_COMPILER_COMMAND = "func"
+private const val FIFT_COMMAND = "fift"
+
+private const val FIFT_STDLIB_PATH = "/fiftstdlib"
+private val FIFT_STDLIB_RESOURCE get() = object {}.javaClass.getResource(FIFT_STDLIB_PATH)?.path
+    ?: error("Cannot find fift stdlib in $FIFT_STDLIB_PATH")

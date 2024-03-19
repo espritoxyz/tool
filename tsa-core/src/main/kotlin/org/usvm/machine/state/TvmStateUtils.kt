@@ -1,23 +1,26 @@
 package org.usvm.machine.state
 
-import org.example.org.ton.bytecode.TvmContractCode
-import org.example.org.ton.bytecode.TvmInstMethodLocation
-import org.example.org.usvm.machine.state.TvmMethodResult
+import org.ton.bytecode.TvmContractCode
+import org.usvm.machine.state.TvmMethodResult
+import org.ton.bytecode.TvmContinuationValue
 import org.ton.bytecode.TvmInst
-import org.ton.bytecode.TvmReturnInst
+import org.ton.bytecode.TvmInstLambdaLocation
+import org.ton.bytecode.TvmInstMethodLocation
+import org.ton.bytecode.TvmContBasicRetInst
 
 val TvmState.lastStmt get() = pathNode.statement
 fun TvmState.newStmt(stmt: TvmInst) {
     pathNode += stmt
 }
 
-fun TvmInst.nextStmt(contractCode: TvmContractCode): TvmInst =
+fun TvmInst.nextStmt(contractCode: TvmContractCode, currentContinuationValue: TvmContinuationValue): TvmInst =
     when (location) {
         is TvmInstMethodLocation -> (location as TvmInstMethodLocation).methodId.let {
             contractCode.methods[it]!!.instList.getOrNull(location.index + 1)
-                ?: TvmReturnInst(TvmInstMethodLocation(it, location.index + 1))
+                ?: TvmContBasicRetInst(TvmInstMethodLocation(it, location.index + 1))
         }
-        else -> TODO()
+        is TvmInstLambdaLocation -> currentContinuationValue.codeBlock.instList.getOrNull(location.index + 1)
+            ?: TvmContBasicRetInst(TvmInstLambdaLocation(location.index + 1))
     }
 
 
@@ -34,6 +37,7 @@ fun TvmState.returnFromMethod() {
     methodResult = TvmMethodResult.TvmSuccess(returnFromMethod, stack)
 
     if (returnSite != null) {
+        currentContinuation = TvmContinuationValue(returnFromMethod, stack, registers)
         newStmt(returnSite)
     }
 }

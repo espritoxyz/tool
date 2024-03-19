@@ -1,9 +1,10 @@
 package org.ton.bytecode
 
-interface TvmType
+sealed interface TvmType
 
 object TvmIntegerType : TvmType
 object TvmCellType : TvmType
+object TvmCellArrayType : TvmType
 object TvmTupleType : TvmType
 object TvmNullType : TvmType
 object TvmSliceType : TvmType

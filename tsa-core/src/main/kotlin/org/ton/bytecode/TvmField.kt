@@ -1,4 +1,4 @@
-package org.example.org.ton.bytecode
+package org.ton.bytecode
 
 import org.ton.bytecode.TvmType
 
