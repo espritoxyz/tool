@@ -27,13 +27,13 @@ class TvmStack(
     private var inputElements: PersistentList<TvmInputStackEntry> = persistentListOf()
     private inline val size: Int get() = stack.size
 
-    fun takeLast(expectedType: TvmType): TvmStackValue {
+    fun takeLast(expectedType: TvmType, createEntry: (Int) -> UExpr<out USort>): TvmStackValue {
         extendStack(1)
 
         val lastStackEntry = stack.last()
         stack = stack.removeAt(size - 1)
 
-        return getStackValue(lastStackEntry, expectedType)
+        return getStackValue(lastStackEntry, expectedType, createEntry)
     }
 
     fun add(value: UExpr<out USort>, type: TvmType) {
@@ -152,15 +152,17 @@ class TvmStack(
     data class TvmConcreteStackEntry(val cell: TvmStackValue): TvmStackEntry
     data class TvmInputStackEntry(val id: Int, var cell: TvmStackValue?): TvmStackEntry
 
-    private fun getStackValue(entry: TvmStackEntry, expectedType: TvmType): TvmStackValue {
+    private fun getStackValue(
+        entry: TvmStackEntry,
+        expectedType: TvmType,
+        createEntry: (Int) -> UExpr<out USort>
+    ): TvmStackValue {
         val cell = when (entry) {
             is TvmConcreteStackEntry -> entry.cell
             is TvmInputStackEntry -> {
                 entry.cell ?: run {
-                    val expectedSort = expectedType.toSort(ctx)
-                    val inputCellValue = ctx.mkRegisterReading(entry.id, expectedSort)
-
-                    inputCellValue.toStackValue(expectedType).also { entry.cell = it }
+                    val stackValue = createEntry(entry.id)
+                    stackValue.toStackValue(expectedType).also { entry.cell = it }
                 }
             }
         }
@@ -182,9 +184,4 @@ class TvmStack(
     }
 
     private fun TvmStackValue.toStackEntry(): TvmConcreteStackEntry = TvmConcreteStackEntry(this)
-}
-
-private fun TvmType.toSort(ctx: TvmContext): USort = when (this) {
-    TvmBoolType, TvmIntegerType -> ctx.mkBvSort(257u)
-    TvmBuilderType, TvmCellArrayType, TvmCellType, TvmContinuationType, TvmNullType, TvmSliceType, TvmTupleType -> ctx.addressSort
 }

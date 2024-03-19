@@ -1,7 +1,7 @@
 package org.usvm.machine.state
 
 import kotlinx.collections.immutable.persistentListOf
-import org.usvm.machine.state.TvmMethodResult
+import org.ton.bytecode.TvmCellType
 import org.ton.bytecode.TvmCodeBlock
 import org.ton.bytecode.TvmContinuationValue
 import org.ton.bytecode.TvmInst
@@ -9,6 +9,7 @@ import org.ton.bytecode.TvmType
 import org.ton.targets.TvmTarget
 import org.usvm.PathNode
 import org.usvm.UCallStack
+import org.usvm.UHeapRef
 import org.usvm.UState
 import org.usvm.constraints.UPathConstraints
 import org.usvm.machine.TvmContext
@@ -69,3 +70,5 @@ class TvmState(
         appendLine(callStack)
     }
 }
+
+fun TvmState.generateSymbolicCell(): UHeapRef = memory.allocStatic(TvmCellType)

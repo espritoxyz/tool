@@ -38,6 +38,7 @@ import org.usvm.machine.state.C4Register
 import org.usvm.machine.state.TvmRegisters
 import org.usvm.machine.state.TvmStack
 import org.usvm.machine.state.TvmState
+import org.usvm.machine.state.generateSymbolicCell
 import org.usvm.machine.state.lastStmt
 import org.usvm.machine.state.newStmt
 import org.usvm.machine.state.nextStmt
@@ -263,7 +264,7 @@ class TvmInterpreter(
             val result = when (stmt) {
                 is TvmArithmBasicAddInst -> {
                     val (secondOperand, firstOperand) = scope.calcOnState {
-                        stack.takeLast(TvmIntegerType).intValue to stack.takeLast(TvmIntegerType).intValue
+                        stack.takeLastInt() to stack.takeLastInt()
                     }
                     // TODO optimize using ksmt implementation?
                     val resOverflow = mkBvAddNoOverflowExpr(firstOperand, secondOperand, isSigned = true)
@@ -276,7 +277,7 @@ class TvmInterpreter(
 
                 is TvmArithmBasicSubInst -> {
                     val (secondOperand, firstOperand) = scope.calcOnState {
-                        stack.takeLast(TvmIntegerType).intValue to stack.takeLast(TvmIntegerType).intValue
+                        stack.takeLastInt() to stack.takeLastInt()
                     }
                     // TODO optimize using ksmt implementation?
                     val resOverflow = mkBvSubNoOverflowExpr(firstOperand, secondOperand)
@@ -289,7 +290,7 @@ class TvmInterpreter(
 
                 is TvmArithmBasicMulInst -> {
                     val (secondOperand, firstOperand) = scope.calcOnState {
-                        stack.takeLast(TvmIntegerType).intValue to stack.takeLast(TvmIntegerType).intValue
+                        stack.takeLastInt() to stack.takeLastInt()
                     }
                     // TODO optimize using ksmt implementation?
                     val resOverflow = mkBvMulNoOverflowExpr(firstOperand, secondOperand, isSigned = true)
@@ -301,7 +302,7 @@ class TvmInterpreter(
                 }
 //            else -> error("Unknown stmt: $stmt")
                 is TvmArithmBasicAddconstInst -> {
-                    val firstOperand = scope.calcOnState { stack.takeLast(TvmIntegerType).intValue }
+                    val firstOperand = scope.calcOnState { stack.takeLastInt() }
                     val secondOperand = stmt.c.toBv257()
 
                     // TODO optimize using ksmt implementation?
@@ -313,7 +314,7 @@ class TvmInterpreter(
                     mkBvAddExpr(firstOperand, secondOperand)
                 }
                 is TvmArithmBasicMulconstInst -> {
-                    val firstOperand = scope.calcOnState { stack.takeLast(TvmIntegerType).intValue }
+                    val firstOperand = scope.calcOnState { stack.takeLastInt() }
                     val secondOperand = stmt.c.toBv257()
 
                     // TODO optimize using ksmt implementation?
@@ -326,7 +327,7 @@ class TvmInterpreter(
                 }
 
                 is TvmArithmBasicIncInst -> {
-                    val firstOperand = scope.calcOnState { stack.takeLast(TvmIntegerType).intValue }
+                    val firstOperand = scope.calcOnState { stack.takeLastInt() }
                     val secondOperand = oneValue
 
                     // TODO optimize using ksmt implementation?
@@ -338,7 +339,7 @@ class TvmInterpreter(
                     mkBvAddExpr(firstOperand, secondOperand)
                 }
                 is TvmArithmBasicDecInst -> {
-                    val firstOperand = scope.calcOnState { stack.takeLast(TvmIntegerType).intValue }
+                    val firstOperand = scope.calcOnState { stack.takeLastInt() }
                     val secondOperand = oneValue
 
                     // TODO optimize using ksmt implementation?
@@ -364,7 +365,7 @@ class TvmInterpreter(
             val result = when (stmt) {
                 is TvmArithmDivDivInst -> {
                     val (secondOperand, firstOperand) = scope.calcOnState {
-                        stack.takeLast(TvmIntegerType).intValue to stack.takeLast(TvmIntegerType).intValue
+                        stack.takeLastInt() to stack.takeLastInt()
                     }
                     checkDivisionByZero(secondOperand, scope) ?: return
 
@@ -373,7 +374,7 @@ class TvmInterpreter(
 
                 is TvmArithmDivModInst -> {
                     val (secondOperand, firstOperand) = scope.calcOnState {
-                        stack.takeLast(TvmIntegerType).intValue to stack.takeLast(TvmIntegerType).intValue
+                        stack.takeLastInt() to stack.takeLastInt()
                     }
                     checkDivisionByZero(secondOperand, scope) ?: return
 
@@ -419,7 +420,7 @@ class TvmInterpreter(
     private fun visitComparisonIntInst(scope: TvmStepScope, stmt: TvmCompareIntInst) {
         when (stmt) {
             is TvmCompareIntEqintInst -> scope.doWithState {
-                val x = stack.takeLast(TvmIntegerType).intValue
+                val x = stack.takeLastInt()
                 val y = ctx.mkBv(stmt.y, x.sort)
 
                 scope.fork(
@@ -447,7 +448,7 @@ class TvmInterpreter(
         when (stmt) {
             is TvmCompareOtherSemptyInst -> {
                 with(ctx) {
-                    val slice = scope.calcOnState { stack.takeLast(TvmSliceType).sliceValue }
+                    val slice = scope.calcOnState { stack.takeLastSlice() }
 
                     val cellFieldLValue = UFieldLValue(addressSort, slice, sliceCellField)
                     val cell = scope.calcOnState { memory.read(cellFieldLValue) }
@@ -500,7 +501,7 @@ class TvmInterpreter(
 
     private fun visitLoadRefInst(scope: TvmStepScope, stmt: TvmCellParseLdrefInst) {
         with(ctx) {
-            val slice = scope.calcOnState { stack.takeLast(TvmSliceType).sliceValue }
+            val slice = scope.calcOnState { stack.takeLastSlice() }
             val updatedSlice = scope.calcOnState { memory.allocConcrete(TvmSliceType) }
 
             val cellFieldLValue = UFieldLValue(addressSort, slice, sliceCellField)
@@ -554,7 +555,7 @@ class TvmInterpreter(
 
     private fun visitEndSliceInst(scope: TvmStepScope, stmt: TvmCellParseEndsInst) {
         with(ctx) {
-            val slice = scope.calcOnState { stack.takeLast(TvmSliceType).sliceValue }
+            val slice = scope.calcOnState { stack.takeLastSlice() }
 
             val cellFieldLValue = UFieldLValue(addressSort, slice, sliceCellField)
             val cell = scope.calcOnState { memory.read(cellFieldLValue) }
@@ -590,7 +591,7 @@ class TvmInterpreter(
         stmt: TvmCellParseLduInst
     ) {
         with(ctx) {
-            val slice = scope.calcOnState { stack.takeLast(TvmSliceType).sliceValue }
+            val slice = scope.calcOnState { stack.takeLastSlice() }
             val updatedSlice = scope.calcOnState { memory.allocConcrete(TvmSliceType) }
 
             val bitsLen = stmt.c + 1
@@ -656,7 +657,7 @@ class TvmInterpreter(
     ) {
         with(ctx) {
             scope.doWithState {
-                val cell = stack.takeLast(TvmCellType).cellValue
+                val cell = stack.takeLastCell()
 //                ensureCellCorrectness(cell, scope)
 
                 val slice = memory.allocConcrete(TvmSliceType) // TODO concrete or static?
@@ -692,12 +693,12 @@ class TvmInterpreter(
     private fun visitStoreUnsignedIntInst(scope: TvmStepScope, stmt: TvmCellBuildStuInst) {
         with(ctx) {
             scope.doWithState {
-                val builder = stack.takeLast(TvmBuilderType).builderValue
+                val builder = stack.takeLastBuilder()
                 val updatedBuilder = memory.allocConcrete(TvmBuilderType)
 
                 val bits = stmt.c + 1
                 val bvSort = mkBvSort(bits.toUInt())
-                val intValue = stack.takeLast(TvmIntegerType).intValue
+                val intValue = stack.takeLastInt()
                 if (intValue !is KBitVecValue) {
                     error("Not concrete value to store")
                 }
@@ -768,7 +769,7 @@ class TvmInterpreter(
 
     private fun visitEndCellInst(scope: TvmStepScope, stmt: TvmCellBuildEndcInst) {
         with(ctx) {
-            val builder = scope.calcOnState { stack.takeLast(TvmBuilderType).builderValue }
+            val builder = scope.calcOnState { stack.takeLastBuilder() }
             val cell = scope.calcOnState { memory.allocConcrete(TvmCellType) } // TODO static or concrete
 
             val builderDataLValue = UFieldLValue(cellDataSort, builder, cellDataField)
@@ -808,7 +809,7 @@ class TvmInterpreter(
                     require(registerIndex == 4) {
                         "POPCTR is supported only for c4 but got $registerIndex register"
                     }
-                    stack.takeLast(TvmCellType)
+                    stack.takeLastCell()
 
                     newStmt(stmt.nextStmt(contractCode, currentContinuation))
 
@@ -895,7 +896,7 @@ class TvmInterpreter(
             is TvmContBasicExecuteInst -> {
                 with(ctx) {
                     scope.doWithState {
-                        val continuationValue = stack.takeLast(TvmContinuationType).continuationValue
+                        val continuationValue = stack.takeLastContinuation()
 
                         // TODO really?
 //                        registers = continuation.registers
@@ -921,7 +922,7 @@ class TvmInterpreter(
         when (stmt) {
             is TvmContConditionalIfretInst -> {
                 scope.doWithState {
-                    val operand = stack.takeLast(TvmIntegerType).intValue
+                    val operand = stack.takeLastInt()
                     with(ctx) {
                         val neqZero = mkEq(operand, falseValue).not()
                         scope.fork(
@@ -945,9 +946,9 @@ class TvmInterpreter(
     private fun visitIfElseInst(scope: TvmStepScope, stmt: TvmContConditionalIfelseInst) {
         with(ctx) {
             scope.doWithState {
-                val firstContinuation = stack.takeLast(TvmContinuationType).continuationValue
-                val secondContinuation = stack.takeLast(TvmContinuationType).continuationValue
-                val flag = stack.takeLast(TvmIntegerType).intValue
+                val firstContinuation = stack.takeLastContinuation()
+                val secondContinuation = stack.takeLastContinuation()
+                val flag = stack.takeLastInt()
                 val ifConstraint = mkEq(flag, falseValue)
 
                 scope.fork(
@@ -978,7 +979,7 @@ class TvmInterpreter(
     private fun visitIfJmpInst(scope: TvmStepScope, stmt: TvmContConditionalIfjmpInst) {
         with(ctx) {
             scope.doWithState {
-                val (continuation, flag) = stack.takeLast(TvmContinuationType).continuationValue to stack.takeLast(TvmIntegerType).intValue
+                val (continuation, flag) = stack.takeLastContinuation() to stack.takeLastInt()
                 val ifConstraint = mkEq(flag, falseValue)
 
                 scope.fork(
@@ -1042,7 +1043,7 @@ class TvmInterpreter(
         when (stmt) {
             is TvmDictSpecialDictigetjmpzInst -> {
                 val methodId =
-                    (scope.calcOnState { stack.takeLast(TvmIntegerType).intValue } as KBitVecValue<KBvSort>).bigIntValue()
+                    (scope.calcOnState { stack.takeLastInt() } as KBitVecValue<KBvSort>).bigIntValue()
                 val method = contractCode.methods[methodId.toInt()]!!
                 val methodFirstStmt = method.instList.first()
 
@@ -1079,6 +1080,59 @@ class TvmInterpreter(
     private fun visitCodepageInst(scope: TvmStepScope, stmt: TvmCodepageInst) {
         // Do nothing
         scope.doWithState { newStmt(stmt.nextStmt(contractCode, currentContinuation)) }
+    }
+
+    context(TvmState)
+    private fun TvmStack.takeLastCell(): UHeapRef {
+        val cellStackValue = takeLast(TvmCellType) { _ ->
+            generateSymbolicCell()
+        }
+        
+        return cellStackValue.cellValue
+    }
+
+    context(TvmState)
+    private fun TvmStack.takeLastInt(): UExpr<UBvSort> {
+        val intStackValue = takeLast(TvmIntegerType) { id ->
+            ctx.mkRegisterReading(id, ctx.int257sort)
+        }
+        
+        return intStackValue.intValue
+    }
+
+    private fun TvmStack.takeLastContinuation(): TvmContinuationValue {
+        val continuationStackValue = takeLast(TvmSliceType) { _ ->
+            error("Unexpected continuation as an input")
+        }
+
+        return continuationStackValue.continuationValue
+    }
+
+    context(TvmState)
+    private fun TvmStack.takeLastSlice(): UHeapRef {
+        val sliceStackValue = takeLast(TvmSliceType) { id ->
+            ctx.mkRegisterReading(id, ctx.addressSort)
+        }
+
+        return sliceStackValue.sliceValue
+    }
+
+    context(TvmState)
+    private fun TvmStack.takeLastBuilder(): UHeapRef {
+        val builderStackValue = takeLast(TvmSliceType) { id ->
+            ctx.mkRegisterReading(id, ctx.addressSort)
+        }
+
+        return builderStackValue.builderValue
+    }
+
+    context(TvmState)
+    private fun TvmStack.takeLastTuple(): UHeapRef {
+        val tupleStackValue = takeLast(TvmSliceType) { id ->
+            ctx.mkRegisterReading(id, ctx.addressSort)
+        }
+
+        return tupleStackValue.tupleValue
     }
 
     private val cellDataField: TvmField = TvmFieldImpl(TvmCellType, "data")

@@ -2,7 +2,6 @@ package org.usvm.machine.state
 
 import kotlinx.collections.immutable.PersistentMap
 import kotlinx.collections.immutable.persistentHashMapOf
-import org.ton.bytecode.TvmCellType
 import org.usvm.UBoolExpr
 import org.usvm.UConcreteHeapAddress
 import org.usvm.UExpr
@@ -149,7 +148,7 @@ fun UReadOnlyMemory<*>.tvmCellRefsRegion(): TvmCellRefsRegion =
 fun TvmState.readCellRef(cell: UHeapRef, refIdx: UExpr<TvmSizeSort>): UHeapRef {
     val region = memory.tvmCellRefsRegion()
     val (result, updatedRegion) = region.readCellRef(cell, refIdx) {
-        memory.allocStatic(TvmCellType)
+        generateSymbolicCell()
     }
     memory.setRegion(TvmCellRefsRegionId, updatedRegion)
     return result
