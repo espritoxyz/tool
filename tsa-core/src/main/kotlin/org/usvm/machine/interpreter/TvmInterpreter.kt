@@ -6,15 +6,93 @@ import io.ksmt.sort.KBvSort
 import io.ksmt.utils.BvUtils.bigIntValue
 import io.ksmt.utils.cast
 import mu.KLogging
+import org.ton.bytecode.TvmArithmBasicAddInst
+import org.ton.bytecode.TvmArithmBasicAddconstInst
+import org.ton.bytecode.TvmArithmBasicDecInst
+import org.ton.bytecode.TvmArithmBasicIncInst
+import org.ton.bytecode.TvmArithmBasicInst
+import org.ton.bytecode.TvmArithmBasicMulInst
+import org.ton.bytecode.TvmArithmBasicMulconstInst
+import org.ton.bytecode.TvmArithmBasicSubInst
+import org.ton.bytecode.TvmArithmDivDivInst
+import org.ton.bytecode.TvmArithmDivInst
+import org.ton.bytecode.TvmArithmDivModInst
+import org.ton.bytecode.TvmBuilderType
+import org.ton.bytecode.TvmCellBuildEndcInst
+import org.ton.bytecode.TvmCellBuildInst
+import org.ton.bytecode.TvmCellBuildNewcInst
+import org.ton.bytecode.TvmCellBuildStuInst
+import org.ton.bytecode.TvmCellParseCtosInst
+import org.ton.bytecode.TvmCellParseEndsInst
+import org.ton.bytecode.TvmCellParseInst
+import org.ton.bytecode.TvmCellParseLdrefInst
+import org.ton.bytecode.TvmCellParseLduInst
+import org.ton.bytecode.TvmCellType
+import org.ton.bytecode.TvmCellValue
+import org.ton.bytecode.TvmCodepageInst
+import org.ton.bytecode.TvmCompareIntEqintInst
+import org.ton.bytecode.TvmCompareIntGreaterInst
+import org.ton.bytecode.TvmCompareIntInst
+import org.ton.bytecode.TvmCompareIntLeqInst
+import org.ton.bytecode.TvmCompareIntLessInst
+import org.ton.bytecode.TvmCompareIntNeqInst
+import org.ton.bytecode.TvmCompareIntSgnInst
+import org.ton.bytecode.TvmCompareOtherInst
+import org.ton.bytecode.TvmCompareOtherSemptyInst
+import org.ton.bytecode.TvmConstDataInst
+import org.ton.bytecode.TvmConstDataPushcontShortInst
+import org.ton.bytecode.TvmConstIntInst
+import org.ton.bytecode.TvmConstIntOneAliasInst
+import org.ton.bytecode.TvmConstIntPushint16Inst
+import org.ton.bytecode.TvmConstIntPushint4Inst
+import org.ton.bytecode.TvmConstIntPushint8Inst
+import org.ton.bytecode.TvmConstIntPushintLongInst
+import org.ton.bytecode.TvmConstIntPushnanInst
+import org.ton.bytecode.TvmConstIntPushnegpow2Inst
+import org.ton.bytecode.TvmConstIntPushpow2Inst
+import org.ton.bytecode.TvmConstIntPushpow2decInst
+import org.ton.bytecode.TvmConstIntTenAliasInst
+import org.ton.bytecode.TvmConstIntTrueAliasInst
+import org.ton.bytecode.TvmConstIntTwoAliasInst
+import org.ton.bytecode.TvmConstIntZeroAliasInst
+import org.ton.bytecode.TvmContBasicExecuteInst
+import org.ton.bytecode.TvmContBasicInst
+import org.ton.bytecode.TvmContBasicRetInst
+import org.ton.bytecode.TvmContConditionalIfelseInst
+import org.ton.bytecode.TvmContConditionalIfjmpInst
+import org.ton.bytecode.TvmContConditionalIfretInst
+import org.ton.bytecode.TvmContConditionalInst
+import org.ton.bytecode.TvmContDictCalldictInst
+import org.ton.bytecode.TvmContDictInst
+import org.ton.bytecode.TvmContRegistersInst
+import org.ton.bytecode.TvmContRegistersPopctrInst
+import org.ton.bytecode.TvmContRegistersPushctrInst
+import org.ton.bytecode.TvmContinuationType
+import org.ton.bytecode.TvmContinuationValue
 import org.ton.bytecode.TvmContractCode
+import org.ton.bytecode.TvmDebugInst
+import org.ton.bytecode.TvmDictSpecialDictigetjmpzInst
+import org.ton.bytecode.TvmDictSpecialDictpushconstInst
+import org.ton.bytecode.TvmDictSpecialInst
+import org.ton.bytecode.TvmExceptionsInst
+import org.ton.bytecode.TvmExceptionsThrowShortInst
+import org.ton.bytecode.TvmExceptionsThrowargInst
 import org.ton.bytecode.TvmField
 import org.ton.bytecode.TvmFieldImpl
-import org.usvm.machine.state.TvmCellOverflow
-import org.usvm.machine.state.TvmCellUnderflow
-import org.usvm.machine.state.TvmIntegerOverflow
-import org.usvm.machine.state.TvmMethodResult
-import org.usvm.machine.state.TvmUnknownFailure
-import org.ton.bytecode.*
+import org.ton.bytecode.TvmInst
+import org.ton.bytecode.TvmIntegerType
+import org.ton.bytecode.TvmLambda
+import org.ton.bytecode.TvmSliceType
+import org.ton.bytecode.TvmStackBasicInst
+import org.ton.bytecode.TvmStackBasicNopInst
+import org.ton.bytecode.TvmStackBasicPopInst
+import org.ton.bytecode.TvmStackBasicPushInst
+import org.ton.bytecode.TvmStackBasicXchg0iInst
+import org.ton.bytecode.TvmStackBasicXchgIjInst
+import org.ton.bytecode.TvmStackComplexBlkdrop2Inst
+import org.ton.bytecode.TvmStackComplexInst
+import org.ton.bytecode.TvmTupleType
+import org.ton.bytecode.TvmType
 import org.ton.cell.Cell
 import org.ton.targets.TvmTarget
 import org.usvm.StepResult
@@ -26,8 +104,6 @@ import org.usvm.UHeapRef
 import org.usvm.UInterpreter
 import org.usvm.URegisterReading
 import org.usvm.USort
-import org.usvm.collection.array.UArrayIndexLValue
-import org.usvm.collection.array.length.UArrayLengthLValue
 import org.usvm.collection.field.UFieldLValue
 import org.usvm.forkblacklists.UForkBlackList
 import org.usvm.machine.TvmContext
@@ -35,9 +111,14 @@ import org.usvm.machine.TvmContext.Companion.MAX_DATA_LENGTH
 import org.usvm.machine.TvmContext.Companion.MAX_REFS_NUMBER
 import org.usvm.machine.state.C3Register
 import org.usvm.machine.state.C4Register
+import org.usvm.machine.state.TvmCellOverflow
+import org.usvm.machine.state.TvmCellUnderflow
+import org.usvm.machine.state.TvmIntegerOverflow
+import org.usvm.machine.state.TvmMethodResult
 import org.usvm.machine.state.TvmRegisters
 import org.usvm.machine.state.TvmStack
 import org.usvm.machine.state.TvmState
+import org.usvm.machine.state.TvmUnknownFailure
 import org.usvm.machine.state.generateSymbolicCell
 import org.usvm.machine.state.lastStmt
 import org.usvm.machine.state.newStmt
@@ -856,56 +937,22 @@ class TvmInterpreter(
             cell
         }
 
-    private fun Cell.toSymbolic(scope: TvmStepScope): UHeapRef {
-        val dataLength = bits.size
-        val bvValue = ctx.mkBv(bits.toBinary(), dataLength.toUInt())
-        val refsLength = refs.size
-        val address = scope.calcOnState { memory.allocStatic(TvmCellType) } // TODO static?
-
-        with(ctx) {
-            val cellDataLValue = UFieldLValue(cellDataSort, address, cellDataField)
-            val cellIdLValue = UFieldLValue(bv32Sort, address, cellIdField)
-//            val cellRefsLValue = UFieldLValue(addressSort, address, cellRefsField)
-            val cellRefs = scope.calcOnState { memory.allocStatic(TvmCellArrayType) } // TODO static?
-            val refsLengthLValue = UArrayLengthLValue(cellRefs, TvmCellType, sizeSort)
-
-            scope.doWithState {
-                memory.write(cellDataLValue, bvValue)
-                memory.write(cellIdLValue, address.address.toBv(32u)) // TODO redundant?
-                memory.write(refsLengthLValue, ctx.mkSizeExpr(refsLength))
-            }
-
-            refs.forEachIndexed { index, cell ->
-                val refAddress = cell.toSymbolic(scope)
-                val indexLValue = UArrayIndexLValue(addressSort, cellRefs, ctx.mkSizeExpr(index), TvmCellType)
-
-                scope.doWithState {
-                    memory.write(indexLValue, refAddress)
-                }
-            }
-        }
-
-        return address
-    }
-
     private fun visitTvmBasicControlFlowInst(
         scope: TvmStepScope,
         stmt: TvmContBasicInst
     ) {
         when (stmt) {
             is TvmContBasicExecuteInst -> {
-                with(ctx) {
-                    scope.doWithState {
-                        val continuationValue = stack.takeLastContinuation()
+                scope.doWithState {
+                    val continuationValue = stack.takeLastContinuation()
 
-                        // TODO really?
+                    // TODO really?
 //                        registers = continuation.registers
 //                        stack = continuation.stack
 
-                        currentContinuation = continuationValue
-                        // TODO discard remainder of the current continuation?
-                        newStmt(continuationValue.codeBlock.instList.first())
-                    }
+                    currentContinuation = continuationValue
+                    // TODO discard remainder of the current continuation?
+                    newStmt(continuationValue.codeBlock.instList.first())
                 }
             }
             is TvmContBasicRetInst -> {
@@ -949,7 +996,7 @@ class TvmInterpreter(
                 val firstContinuation = stack.takeLastContinuation()
                 val secondContinuation = stack.takeLastContinuation()
                 val flag = stack.takeLastInt()
-                val ifConstraint = mkEq(flag, falseValue)
+                val ifConstraint = mkEq(flag, falseValue).not()
 
                 scope.fork(
                     ifConstraint,
@@ -980,7 +1027,7 @@ class TvmInterpreter(
         with(ctx) {
             scope.doWithState {
                 val (continuation, flag) = stack.takeLastContinuation() to stack.takeLastInt()
-                val ifConstraint = mkEq(flag, falseValue)
+                val ifConstraint = mkEq(flag, falseValue).not()
 
                 scope.fork(
                     ifConstraint,
@@ -1101,7 +1148,7 @@ class TvmInterpreter(
     }
 
     private fun TvmStack.takeLastContinuation(): TvmContinuationValue {
-        val continuationStackValue = takeLast(TvmSliceType) { _ ->
+        val continuationStackValue = takeLast(TvmContinuationType) { _ ->
             error("Unexpected continuation as an input")
         }
 
@@ -1119,7 +1166,7 @@ class TvmInterpreter(
 
     context(TvmState)
     private fun TvmStack.takeLastBuilder(): UHeapRef {
-        val builderStackValue = takeLast(TvmSliceType) { id ->
+        val builderStackValue = takeLast(TvmBuilderType) { id ->
             ctx.mkRegisterReading(id, ctx.addressSort)
         }
 
@@ -1128,7 +1175,7 @@ class TvmInterpreter(
 
     context(TvmState)
     private fun TvmStack.takeLastTuple(): UHeapRef {
-        val tupleStackValue = takeLast(TvmSliceType) { id ->
+        val tupleStackValue = takeLast(TvmTupleType) { id ->
             ctx.mkRegisterReading(id, ctx.addressSort)
         }
 
@@ -1138,7 +1185,6 @@ class TvmInterpreter(
     private val cellDataField: TvmField = TvmFieldImpl(TvmCellType, "data")
     private val cellDataLengthField: TvmField = TvmFieldImpl(TvmCellType, "dataLength")
     private val cellRefsLengthField: TvmField = TvmFieldImpl(TvmCellType, "refsLength")
-    private val cellIdField: TvmField = TvmFieldImpl(TvmCellType, "id") // TODO redundant?
 
     private val sliceDataPosField: TvmField = TvmFieldImpl(TvmSliceType, "dataPos")
     private val sliceRefPosField: TvmField = TvmFieldImpl(TvmSliceType, "refPos")

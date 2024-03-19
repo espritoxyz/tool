@@ -2,9 +2,7 @@ package org.usvm.machine.state
 
 import kotlinx.collections.immutable.PersistentList
 import kotlinx.collections.immutable.persistentListOf
-import org.ton.bytecode.TvmBoolType
 import org.ton.bytecode.TvmBuilderType
-import org.ton.bytecode.TvmCellArrayType
 import org.ton.bytecode.TvmCellType
 import org.ton.bytecode.TvmContinuationType
 import org.ton.bytecode.TvmContinuationValue
@@ -157,6 +155,10 @@ class TvmStack(
         expectedType: TvmType,
         createEntry: (Int) -> UExpr<out USort>
     ): TvmStackValue {
+        require(expectedType !is TvmNullType) {
+            "Unexpected reading NULL from the stack"
+        }
+
         val cell = when (entry) {
             is TvmConcreteStackEntry -> entry.cell
             is TvmInputStackEntry -> {
@@ -173,9 +175,7 @@ class TvmStack(
     @Suppress("UNCHECKED_CAST")
     private fun UExpr<*>.toStackValue(expectedType: TvmType): TvmStackValue = when (expectedType) {
         is TvmIntegerType -> TvmStackIntValue(this as UExpr<UBvSort>)
-        TvmBoolType -> TODO()
         TvmBuilderType -> TvmStackBuilderValue(this as UHeapRef)
-        TvmCellArrayType -> TODO()
         TvmCellType -> TvmStackCellValue(this as UHeapRef)
         TvmContinuationType -> TODO()
         TvmNullType -> TODO()

@@ -3,9 +3,11 @@ package org.usvm.machine
 import io.ksmt.expr.KBitVecValue
 import io.ksmt.utils.toBigInteger
 import org.ton.bytecode.TvmType
+import org.usvm.NULL_ADDRESS
 import org.usvm.UBv32Sort
 import org.usvm.UBvSort
 import org.usvm.UComponents
+import org.usvm.UConcreteHeapRef
 import org.usvm.UContext
 
 // TODO: There is no size sort in TVM because of absence of arrays, but we need to represent cell data as boolean arrays
@@ -22,6 +24,8 @@ class TvmContext(components : UComponents<TvmType, TvmSizeSort>) : UContext<TvmS
     val falseValue: KBitVecValue<UBvSort> = 0.toBv257()
     val oneValue: KBitVecValue<UBvSort> = 1.toBv257()
     val zeroValue: KBitVecValue<UBvSort> = falseValue
+
+    val nullValue: UConcreteHeapRef = mkConcreteHeapRef(NULL_ADDRESS)
 
     fun Number.toBv257(): KBitVecValue<UBvSort> = mkBv(toBigInteger(), int257sort)
 
