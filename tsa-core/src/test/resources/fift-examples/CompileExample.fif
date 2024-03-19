@@ -1,0 +1,16 @@
+"../fiftstdlib/Fift.fif" include
+"../fiftstdlib/Asm.fif" include
+
+// Run this script using "fift -n CompileExample.fif"
+
+PROGRAM{
+  0 DECLMETHOD main
+  main PROC:<{
+      42 PUSHINT
+      17 PUSHINT
+      DUMPSTK
+      ADD
+      DUMPSTK
+  }>
+}END>c
+2 boc+>B "out.boc" B>file
