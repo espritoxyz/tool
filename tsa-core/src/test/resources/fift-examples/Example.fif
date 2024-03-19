@@ -1,0 +1,15 @@
+#!fift
+
+"Asm.fif" include
+
+<{
+    SETCP0
+    42 PUSHINT
+    17 PUSHINT
+    DUMPSTK
+    ADD
+    DUMPSTK
+}>s
+
+runvmcode
+.s
