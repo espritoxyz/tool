@@ -25,6 +25,8 @@ class TvmStack(
     private var inputElements: PersistentList<TvmInputStackEntry> = persistentListOf()
     private inline val size: Int get() = stack.size
 
+    val stackContents: List<TvmStackEntry> get() = stack
+
     fun takeLast(expectedType: TvmType, createEntry: (Int) -> UExpr<out USort>): TvmStackValue {
         extendStack(1)
 
@@ -90,7 +92,14 @@ class TvmStack(
         val newSize = i + 1
         extendStack(newSize)
 
-        stack = stack.removeAt(stackIndex(i))
+        val lastIdx = stackIndex(0)
+        val value = stack[lastIdx]
+        val removedLast = stack.removeAt(lastIdx)
+        stack = if (i != 0) {
+            removedLast.set(lastIdx - i, value)
+        } else {
+            removedLast
+        }
     }
 
     private fun extendStack(newSize: Int) {

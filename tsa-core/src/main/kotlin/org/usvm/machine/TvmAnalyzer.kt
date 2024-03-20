@@ -13,6 +13,7 @@ import kotlin.io.path.createTempFile
 import kotlin.io.path.deleteIfExists
 import kotlin.io.path.exists
 import kotlin.io.path.readBytes
+import kotlin.io.path.readText
 
 fun compileAndAnalyzeAllMethods(
     funcSourcesPath: Path,
@@ -21,6 +22,19 @@ fun compileAndAnalyzeAllMethods(
     val tmpBocFile = createTempFile(suffix = ".boc")
     try {
         compileFuncSourceToBoc(funcSourcesPath, tmpBocFile)
+        return analyzeAllMethods(tmpBocFile.absolutePathString(), contractDataHex)
+    } finally {
+        tmpBocFile.deleteIfExists()
+    }
+}
+
+fun compileAndAnalyzeFift(
+    fiftPath: Path,
+    contractDataHex: String? = null
+): Map<TvmMethod, List<TvmState>> {
+    val tmpBocFile = createTempFile(suffix = ".boc")
+    try {
+        compileFiftToBoc(fiftPath, tmpBocFile)
         return analyzeAllMethods(tmpBocFile.absolutePathString(), contractDataHex)
     } finally {
         tmpBocFile.deleteIfExists()
@@ -64,6 +78,23 @@ fun compileFuncSourceToBoc(funcSourcesPath: Path, bocFilePath: Path) {
     compilerProcess.waitFor(COMPILER_TIMEOUT, TimeUnit.SECONDS)
 
     check(bocFilePath.exists() && bocFilePath.readBytes().isNotEmpty()) {
+        "Compilation failed, error: ${compilerProcess.errorStream.bufferedReader().readText()}"
+    }
+}
+
+fun compileFiftToBoc(fiftPath: Path, bocFilePath: Path) {
+    val fiftTextWithOutputCommand = """
+        ${fiftPath.readText()}
+        2 boc+>B "$bocFilePath" B>file
+    """.trimIndent()
+
+    val fiftCommand = "echo '$fiftTextWithOutputCommand' | $FIFT_COMMAND -n"
+    val compilerProcess = ProcessBuilder(listOf("/bin/sh", "-c", fiftCommand))
+        .directory(fiftPath.parent.toFile())
+        .start()
+    compilerProcess.waitFor(COMPILER_TIMEOUT, TimeUnit.SECONDS)
+
+    check(compilerProcess.exitValue() == 0 && bocFilePath.exists() && bocFilePath.readBytes().isNotEmpty()) {
         "Compilation failed, error: ${compilerProcess.errorStream.bufferedReader().readText()}"
     }
 }

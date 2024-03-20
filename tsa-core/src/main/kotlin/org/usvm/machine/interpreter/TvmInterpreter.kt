@@ -91,6 +91,8 @@ import org.ton.bytecode.TvmStackBasicNopInst
 import org.ton.bytecode.TvmStackBasicPopInst
 import org.ton.bytecode.TvmStackBasicPushInst
 import org.ton.bytecode.TvmStackBasicXchg0iInst
+import org.ton.bytecode.TvmStackBasicXchg0iLongInst
+import org.ton.bytecode.TvmStackBasicXchg1iInst
 import org.ton.bytecode.TvmStackBasicXchgIjInst
 import org.ton.bytecode.TvmStackComplexBlkdrop2Inst
 import org.ton.bytecode.TvmStackComplexInst
@@ -218,6 +220,12 @@ class TvmInterpreter(
 //            return scope.stepResult()
 //        }
 
+        visit(scope, stmt)
+
+        return scope.stepResult()
+    }
+
+    private fun visit(scope: TvmStepScope, stmt: TvmInst) {
         when (stmt) {
             is TvmStackBasicInst -> visitBasicStackInst(scope, stmt)
             is TvmStackComplexInst -> visitComplexStackInst(scope, stmt)
@@ -240,8 +248,6 @@ class TvmInterpreter(
             is TvmTupleInst -> visitTvmTupleInst(scope, stmt)
             else -> TODO("$stmt")
         }
-
-        return scope.stepResult()
     }
 
     private fun visitBasicStackInst(scope: TvmStepScope, stmt: TvmStackBasicInst) {
@@ -249,40 +255,35 @@ class TvmInterpreter(
             is TvmStackBasicNopInst -> {
                 // Do nothing
             }
-            is TvmStackBasicPopInst -> {
-                scope.doWithState {
-                    stack.pop(stmt.i)
-                }
-            }
-            is TvmStackBasicPushInst -> {
-                scope.doWithState {
-                    stack.push(stmt.i)
-                }
-            }
-            is TvmStackBasicXchg0iInst -> {
-                // TODO it is not optimal, optimize with [] operators
-                val first = stmt.i
-                val second = 0
-
-                scope.doWithState {
-                    stack.swap(first, second)
-                }
-            }
-            is TvmStackBasicXchgIjInst -> {
-                // TODO it is not optimal, optimize with [] operators
-                val first = stmt.i
-                val second = stmt.j
-
-                scope.doWithState {
-                    stack.swap(first, second)
-                }
-            }
-
-            else -> TODO("$stmt")
+            is TvmStackBasicPopInst -> doPop(scope, stmt.i)
+            is TvmStackBasicPushInst -> doPush(scope, stmt.i)
+            is TvmStackBasicXchg0iInst -> doXchg(scope, stmt.i, 0)
+            is TvmStackBasicXchgIjInst -> doXchg(scope, stmt.i, stmt.j)
+            is TvmStackBasicXchg1iInst -> doXchg(scope, stmt.i, 1)
+            is TvmStackBasicXchg0iLongInst -> doXchg(scope, stmt.i, 0)
+            is TvmAliasInst -> visit(scope, stmt.resolveAlias())
         }
 
         scope.doWithState {
             newStmt(stmt.nextStmt(contractCode, currentContinuation))
+        }
+    }
+
+    private fun doXchg(scope: TvmStepScope, first: Int, second: Int) {
+        scope.doWithState {
+            stack.swap(first, second)
+        }
+    }
+
+    private fun doPop(scope: TvmStepScope, i: Int) {
+        scope.doWithState {
+            stack.pop(i)
+        }
+    }
+
+    private fun doPush(scope: TvmStepScope, i: Int) {
+        scope.doWithState {
+            stack.push(i)
         }
     }
 

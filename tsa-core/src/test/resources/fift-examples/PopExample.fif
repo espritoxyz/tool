@@ -1,0 +1,21 @@
+"../fiftstdlib/Fift.fif" include
+"../fiftstdlib/Asm.fif" include
+
+PROGRAM{
+  0 DECLMETHOD f1
+  1 DECLMETHOD f2
+  f1 PROC:<{
+      42 PUSHINT
+      17 PUSHINT
+      52 PUSHINT
+      13 PUSHINT
+      s2 POP
+  }>
+  f2 PROC:<{
+      42 PUSHINT
+      17 PUSHINT
+      52 PUSHINT
+      13 PUSHINT
+      s0 POP
+  }>
+}END>c

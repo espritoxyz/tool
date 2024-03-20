@@ -4,11 +4,12 @@
 // Run this script using "fift -n Example.fif"
 
 <{
-    SETCP0
     42 PUSHINT
     17 PUSHINT
+    52 PUSHINT
+    13 PUSHINT
     DUMPSTK
-    ADD
+    s0 POP
     DUMPSTK
 }>s
 
