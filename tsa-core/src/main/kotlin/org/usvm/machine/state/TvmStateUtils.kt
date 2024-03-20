@@ -7,6 +7,8 @@ import org.ton.bytecode.TvmInst
 import org.ton.bytecode.TvmInstLambdaLocation
 import org.ton.bytecode.TvmInstMethodLocation
 import org.ton.bytecode.TvmContBasicRetInst
+import org.usvm.machine.TvmContext
+import org.usvm.machine.interpreter.TvmStepScope
 
 val TvmState.lastStmt get() = pathNode.statement
 fun TvmState.newStmt(stmt: TvmInst) {
@@ -40,4 +42,12 @@ fun TvmState.returnFromMethod() {
         currentContinuation = TvmContinuationValue(returnFromMethod, stack, registers)
         newStmt(returnSite)
     }
+}
+
+fun <R> TvmStepScope.calcOnStateCtx(block: context(TvmContext) TvmState.() -> R): R = calcOnState {
+    block(ctx, this)
+}
+
+fun TvmStepScope.doWithStateCtx(block: context(TvmContext) TvmState.() -> Unit) = doWithState {
+    block(ctx, this)
 }

@@ -6,6 +6,7 @@ import io.ksmt.sort.KBvSort
 import io.ksmt.utils.BvUtils.bigIntValue
 import io.ksmt.utils.cast
 import mu.KLogging
+import org.ton.bytecode.TvmAliasInst
 import org.ton.bytecode.TvmArithmBasicAddInst
 import org.ton.bytecode.TvmArithmBasicAddconstInst
 import org.ton.bytecode.TvmArithmBasicDecInst
@@ -41,6 +42,7 @@ import org.ton.bytecode.TvmCompareOtherInst
 import org.ton.bytecode.TvmCompareOtherSemptyInst
 import org.ton.bytecode.TvmConstDataInst
 import org.ton.bytecode.TvmConstDataPushcontShortInst
+import org.ton.bytecode.TvmConstDataPushsliceInst
 import org.ton.bytecode.TvmConstIntInst
 import org.ton.bytecode.TvmConstIntOneAliasInst
 import org.ton.bytecode.TvmConstIntPushint16Inst
@@ -82,6 +84,7 @@ import org.ton.bytecode.TvmFieldImpl
 import org.ton.bytecode.TvmInst
 import org.ton.bytecode.TvmIntegerType
 import org.ton.bytecode.TvmLambda
+import org.ton.bytecode.TvmNullType
 import org.ton.bytecode.TvmSliceType
 import org.ton.bytecode.TvmStackBasicInst
 import org.ton.bytecode.TvmStackBasicNopInst
@@ -91,6 +94,9 @@ import org.ton.bytecode.TvmStackBasicXchg0iInst
 import org.ton.bytecode.TvmStackBasicXchgIjInst
 import org.ton.bytecode.TvmStackComplexBlkdrop2Inst
 import org.ton.bytecode.TvmStackComplexInst
+import org.ton.bytecode.TvmSubSliceSerializedLoader
+import org.ton.bytecode.TvmTupleInst
+import org.ton.bytecode.TvmTupleNullInst
 import org.ton.bytecode.TvmTupleType
 import org.ton.bytecode.TvmType
 import org.ton.cell.Cell
@@ -104,6 +110,7 @@ import org.usvm.UHeapRef
 import org.usvm.UInterpreter
 import org.usvm.URegisterReading
 import org.usvm.USort
+import org.usvm.api.writeField
 import org.usvm.collection.field.UFieldLValue
 import org.usvm.forkblacklists.UForkBlackList
 import org.usvm.machine.TvmContext
@@ -119,6 +126,7 @@ import org.usvm.machine.state.TvmRegisters
 import org.usvm.machine.state.TvmStack
 import org.usvm.machine.state.TvmState
 import org.usvm.machine.state.TvmUnknownFailure
+import org.usvm.machine.state.doWithStateCtx
 import org.usvm.machine.state.generateSymbolicCell
 import org.usvm.machine.state.lastStmt
 import org.usvm.machine.state.newStmt
@@ -229,6 +237,7 @@ class TvmInterpreter(
             is TvmDebugInst -> visitDebugInst(scope, stmt)
             is TvmCodepageInst -> visitCodepageInst(scope, stmt)
             is TvmDictSpecialInst -> visitDictControlFlowInst(scope, stmt)
+            is TvmTupleInst -> visitTvmTupleInst(scope, stmt)
             else -> TODO("$stmt")
         }
 
@@ -325,6 +334,29 @@ class TvmInterpreter(
     private fun visitConstantDataInst(scope: TvmStepScope, stmt: TvmConstDataInst) {
         when (stmt) {
             is TvmConstDataPushcontShortInst -> visitPushContShortInst(scope, stmt)
+            is TvmConstDataPushsliceInst -> {
+                check(stmt.s.refs.isEmpty()) { "Unexpected refs in $stmt" }
+
+                scope.doWithStateCtx {
+                    val cell = memory.allocConcrete(TvmCellType)
+                    val slice = memory.allocConcrete(TvmSliceType)
+
+                    memory.writeField(cell, cellRefsLengthField, sizeSort, mkSizeExpr(0), guard = trueExpr)
+
+                    val sliceBits = stmt.s.bitsToBv()
+                    val bitLength = sliceBits.sort.sizeBits.toInt()
+                    val sliceData = mkBvZeroExtensionExpr(MAX_DATA_LENGTH - bitLength, sliceBits)
+                    memory.writeField(cell, cellDataField, cellDataSort, sliceData, guard = trueExpr)
+                    memory.writeField(cell, cellDataLengthField, sizeSort, mkSizeExpr(bitLength), guard = trueExpr)
+
+                    memory.writeField(slice, sliceCellField, addressSort, cell, guard = trueExpr)
+                    memory.writeField(slice, sliceDataPosField, sizeSort, mkSizeExpr(0), guard = trueExpr)
+                    memory.writeField(slice, sliceRefPosField, sizeSort, mkSizeExpr(0), guard = trueExpr)
+
+                    stack.add(slice, TvmSliceType)
+                    newStmt(stmt.nextStmt(contractCode, currentContinuation))
+                }
+            }
             else -> TODO("$stmt")
         }
     }
@@ -1119,6 +1151,17 @@ class TvmInterpreter(
         }
     }
 
+    private fun visitTvmTupleInst(scope: TvmStepScope, stmt: TvmTupleInst) {
+        when (stmt) {
+            is TvmAliasInst -> return visitTvmTupleInst(scope, stmt.resolveAlias() as TvmTupleInst)
+            is TvmTupleNullInst -> scope.doWithStateCtx {
+                stack.add(nullValue, TvmNullType)
+                newStmt(stmt.nextStmt(contractCode, currentContinuation))
+            }
+            else -> TODO("$stmt")
+        }
+    }
+
     private fun visitDebugInst(scope: TvmStepScope, stmt: TvmDebugInst) {
         // Do nothing
         scope.doWithState { newStmt(stmt.nextStmt(contractCode, currentContinuation)) }
@@ -1180,6 +1223,12 @@ class TvmInterpreter(
         }
 
         return tupleStackValue.tupleValue
+    }
+
+    context(TvmContext)
+    private fun TvmSubSliceSerializedLoader.bitsToBv(): KBitVecValue<UBvSort> {
+        // todo: check bits order
+        return mkBv(bits.joinToString(""), bits.size.toUInt())
     }
 
     private val cellDataField: TvmField = TvmFieldImpl(TvmCellType, "data")
