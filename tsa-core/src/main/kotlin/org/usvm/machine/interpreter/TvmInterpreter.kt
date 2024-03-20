@@ -95,7 +95,10 @@ import org.ton.bytecode.TvmStackBasicXchg0iLongInst
 import org.ton.bytecode.TvmStackBasicXchg1iInst
 import org.ton.bytecode.TvmStackBasicXchgIjInst
 import org.ton.bytecode.TvmStackComplexBlkdrop2Inst
+import org.ton.bytecode.TvmStackComplexBlkswapInst
 import org.ton.bytecode.TvmStackComplexInst
+import org.ton.bytecode.TvmStackComplexReverseInst
+import org.ton.bytecode.TvmStackComplexRotInst
 import org.ton.bytecode.TvmSubSliceSerializedLoader
 import org.ton.bytecode.TvmTupleInst
 import org.ton.bytecode.TvmTupleNullInst
@@ -292,14 +295,30 @@ class TvmInterpreter(
         stmt: TvmStackComplexInst
     ) {
         when (stmt) {
-            is TvmStackComplexBlkdrop2Inst -> {
-                scope.doWithState {
-                    stack.blkDrop2(stmt.i, stmt.j)
-                    newStmt(stmt.nextStmt(contractCode, currentContinuation))
-                }
+            is TvmStackComplexBlkdrop2Inst -> scope.doWithState {
+                stack.blkDrop2(stmt.i, stmt.j)
+            }
+            is TvmStackComplexReverseInst -> scope.doWithState {
+                stack.reverse(stmt.i + 2, stmt.j)
+            }
+            is TvmStackComplexBlkswapInst -> scope.doWithState {
+                stack.doBlkSwap(stmt.i, stmt.j)
+            }
+            is TvmStackComplexRotInst -> scope.doWithState {
+                stack.doBlkSwap(0, 1)
             }
             else -> TODO("$stmt")
         }
+
+        scope.doWithState {
+            newStmt(stmt.nextStmt(contractCode, currentContinuation))
+        }
+    }
+
+    private fun TvmStack.doBlkSwap(i: Int, j: Int) {
+        reverse(i + 1, j + 1)
+        reverse(j + 1, 0)
+        reverse(i + j + 2, 0)
     }
 
     private fun visitConstantIntInst(scope: TvmStepScope, stmt: TvmConstIntInst) {
@@ -320,10 +339,26 @@ class TvmInterpreter(
             is TvmConstIntPushint8Inst -> x.toBv257()
             is TvmConstIntPushint16Inst -> x.toBv257()
             is TvmConstIntPushintLongInst -> BigInteger(x).toBv257()
-            is TvmConstIntPushnanInst -> TODO()
-            is TvmConstIntPushnegpow2Inst -> TODO()
-            is TvmConstIntPushpow2Inst -> TODO()
-            is TvmConstIntPushpow2decInst -> TODO()
+            is TvmConstIntPushnanInst -> TODO("NaN value")
+            is TvmConstIntPushpow2Inst -> {
+                check(x in 0..255) { "Unexpected power $x" }
+
+                if (x == 255) {
+                    TODO("NaN value")
+                }
+
+                BigInteger.valueOf(2).pow(x + 1).toBv257()
+            }
+            is TvmConstIntPushnegpow2Inst -> {
+                check(x in 0..255) { "Unexpected power $x" }
+                // todo: nothing in docs about nan
+                BigInteger.valueOf(-2).pow(x + 1).toBv257()
+            }
+            is TvmConstIntPushpow2decInst -> {
+                check(x in 0..255) { "Unexpected power $x" }
+                // todo: nothing in docs about nan
+                (BigInteger.valueOf(2).pow(x + 1) - BigInteger.ONE).toBv257()
+            }
             is TvmConstIntTenAliasInst -> resolveAlias().bv257value(ctx)
             is TvmConstIntTrueAliasInst -> resolveAlias().bv257value(ctx)
             is TvmConstIntTwoAliasInst -> resolveAlias().bv257value(ctx)

@@ -1,6 +1,7 @@
 package org.usvm.machine.state
 
 import kotlinx.collections.immutable.PersistentList
+import kotlinx.collections.immutable.mutate
 import kotlinx.collections.immutable.persistentListOf
 import org.ton.bytecode.TvmBuilderType
 import org.ton.bytecode.TvmCellType
@@ -70,6 +71,20 @@ class TvmStack(
         }
 
         topElements.asReversed().forEach { stack = stack.add(it) }
+    }
+
+    /**
+     * Reverses the order of s[j+i+1] ... s[j].
+     * @param i -- number of stack entries to reverse
+     * @param j -- offset before first reversed entry
+     * */
+    fun reverse(i: Int, j: Int) {
+        extendStack(i + j)
+        stack = stack.mutate { stack ->
+            val blockStart = stack.size - j
+            val reversedBlock = stack.subList(blockStart - i, blockStart).toList()
+            reversedBlock.indices.forEach { stack[blockStart - 1 - it] = reversedBlock[it] }
+        }
     }
 
     /**
