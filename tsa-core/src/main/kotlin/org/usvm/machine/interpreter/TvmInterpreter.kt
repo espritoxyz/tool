@@ -85,6 +85,7 @@ import org.ton.bytecode.TvmInst
 import org.ton.bytecode.TvmIntegerType
 import org.ton.bytecode.TvmLambda
 import org.ton.bytecode.TvmNullType
+import org.ton.bytecode.TvmReferenceType
 import org.ton.bytecode.TvmSliceType
 import org.ton.bytecode.TvmStackBasicInst
 import org.ton.bytecode.TvmStackBasicNopInst
@@ -118,6 +119,7 @@ import org.usvm.USort
 import org.usvm.api.writeField
 import org.usvm.collection.field.UFieldLValue
 import org.usvm.forkblacklists.UForkBlackList
+import org.usvm.isStaticHeapRef
 import org.usvm.machine.TvmContext
 import org.usvm.machine.TvmContext.Companion.MAX_DATA_LENGTH
 import org.usvm.machine.TvmContext.Companion.MAX_REFS_NUMBER
@@ -132,7 +134,7 @@ import org.usvm.machine.state.TvmStack
 import org.usvm.machine.state.TvmState
 import org.usvm.machine.state.TvmUnknownFailure
 import org.usvm.machine.state.doWithStateCtx
-import org.usvm.machine.state.generateSymbolicCell
+import org.usvm.machine.state.generateSymbolicRef
 import org.usvm.machine.state.lastStmt
 import org.usvm.machine.state.newStmt
 import org.usvm.machine.state.nextStmt
@@ -762,11 +764,6 @@ class TvmInterpreter(
                 ?: error("Cannot ensure correctness for data length in cell $cell")
 
             val dataPosLValue = UFieldLValue(sizeSort, slice, sliceDataPosField)
-            // TODO hack!
-            if (slice is URegisterReading) {
-                scope.doWithState { memory.write(dataPosLValue, mkSizeExpr(0)) }
-            }
-
             val dataPos = scope.calcOnState { memory.read(dataPosLValue) }
 
             val bitsSizeExpr = mkSizeExpr(bitsLen)
@@ -1208,23 +1205,45 @@ class TvmInterpreter(
         scope.doWithState { newStmt(stmt.nextStmt(contractCode, currentContinuation)) }
     }
 
-    context(TvmState)
-    private fun TvmStack.takeLastCell(): UHeapRef {
-        val cellStackValue = takeLast(TvmCellType) { _ ->
-            generateSymbolicCell()
-        }
-        
-        return cellStackValue.cellValue
-    }
-
-    context(TvmState)
     private fun TvmStack.takeLastInt(): UExpr<UBvSort> {
         val intStackValue = takeLast(TvmIntegerType) { id ->
             ctx.mkRegisterReading(id, ctx.int257sort)
         }
-        
+
         return intStackValue.intValue
     }
+
+    context(TvmState)
+    private fun TvmStack.takeLastCell(): UHeapRef =
+        takeLastRef(this, TvmCellType, TvmStack.TvmStackValue::cellValue)
+
+    context(TvmState)
+    private fun TvmStack.takeLastSlice(): UHeapRef =
+        takeLastRef(this, TvmSliceType, TvmStack.TvmStackValue::sliceValue).also {
+            if (it.isCellViewInputRef()) {
+                // TODO hack! Assume that all input slices were not read, that means dataPos == 0 and refsPos == 0
+                with(ctx) {
+                    memory.writeField(it, sliceDataPosField, sizeSort, mkSizeExpr(0), guard = trueExpr)
+                    memory.writeField(it, sliceRefPosField, sizeSort, mkSizeExpr(0), guard = trueExpr)
+                }
+            }
+        }
+
+    context(TvmState)
+    private fun TvmStack.takeLastBuilder(): UHeapRef =
+        takeLastRef(this, TvmBuilderType, TvmStack.TvmStackValue::builderValue).also {
+            if (it.isCellViewInputRef()) {
+                // TODO hack! Assume that all input builder were not written, that means dataLength == 0 and refsLength == 0
+                with(ctx) {
+                    memory.writeField(it, cellDataLengthField, sizeSort, mkSizeExpr(0), guard = trueExpr)
+                    memory.writeField(it, cellRefsLengthField, sizeSort, mkSizeExpr(0), guard = trueExpr)
+                }
+            }
+        }
+
+    context(TvmState)
+    private fun TvmStack.takeLastTuple(): UHeapRef =
+        takeLastRef(this, TvmTupleType, TvmStack.TvmStackValue::tupleValue)
 
     private fun TvmStack.takeLastContinuation(): TvmContinuationValue {
         val continuationStackValue = takeLast(TvmContinuationType) { _ ->
@@ -1235,31 +1254,25 @@ class TvmInterpreter(
     }
 
     context(TvmState)
-    private fun TvmStack.takeLastSlice(): UHeapRef {
-        val sliceStackValue = takeLast(TvmSliceType) { id ->
-            ctx.mkRegisterReading(id, ctx.addressSort)
+    private fun takeLastRef(
+        stack: TvmStack,
+        referenceType: TvmReferenceType,
+        extractValue: TvmStack.TvmStackValue.() -> UHeapRef
+    ): UHeapRef {
+        val lastRefValue = stack.takeLast(referenceType) {
+            generateSymbolicRef(referenceType)
         }
 
-        return sliceStackValue.sliceValue
+        return lastRefValue.extractValue()
     }
 
-    context(TvmState)
-    private fun TvmStack.takeLastBuilder(): UHeapRef {
-        val builderStackValue = takeLast(TvmBuilderType) { id ->
-            ctx.mkRegisterReading(id, ctx.addressSort)
-        }
-
-        return builderStackValue.builderValue
-    }
-
-    context(TvmState)
-    private fun TvmStack.takeLastTuple(): UHeapRef {
-        val tupleStackValue = takeLast(TvmTupleType) { id ->
-            ctx.mkRegisterReading(id, ctx.addressSort)
-        }
-
-        return tupleStackValue.tupleValue
-    }
+    /**
+     * For now, we make static refs for all used (popped from the stack) input non-primitive values.
+     * Any possible ite expressions could be made only in the [org.usvm.machine.state.TvmCellRefsRegion.readCellRef] method,
+     * which is used only for cells, that do not require any input constraints. So, any cell view ([TvmSliceType] or [TvmBuilderType])
+     * could be either static ref or allocated ref, that was allocated in the body of the method.
+     */
+    private fun UHeapRef.isCellViewInputRef(): Boolean = isStaticHeapRef(this)
 
     context(TvmContext)
     private fun TvmSubSliceSerializedLoader.bitsToBv(): KBitVecValue<UBvSort> {

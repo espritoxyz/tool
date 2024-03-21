@@ -1,12 +1,13 @@
 package org.usvm.machine.state
 
-import org.ton.bytecode.TvmContractCode
-import org.usvm.machine.state.TvmMethodResult
+import org.ton.bytecode.TvmContBasicRetInst
 import org.ton.bytecode.TvmContinuationValue
+import org.ton.bytecode.TvmContractCode
 import org.ton.bytecode.TvmInst
 import org.ton.bytecode.TvmInstLambdaLocation
 import org.ton.bytecode.TvmInstMethodLocation
-import org.ton.bytecode.TvmContBasicRetInst
+import org.ton.bytecode.TvmReferenceType
+import org.usvm.UHeapRef
 import org.usvm.machine.TvmContext
 import org.usvm.machine.interpreter.TvmStepScope
 
@@ -51,3 +52,5 @@ fun <R> TvmStepScope.calcOnStateCtx(block: context(TvmContext) TvmState.() -> R)
 fun TvmStepScope.doWithStateCtx(block: context(TvmContext) TvmState.() -> Unit) = doWithState {
     block(ctx, this)
 }
+
+fun TvmState.generateSymbolicRef(referenceType: TvmReferenceType): UHeapRef = memory.allocStatic(referenceType)
