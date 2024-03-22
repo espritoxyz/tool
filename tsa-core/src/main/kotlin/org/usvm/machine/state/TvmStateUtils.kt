@@ -2,7 +2,6 @@ package org.usvm.machine.state
 
 import org.ton.bytecode.TvmContBasicRetInst
 import org.ton.bytecode.TvmContinuationValue
-import org.ton.bytecode.TvmContractCode
 import org.ton.bytecode.TvmInst
 import org.ton.bytecode.TvmInstLambdaLocation
 import org.ton.bytecode.TvmInstMethodLocation
@@ -16,15 +15,16 @@ fun TvmState.newStmt(stmt: TvmInst) {
     pathNode += stmt
 }
 
-fun TvmInst.nextStmt(contractCode: TvmContractCode, currentContinuationValue: TvmContinuationValue): TvmInst =
-    when (location) {
-        is TvmInstMethodLocation -> (location as TvmInstMethodLocation).methodId.let {
-            contractCode.methods[it]!!.instList.getOrNull(location.index + 1)
-                ?: TvmContBasicRetInst(TvmInstMethodLocation(it, location.index + 1))
-        }
-        is TvmInstLambdaLocation -> currentContinuationValue.codeBlock.instList.getOrNull(location.index + 1)
+fun TvmInst.nextStmt(): TvmInst = when (location) {
+    is TvmInstMethodLocation -> (location as TvmInstMethodLocation).run {
+        codeBlock.instList.getOrNull(location.index + 1)
+            ?: TvmContBasicRetInst(TvmInstMethodLocation(methodId, location.index + 1))
+    }
+    is TvmInstLambdaLocation -> (location as TvmInstLambdaLocation).run {
+        codeBlock.instList.getOrNull(location.index + 1)
             ?: TvmContBasicRetInst(TvmInstLambdaLocation(location.index + 1))
     }
+}
 
 
 fun TvmState.returnFromMethod() {

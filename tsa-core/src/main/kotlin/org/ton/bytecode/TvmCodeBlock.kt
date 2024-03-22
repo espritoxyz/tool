@@ -5,8 +5,14 @@ import kotlinx.serialization.Serializable
 
 // TODO is it a real entity?
 @Serializable
-sealed interface TvmCodeBlock {
-    val instList: List<TvmInst>
+sealed class TvmCodeBlock {
+    abstract val instList: List<TvmInst>
+
+    protected fun initLocationsCodeBlock() {
+        instList.forEach {
+            it.location.codeBlock = this
+        }
+    }
 }
 
 @Serializable
@@ -14,11 +20,19 @@ sealed interface TvmCodeBlock {
 data class TvmMethod(
     val id: Int,
     override val instList: List<TvmInst>
-) : TvmCodeBlock
+) : TvmCodeBlock() {
+    init {
+        initLocationsCodeBlock()
+    }
+}
 
 // An artificial entity representing instructions in continuation
 @Serializable
 @SerialName("TvmLambda")
 data class TvmLambda(
     override val instList: List<TvmInst>
-) : TvmCodeBlock
+) : TvmCodeBlock() {
+    init {
+        initLocationsCodeBlock()
+    }
+}

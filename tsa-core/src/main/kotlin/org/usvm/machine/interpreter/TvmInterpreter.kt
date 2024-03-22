@@ -270,7 +270,7 @@ class TvmInterpreter(
         }
 
         scope.doWithState {
-            newStmt(stmt.nextStmt(contractCode, currentContinuation))
+            newStmt(stmt.nextStmt())
         }
     }
 
@@ -313,7 +313,7 @@ class TvmInterpreter(
         }
 
         scope.doWithState {
-            newStmt(stmt.nextStmt(contractCode, currentContinuation))
+            newStmt(stmt.nextStmt())
         }
     }
 
@@ -327,7 +327,7 @@ class TvmInterpreter(
         scope.doWithState {
             val value = stmt.bv257value(ctx)
             stack.add(value, TvmIntegerType)
-            newStmt(stmt.nextStmt(contractCode, currentContinuation))
+            newStmt(stmt.nextStmt())
         }
     }
 
@@ -392,7 +392,7 @@ class TvmInterpreter(
                     memory.writeField(slice, sliceRefPosField, sizeSort, mkSizeExpr(0), guard = trueExpr)
 
                     stack.add(slice, TvmSliceType)
-                    newStmt(stmt.nextStmt(contractCode, currentContinuation))
+                    newStmt(stmt.nextStmt())
                 }
             }
             else -> TODO("$stmt")
@@ -406,7 +406,7 @@ class TvmInterpreter(
 
             stack += continuationValue
             currentContinuation = continuationValue
-            newStmt(stmt.nextStmt(contractCode, currentContinuation))
+            newStmt(stmt.nextStmt())
         }
     }
 
@@ -506,7 +506,7 @@ class TvmInterpreter(
 
             scope.doWithState {
                 stack.add(result, TvmIntegerType)
-                newStmt(stmt.nextStmt(contractCode, currentContinuation))
+                newStmt(stmt.nextStmt())
             }
         }
     }
@@ -537,7 +537,7 @@ class TvmInterpreter(
 
             scope.doWithState {
                 stack.add(result, TvmIntegerType)
-                newStmt(stmt.nextStmt(contractCode, currentContinuation))
+                newStmt(stmt.nextStmt())
             }
         }
     }
@@ -578,11 +578,11 @@ class TvmInterpreter(
                     ctx.mkEq(x, y),
                     blockOnFalseState = {
                         stack.add(ctx.falseValue, TvmIntegerType)
-                        newStmt(stmt.nextStmt(contractCode, currentContinuation))
+                        newStmt(stmt.nextStmt())
                     },
                     blockOnTrueState = {
                         stack.add(ctx.trueValue, TvmIntegerType)
-                        newStmt(stmt.nextStmt(contractCode, currentContinuation))
+                        newStmt(stmt.nextStmt())
                     }
                 )
             }
@@ -623,11 +623,11 @@ class TvmInterpreter(
                         mkAnd(isRemainingDataEmptyConstraint, areRemainingRefsEmpty),
                         blockOnFalseState = {
                             stack.add(falseValue, TvmIntegerType)
-                            newStmt(stmt.nextStmt(contractCode, currentContinuation))
+                            newStmt(stmt.nextStmt())
                         },
                         blockOnTrueState = {
                             stack.add(trueValue, TvmIntegerType)
-                            newStmt(stmt.nextStmt(contractCode, currentContinuation))
+                            newStmt(stmt.nextStmt())
                         },
                     )
                 }
@@ -699,7 +699,7 @@ class TvmInterpreter(
                 stack.add(ref, TvmCellType)
                 stack.add(updatedSlice, TvmSliceType)
 
-                newStmt(stmt.nextStmt(contractCode, currentContinuation))
+                newStmt(stmt.nextStmt())
             }
         }
     }
@@ -732,7 +732,7 @@ class TvmInterpreter(
             ) ?: return
 
             scope.doWithState {
-                newStmt(stmt.nextStmt(contractCode, currentContinuation))
+                newStmt(stmt.nextStmt())
             }
         }
     }
@@ -792,7 +792,7 @@ class TvmInterpreter(
 
                 stack.add(extendedToIntBits, TvmIntegerType)
                 stack.add(updatedSlice, TvmSliceType)
-                newStmt(stmt.nextStmt(contractCode, currentContinuation))
+                newStmt(stmt.nextStmt())
             }
         }
     }
@@ -819,7 +819,7 @@ class TvmInterpreter(
             }
 
             scope.doWithState {
-                newStmt(stmt.nextStmt(contractCode, currentContinuation))
+                newStmt(stmt.nextStmt())
             }
         }
     }
@@ -889,7 +889,7 @@ class TvmInterpreter(
                 }
 
                 stack.add(updatedBuilder, TvmBuilderType)
-                newStmt(stmt.nextStmt(contractCode, currentContinuation))
+                newStmt(stmt.nextStmt())
             }
         }
     }
@@ -908,7 +908,7 @@ class TvmInterpreter(
                 memory.write(builderRefsLengthLValue, mkSizeExpr(0))
 
                 stack.add(builder, TvmBuilderType)
-                newStmt(stmt.nextStmt(contractCode, currentContinuation))
+                newStmt(stmt.nextStmt())
             }
         }
     }
@@ -937,7 +937,7 @@ class TvmInterpreter(
                 }
 
                 stack.add(cell, TvmCellType)
-                newStmt(stmt.nextStmt(contractCode, currentContinuation))
+                newStmt(stmt.nextStmt())
             }
         }
     }
@@ -957,7 +957,7 @@ class TvmInterpreter(
                     }
                     stack.takeLastCell()
 
-                    newStmt(stmt.nextStmt(contractCode, currentContinuation))
+                    newStmt(stmt.nextStmt())
 
                     // TODO save to the correct register
                 }
@@ -981,14 +981,14 @@ class TvmInterpreter(
                         symbolicCell
                     }
                     stack.add(data, TvmCellType)
-                    newStmt(stmt.nextStmt(contractCode, currentContinuation))
+                    newStmt(stmt.nextStmt())
                 }
                 3 -> {
                     val mainMethod = contractCode.methods[Int.MAX_VALUE]
                         ?: error("No main method found")
                     val continuationValue = TvmContinuationValue(mainMethod, stack, registers)
                     stack += continuationValue
-                    newStmt(stmt.nextStmt(contractCode, currentContinuation))
+                    newStmt(stmt.nextStmt())
                 }
                 else -> TODO("Not yet implemented")
             }
@@ -1039,7 +1039,7 @@ class TvmInterpreter(
                         val neqZero = mkEq(operand, falseValue).not()
                         scope.fork(
                             neqZero,
-                            blockOnFalseState = { newStmt(stmt.nextStmt(contractCode, currentContinuation)) }
+                            blockOnFalseState = { newStmt(stmt.nextStmt()) }
                         ) ?: return@with
 
                         // TODO check NaN for integer overflow exception
@@ -1105,7 +1105,7 @@ class TvmInterpreter(
                         //  The remainder of the previous current continuation cc is discarded.
                         newStmt(continuation.codeBlock.instList.first())
                     },
-                    blockOnFalseState = { newStmt(stmt.nextStmt(contractCode, currentContinuation)) }
+                    blockOnFalseState = { newStmt(stmt.nextStmt()) }
                 )
             }
         }
@@ -1127,7 +1127,7 @@ class TvmInterpreter(
 //                    callStack.push(contractCode.methods[continuationStmt.location.methodId]!!, nextStmt)
 //                    newStmt(continuationStmt)
 
-                    val nextStmt = stmt.nextStmt(contractCode, currentContinuation)
+                    val nextStmt = stmt.nextStmt()
                     val nextMethod = contractCode.methods[methodId] ?: error("Unknown method with id $methodId")
                     val methodFirstStmt = nextMethod.instList.first()
                     callStack.push(nextMethod, nextStmt)
@@ -1178,7 +1178,7 @@ class TvmInterpreter(
 //                    stack += ctx.mkHe
                 }
 
-                scope.doWithState { newStmt(stmt.nextStmt(contractCode, currentContinuation)) }
+                scope.doWithState { newStmt(stmt.nextStmt()) }
             }
             else -> TODO("$stmt")
         }
@@ -1189,7 +1189,7 @@ class TvmInterpreter(
             is TvmAliasInst -> return visitTvmTupleInst(scope, stmt.resolveAlias() as TvmTupleInst)
             is TvmTupleNullInst -> scope.doWithStateCtx {
                 stack.add(nullValue, TvmNullType)
-                newStmt(stmt.nextStmt(contractCode, currentContinuation))
+                newStmt(stmt.nextStmt())
             }
             else -> TODO("$stmt")
         }
@@ -1197,12 +1197,12 @@ class TvmInterpreter(
 
     private fun visitDebugInst(scope: TvmStepScope, stmt: TvmDebugInst) {
         // Do nothing
-        scope.doWithState { newStmt(stmt.nextStmt(contractCode, currentContinuation)) }
+        scope.doWithState { newStmt(stmt.nextStmt()) }
     }
 
     private fun visitCodepageInst(scope: TvmStepScope, stmt: TvmCodepageInst) {
         // Do nothing
-        scope.doWithState { newStmt(stmt.nextStmt(contractCode, currentContinuation)) }
+        scope.doWithState { newStmt(stmt.nextStmt()) }
     }
 
     private fun TvmStack.takeLastInt(): UExpr<UBvSort> {
