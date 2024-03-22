@@ -1,6 +1,7 @@
 package org.usvm.machine
 
 import org.usvm.UAddressSort
+import org.usvm.UBoolExpr
 import org.usvm.UConcreteHeapRef
 import org.usvm.UExpr
 import org.usvm.UHeapRef
@@ -8,8 +9,15 @@ import org.usvm.UIteExpr
 import org.usvm.UNullRef
 import org.usvm.USort
 import org.usvm.USymbolicHeapRef
+import org.usvm.collection.map.primitive.UMapRegion
+import org.usvm.collection.map.primitive.UMapRegionId
+import org.usvm.collection.set.primitive.USetRegion
+import org.usvm.collection.set.primitive.USetRegionId
 import org.usvm.isStaticHeapRef
+import org.usvm.memory.USymbolicCollectionKeyInfo
+import org.usvm.memory.UWritableMemory
 import org.usvm.memory.foldHeapRef
+import org.usvm.regions.Region
 import org.usvm.uctx
 
 // todo: remove this bunch of internal functions, copied from usvm-core
@@ -115,3 +123,49 @@ internal inline fun <Sort : USort> UHeapRef.mapWithStaticAsConcrete(
     symbolicMapper,
     ignoreNullRefs
 )
+
+
+internal fun <SetType, KeySort : USort, Reg : Region<Reg>> UWritableMemory<*>.setUnion(
+    srcRef: UHeapRef,
+    dstRef: UHeapRef,
+    type: SetType,
+    keySort: KeySort,
+    keyInfo: USymbolicCollectionKeyInfo<UExpr<KeySort>, Reg>,
+    guard: UBoolExpr,
+) {
+    val regionId = USetRegionId(keySort, type, keyInfo)
+    val region = getRegion(regionId)
+
+    check(region is USetRegion<SetType, KeySort, Reg>) {
+        "setUnion is not applicable to $region"
+    }
+
+    val newRegion = region.union(srcRef, dstRef, guard)
+    setRegion(regionId, newRegion)
+}
+
+internal fun <MapType, KeySort : USort, ValueSort : USort, Reg : Region<Reg>> UWritableMemory<*>.mapMerge(
+    srcRef: UHeapRef,
+    dstRef: UHeapRef,
+    mapType: MapType,
+    keySort: KeySort,
+    sort: ValueSort,
+    keyInfo: USymbolicCollectionKeyInfo<UExpr<KeySort>, Reg>,
+    keySet: USetRegionId<MapType, KeySort, Nothing>,
+    guard: UBoolExpr
+) {
+    val regionId = UMapRegionId(keySort, sort, mapType, keyInfo)
+    val region = getRegion(regionId)
+
+    check(region is UMapRegion<MapType, KeySort, ValueSort, Reg>) {
+        "mapMerge is not applicable to $region"
+    }
+
+    val keySetRegion = getRegion(keySet)
+    check(keySetRegion is USetRegion<MapType, KeySort, *>) {
+        "mapMerge is not applicable to set $region"
+    }
+
+    val newRegion = region.merge(srcRef, dstRef, mapType, keySetRegion, guard)
+    setRegion(regionId, newRegion)
+}

@@ -14,8 +14,8 @@
 
 (int) dict_is_empty() method_id {
     cell d = new_dict();
-    d~udict_set(256, 0, "hello");
-    d~udict_set(256, 1, "world");
+    d~udict_set(256, 11, "hello");
+    d~udict_set(256, 17, "world");
 
     if (d.dict_empty?()) {
         ;; Determine if dict is empty
@@ -30,16 +30,15 @@
 
 (int) load_dict_example(cell data) method_id {
     slice local_storage = data.begin_parse();
-    cell dictionary_cell = new_dict();
-    if (~ slice_empty?(local_storage)) {
-        dictionary_cell = local_storage~load_dict();
-    }
-
-    return 0;
+    cell dictionary_cell = local_storage~load_dict();
+    return dictionary_cell.dict_empty?();
 }
 
-(cell) store_dict_example(cell dictionary_cell) method_id {
-    cell result = begin_cell().store_dict(dictionary_cell).end_cell();
+(cell) store_dict_example() method_id {
+    cell d = new_dict();
+    d~udict_set(256, 11, "hello");
+    d~udict_set(256, 17, "world");
+    cell result = begin_cell().store_dict(d).end_cell();
     return result;
 }
 
@@ -51,12 +50,11 @@
 
     ;; iterate keys from small to big
     (int key, slice val, int flag) = d.udict_get_min?(256);
-    while (flag) {
-        ;; do something with pair key->val
-        (key, val, flag) = d.udict_get_next?(256, key);
-    }
 
-    return 0;
+    ;; do something with pair key->val
+    (key, val, flag) = d.udict_get_next?(256, key);
+
+    return flag;
 }
 
 () recv_internal(int msg_value, cell in_msg, slice in_msg_body) impure {

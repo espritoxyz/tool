@@ -1,7 +1,5 @@
 package org.ton.bytecode
 
-import org.ton.bytecode.TvmType
-
 interface TvmField {
     val enclosingType: TvmType
     val name: String

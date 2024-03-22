@@ -5,6 +5,7 @@ import org.ton.bytecode.TvmContinuationValue
 import org.ton.bytecode.TvmInst
 import org.ton.bytecode.TvmInstLambdaLocation
 import org.ton.bytecode.TvmInstMethodLocation
+import org.usvm.UBoolExpr
 import org.ton.bytecode.TvmReferenceType
 import org.usvm.UHeapRef
 import org.usvm.machine.TvmContext
@@ -54,3 +55,11 @@ fun TvmStepScope.doWithStateCtx(block: context(TvmContext) TvmState.() -> Unit) 
 }
 
 fun TvmState.generateSymbolicRef(referenceType: TvmReferenceType): UHeapRef = memory.allocStatic(referenceType)
+
+fun TvmStepScope.assertIfSat(
+    constraint: UBoolExpr
+): Boolean {
+    val originalState = calcOnState { this }
+    val (stateWithConstraint) = originalState.ctx.statesForkProvider.forkMulti(originalState, listOf(constraint))
+    return stateWithConstraint != null
+}

@@ -92,37 +92,40 @@ sealed interface TvmContStackInst: TvmInst
 sealed interface TvmDebugInst: TvmInst
 
 @Serializable
-sealed interface TvmDictDeleteInst: TvmInst
+sealed interface TvmDictInst: TvmInst
 
 @Serializable
-sealed interface TvmDictGetInst: TvmInst
+sealed interface TvmDictDeleteInst: TvmInst, TvmDictInst
 
 @Serializable
-sealed interface TvmDictMayberefInst: TvmInst
+sealed interface TvmDictGetInst: TvmInst, TvmDictInst
 
 @Serializable
-sealed interface TvmDictMinInst: TvmInst
+sealed interface TvmDictMayberefInst: TvmInst, TvmDictInst
 
 @Serializable
-sealed interface TvmDictNextInst: TvmInst
+sealed interface TvmDictMinInst: TvmInst, TvmDictInst
 
 @Serializable
-sealed interface TvmDictPrefixInst: TvmInst
+sealed interface TvmDictNextInst: TvmInst, TvmDictInst
 
 @Serializable
-sealed interface TvmDictSerialInst: TvmInst
+sealed interface TvmDictPrefixInst: TvmInst, TvmDictInst
 
 @Serializable
-sealed interface TvmDictSetInst: TvmInst
+sealed interface TvmDictSerialInst: TvmInst, TvmDictInst
 
 @Serializable
-sealed interface TvmDictSetBuilderInst: TvmInst
+sealed interface TvmDictSetInst: TvmInst, TvmDictInst
 
 @Serializable
-sealed interface TvmDictSpecialInst: TvmInst
+sealed interface TvmDictSetBuilderInst: TvmInst, TvmDictInst
 
 @Serializable
-sealed interface TvmDictSubInst: TvmInst
+sealed interface TvmDictSpecialInst: TvmInst, TvmDictInst
+
+@Serializable
+sealed interface TvmDictSubInst: TvmInst, TvmDictInst
 
 @Serializable
 sealed interface TvmExceptionsInst: TvmInst

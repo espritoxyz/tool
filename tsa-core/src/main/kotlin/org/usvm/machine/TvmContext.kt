@@ -2,6 +2,10 @@ package org.usvm.machine
 
 import io.ksmt.expr.KBitVecValue
 import io.ksmt.utils.toBigInteger
+import org.ton.bytecode.TvmCellType
+import org.ton.bytecode.TvmField
+import org.ton.bytecode.TvmFieldImpl
+import org.ton.bytecode.TvmSliceType
 import org.ton.bytecode.TvmType
 import org.usvm.NULL_ADDRESS
 import org.usvm.UBv32Sort
@@ -34,5 +38,13 @@ class TvmContext(components : UComponents<TvmType, TvmSizeSort>) : UContext<TvmS
         const val MAX_REFS_NUMBER: Int = 4
 
         const val INT_BITS = 257u
+
+        val cellDataField: TvmField = TvmFieldImpl(TvmCellType, "data")
+        val cellDataLengthField: TvmField = TvmFieldImpl(TvmCellType, "dataLength")
+        val cellRefsLengthField: TvmField = TvmFieldImpl(TvmCellType, "refsLength")
+
+        val sliceDataPosField: TvmField = TvmFieldImpl(TvmSliceType, "dataPos")
+        val sliceRefPosField: TvmField = TvmFieldImpl(TvmSliceType, "refPos")
+        val sliceCellField: TvmField = TvmFieldImpl(TvmSliceType, "cell")
     }
 }

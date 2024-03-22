@@ -1,0 +1,149 @@
+"../fiftstdlib/Fift.fif" include
+"../fiftstdlib/Asm.fif" include
+
+PROGRAM{
+  0 DECLMETHOD f0
+  1 DECLMETHOD f1
+  2 DECLMETHOD f3
+  3 DECLMETHOD f4
+  4 DECLMETHOD f5
+  5 DECLMETHOD f6
+  6 DECLMETHOD f7
+  7 DECLMETHOD f8
+  8 DECLMETHOD f9
+  9 DECLMETHOD f10
+  10 DECLMETHOD f11
+  11 DECLMETHOD f12
+  12 DECLMETHOD f13
+  13 DECLMETHOD f14
+  14 DECLMETHOD f15
+  15 DECLMETHOD f16
+f0 PROC:<{
+    6 PUSHINT
+    7 PUSHINT
+    -1 PUSHINT
+    // 6 7 -1
+    NULLROTRIF
+    // 6 NULL 7 -1
+}>
+f1 PROC:<{
+      6 PUSHINT
+      7 PUSHINT
+      0 PUSHINT
+      // 6 7 0
+      NULLROTRIF
+      // 6 7 0
+}>
+f3 PROC:<{
+    6 PUSHINT
+    7 PUSHINT
+    -1 PUSHINT
+    // 6 7 -1
+    NULLROTRIF2
+    // 6 NULL NULL 7 -1
+}>
+f4 PROC:<{
+      6 PUSHINT
+      7 PUSHINT
+      0 PUSHINT
+      // 6 7 0
+      NULLROTRIF2
+      // 6 7 0
+}>
+f5 PROC:<{
+    6 PUSHINT
+    7 PUSHINT
+    -1 PUSHINT
+    // 6 7 -1
+    NULLSWAPIF
+    // 6 7 NULL -1
+}>
+f6 PROC:<{
+      6 PUSHINT
+      7 PUSHINT
+      0 PUSHINT
+      // 6 7 0
+      NULLSWAPIF
+      // 6 7 0
+}>
+f7 PROC:<{
+    6 PUSHINT
+    7 PUSHINT
+    -1 PUSHINT
+    // 6 7 -1
+    NULLSWAPIF2
+    // 6 7 NULL NULL -1
+}>
+f8 PROC:<{
+      6 PUSHINT
+      7 PUSHINT
+      0 PUSHINT
+      // 6 7 0
+      NULLSWAPIF2
+      // 6 7 0
+}>
+f9 PROC:<{
+    6 PUSHINT
+    7 PUSHINT
+    0 PUSHINT
+    // 6 7 0
+    NULLROTRIFNOT
+    // 6 NULL 7 0
+}>
+f10 PROC:<{
+      6 PUSHINT
+      7 PUSHINT
+      -1 PUSHINT
+      // 6 7 -1
+      NULLROTRIFNOT
+      // 6 7 -1
+}>
+f11 PROC:<{
+    6 PUSHINT
+    7 PUSHINT
+    0 PUSHINT
+    // 6 7 0
+    NULLROTRIFNOT2
+    // 6 NULL NULL 7 0
+}>
+f12 PROC:<{
+      6 PUSHINT
+      7 PUSHINT
+      -1 PUSHINT
+      // 6 7 -1
+      NULLROTRIFNOT2
+      // 6 7 -1
+}>
+f13 PROC:<{
+    6 PUSHINT
+    7 PUSHINT
+    0 PUSHINT
+    // 6 7 0
+    NULLSWAPIFNOT
+    // 6 7 NULL 0
+}>
+f14 PROC:<{
+      6 PUSHINT
+      7 PUSHINT
+      -1 PUSHINT
+      // 6 7 -1
+      NULLSWAPIFNOT
+      // 6 7 -1
+}>
+f15 PROC:<{
+    6 PUSHINT
+    7 PUSHINT
+    0 PUSHINT
+    // 6 7 0
+    NULLSWAPIFNOT2
+    // 6 7 NULL NULL 0
+}>
+f16 PROC:<{
+      6 PUSHINT
+      7 PUSHINT
+      -1 PUSHINT
+      // 6 7 -1
+      NULLSWAPIFNOT2
+      // 6 7 -1
+}>
+}END>c

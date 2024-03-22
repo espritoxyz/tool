@@ -15,6 +15,10 @@ private val instructionOperandType = mapOf(
     "PUSHREFCONT" to mapOf("c" to "List<TvmInst>"),
 )
 
+private const val ADDITIONAL_CATEGORY_DICT = "dict"
+
+private val additionalCategories = setOf(ADDITIONAL_CATEGORY_DICT)
+
 @OptIn(ExperimentalSerializationApi::class)
 private val json = Json {
     explicitNulls = false
@@ -131,11 +135,17 @@ private fun tvmInstSubSliceOperandGetter(
     $indent    )
          """.trimIndent()
 
-private fun tvmInstCategoryDeclaration(category: String): String =
-    """
+private fun tvmInstCategoryDeclaration(category: String): String {
+    var additionalCategories = ""
+    if (category !=  ADDITIONAL_CATEGORY_DICT && category.lowercase().startsWith(ADDITIONAL_CATEGORY_DICT)) {
+        additionalCategories += ", ${tvmInstCategoryClassName(ADDITIONAL_CATEGORY_DICT)}"
+    }
+
+    return """
         @Serializable
-        sealed interface ${tvmInstCategoryClassName(category)}: TvmInst
+        sealed interface ${tvmInstCategoryClassName(category)}: TvmInst$additionalCategories
     """.trimIndent()
+}
 
 private fun normalizeDocString(docStr: String): List<String> =
     docStr.split("\n").flatMap { str ->
@@ -261,6 +271,7 @@ fun main() {
     }
 
     val categories = instructions.instructions.mapTo(mutableSetOf()) { it.doc.category }
+        .also { it += additionalCategories }
         .associateWith { tvmInstCategoryDeclaration(it) }
 
     val basicInstructionsDeclarations = basicInstructions.mapValues { tvmInstDeclaration(it.value) }

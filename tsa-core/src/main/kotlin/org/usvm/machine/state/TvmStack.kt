@@ -20,7 +20,7 @@ import org.usvm.machine.TvmContext
 import kotlin.math.max
 
 class TvmStack(
-    private val ctx: TvmContext,
+    val ctx: TvmContext,
     private var stack: PersistentList<TvmStackEntry> = persistentListOf(), // [n n-1 n-2 ... 2 1 0]
 ) {
     private var inputElements: PersistentList<TvmInputStackEntry> = persistentListOf()
@@ -35,6 +35,21 @@ class TvmStack(
         stack = stack.removeAt(size - 1)
 
         return getStackValue(lastStackEntry, expectedType, createEntry)
+    }
+
+    fun takeLastEntry(): TvmStackEntry {
+        extendStack(1)
+        val lastStackEntry = stack.last()
+        stack = stack.removeAt(size - 1)
+        return lastStackEntry
+    }
+
+    fun addStackEntry(entry: TvmStackEntry) {
+        stack = stack.add(entry)
+    }
+
+    fun lastIsNull(): Boolean = stack.lastOrNull().let {
+        it is TvmConcreteStackEntry && it.cell is TvmStackNullValue
     }
 
     fun add(value: UExpr<out USort>, type: TvmType) {
