@@ -27,6 +27,9 @@ fun TvmInst.nextStmt(): TvmInst = when (location) {
     }
 }
 
+fun setFailure(failure: TvmMethodResult.TvmFailure): (TvmState) -> Unit = { state ->
+    state.methodResult = failure
+}
 
 fun TvmState.returnFromMethod() {
     val returnFromMethod = callStack.lastMethod()

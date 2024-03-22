@@ -299,12 +299,12 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
 
     private fun doLoadDict(inst: TvmDictSerialInst, scope: TvmStepScope, returnUpdatedSlice: Boolean) {
         val slice = scope.calcOnStateCtx { stack.takeLastSlice() }
-        val dictConstructorTypeBit = scope.calcOnStateCtx { sliceLoadDataBits(slice, bits = 1) }
-        val dictIsEmpty = scope.calcOnStateCtx { mkEq(dictConstructorTypeBit, mkBv(value = 0, sizeBits = 1u)) }
+        val dictConstructorTypeBit = scope.sliceLoadDataBits(slice, bits = 1) ?: return
+        val dictIsNotEmpty = scope.calcOnStateCtx { mkEq(dictConstructorTypeBit, mkBv(value = 1, sizeBits = 1u)) }
 
         scope.fork(
-            dictIsEmpty,
-            blockOnTrueState = {
+            dictIsNotEmpty,
+            blockOnFalseState = {
                 stack.add(ctx.nullValue, TvmNullType)
 
                 if (returnUpdatedSlice) {
@@ -316,21 +316,22 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
 
                 newStmt(inst.nextStmt())
             },
-            blockOnFalseState = {
-                val dictCellRef = sliceLoadNextRef(slice)
-                stack.add(dictCellRef, TvmCellType)
+        ) ?: return
 
-                if (returnUpdatedSlice) {
-                    val updatedSlice = memory.allocConcrete(TvmSliceType)
-                    sliceCopy(slice, updatedSlice)
-                    sliceMoveDataPtr(updatedSlice, bits = 1)
-                    sliceMoveRefPtr(updatedSlice)
-                    stack.add(updatedSlice, TvmSliceType)
-                }
+        scope.doWithStateCtx {
+            val dictCellRef = scope.sliceLoadNextRef(slice) ?: return@doWithStateCtx
+            stack.add(dictCellRef, TvmCellType)
 
-                newStmt(inst.nextStmt())
+            if (returnUpdatedSlice) {
+                val updatedSlice = memory.allocConcrete(TvmSliceType)
+                sliceCopy(slice, updatedSlice)
+                sliceMoveDataPtr(updatedSlice, bits = 1)
+                sliceMoveRefPtr(updatedSlice)
+                stack.add(updatedSlice, TvmSliceType)
             }
-        )
+
+            newStmt(inst.nextStmt())
+        }
     }
 
     private fun doStoreDictToBuilder(inst: TvmDictSerialInst, scope: TvmStepScope) {
@@ -365,7 +366,7 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
     ) {
         val keyLength = loadKeyLength(scope)
         val dictCellRef = loadDict(scope)
-        val key = loadKey(scope, keyType, keyLength)
+        val key = loadKey(scope, keyType, keyLength) ?: return
         val value = loadValue(scope, valueType)
 
         val dictId = DictId(keyLength)
@@ -446,7 +447,7 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
     ) {
         val keyLength = loadKeyLength(scope)
         val dictCellRef = loadDict(scope)
-        val key = loadKey(scope, keyType, keyLength)
+        val key = loadKey(scope, keyType, keyLength) ?: return
 
         if (dictCellRef == null) {
             scope.doWithStateCtx {
@@ -488,7 +489,7 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
     ) {
         val keyLength = loadKeyLength(scope)
         val dictCellRef = loadDict(scope)
-        val key = loadKey(scope, keyType, keyLength)
+        val key = loadKey(scope, keyType, keyLength) ?: return
 
         if (dictCellRef == null) {
             scope.doWithStateCtx {
@@ -642,7 +643,7 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
     ) {
         val keyLength = loadKeyLength(scope)
         val dictCellRef = loadDict(scope)
-        val key = loadKey(scope, keyType, keyLength)
+        val key = loadKey(scope, keyType, keyLength) ?: return
 
         if (dictCellRef == null) {
             scope.doWithStateCtx {
@@ -782,14 +783,14 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
         scope: TvmStepScope,
         keyType: DictKeyType,
         keyLength: Int
-    ): UExpr<UBvSort> = scope.calcOnStateCtx {
+    ): UExpr<UBvSort>? = scope.calcOnStateCtx {
         // todo: handle keyLength errors
         when (keyType) {
             DictKeyType.SIGNED_INT -> stack.takeLastInt().let { mkBvExtractExpr(high = keyLength - 1, low = 0, it) }
             DictKeyType.UNSIGNED_INT -> stack.takeLastInt().let { mkBvExtractExpr(high = keyLength - 1, low = 0, it) }
             DictKeyType.SLICE -> {
                 val slice = stack.takeLastSlice()
-                sliceLoadDataBits(slice, keyLength)
+                scope.sliceLoadDataBits(slice, keyLength) ?: return@calcOnStateCtx null
             }
         }
     }

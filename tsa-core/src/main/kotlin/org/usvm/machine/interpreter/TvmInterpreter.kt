@@ -1,6 +1,5 @@
 package org.usvm.machine.interpreter
 
-import io.ksmt.expr.KBitVec32Value
 import io.ksmt.expr.KBitVecValue
 import io.ksmt.sort.KBvSort
 import io.ksmt.utils.BvUtils.bigIntValue
@@ -117,16 +116,14 @@ import org.usvm.StepScope
 import org.usvm.UBoolExpr
 import org.usvm.UBvSort
 import org.usvm.UExpr
-import org.usvm.UHeapRef
 import org.usvm.UInterpreter
-import org.usvm.URegisterReading
 import org.usvm.USort
+import org.usvm.api.readField
 import org.usvm.api.writeField
 import org.usvm.collection.field.UFieldLValue
 import org.usvm.forkblacklists.UForkBlackList
 import org.usvm.machine.TvmContext
 import org.usvm.machine.TvmContext.Companion.MAX_DATA_LENGTH
-import org.usvm.machine.TvmContext.Companion.MAX_REFS_NUMBER
 import org.usvm.machine.TvmContext.Companion.cellDataField
 import org.usvm.machine.TvmContext.Companion.cellDataLengthField
 import org.usvm.machine.TvmContext.Companion.cellRefsLengthField
@@ -138,29 +135,34 @@ import org.usvm.machine.state.C4Register
 import org.usvm.machine.state.TvmCellOverflow
 import org.usvm.machine.state.TvmCellUnderflow
 import org.usvm.machine.state.TvmIntegerOverflow
-import org.usvm.machine.state.TvmMethodResult
 import org.usvm.machine.state.TvmRegisters
 import org.usvm.machine.state.TvmStack
 import org.usvm.machine.state.TvmState
 import org.usvm.machine.state.TvmUnknownFailure
+import org.usvm.machine.state.builderCopy
+import org.usvm.machine.state.builderStoreDataBits
 import org.usvm.machine.state.calcOnStateCtx
 import org.usvm.machine.state.doWithStateCtx
+import org.usvm.machine.state.generateSymbolicRef
 import org.usvm.machine.state.lastStmt
 import org.usvm.machine.state.newStmt
 import org.usvm.machine.state.nextStmt
-import org.usvm.machine.state.readCellRef
 import org.usvm.machine.state.returnFromMethod
+import org.usvm.machine.state.setFailure
+import org.usvm.machine.state.sliceCopy
+import org.usvm.machine.state.sliceLoadDataBits
+import org.usvm.machine.state.sliceLoadNextRef
+import org.usvm.machine.state.sliceMoveDataPtr
+import org.usvm.machine.state.sliceMoveRefPtr
 import org.usvm.machine.state.takeLastBuilder
 import org.usvm.machine.state.takeLastCell
 import org.usvm.machine.state.takeLastContinuation
 import org.usvm.machine.state.takeLastInt
 import org.usvm.machine.state.takeLastSlice
-import org.usvm.machine.state.writeCellRef
 import org.usvm.mkSizeAddExpr
 import org.usvm.mkSizeExpr
 import org.usvm.mkSizeGeExpr
 import org.usvm.mkSizeLeExpr
-import org.usvm.mkSizeLtExpr
 import org.usvm.sizeSort
 import org.usvm.solver.USatResult
 import org.usvm.targets.UTargetsSet
@@ -582,10 +584,6 @@ class TvmInterpreter(
         blockOnFalseState = setFailure(TvmIntegerOverflow)
     )
 
-    private fun setFailure(failure: TvmMethodResult.TvmFailure): (TvmState) -> Unit = { state ->
-        state.methodResult = failure
-    }
-
     private fun visitComparisonIntInst(scope: TvmStepScope, stmt: TvmCompareIntInst) {
         when (stmt) {
             is TvmCompareIntEqintInst -> scope.doWithState {
@@ -619,20 +617,11 @@ class TvmInterpreter(
                 with(ctx) {
                     val slice = scope.calcOnState { stack.takeLastSlice() }
 
-                    val cellFieldLValue = UFieldLValue(addressSort, slice, sliceCellField)
-                    val cell = scope.calcOnState { memory.read(cellFieldLValue) }
-
-                    val dataLengthLValue = UFieldLValue(sizeSort, cell, cellDataLengthField)
-                    val dataLength = scope.calcOnState { memory.read(dataLengthLValue) }
-
-                    val refsLengthLValue = UFieldLValue(sizeSort, cell, cellRefsLengthField)
-                    val refsLength = scope.calcOnState { memory.read(refsLengthLValue) }
-
-                    val dataPosLValue = UFieldLValue(sizeSort, slice, sliceDataPosField)
-                    val dataPos = scope.calcOnState { memory.read(dataPosLValue) }
-
-                    val refsPosLValue = UFieldLValue(sizeSort, slice, sliceRefPosField)
-                    val refsPos = scope.calcOnState { memory.read(refsPosLValue) }
+                    val cell = scope.calcOnState { memory.readField(slice, sliceCellField, addressSort) }
+                    val dataPos = scope.calcOnState { memory.readField(slice, sliceDataPosField, sizeSort) }
+                    val refsPos = scope.calcOnState { memory.readField(slice, sliceRefPosField, sizeSort) }
+                    val dataLength = scope.calcOnState { memory.readField(cell, cellDataLengthField, sizeSort) }
+                    val refsLength = scope.calcOnState { memory.readField(cell, cellRefsLengthField, sizeSort) }
 
                     val isRemainingDataEmptyConstraint = mkSizeGeExpr(dataPos, dataLength)
                     val areRemainingRefsEmpty = mkSizeGeExpr(refsPos, refsLength)
@@ -669,56 +658,19 @@ class TvmInterpreter(
     }
 
     private fun visitLoadRefInst(scope: TvmStepScope, stmt: TvmCellParseLdrefInst) {
-        with(ctx) {
-            val slice = scope.calcOnState { stack.takeLastSlice() }
-            val updatedSlice = scope.calcOnState { memory.allocConcrete(TvmSliceType) }
+        val slice = scope.calcOnState { stack.takeLastSlice() }
+        val updatedSlice = scope.calcOnState {
+            memory.allocConcrete(TvmSliceType).also { sliceCopy(slice, it) }
+        }
 
-            val cellFieldLValue = UFieldLValue(addressSort, slice, sliceCellField)
-            val cell = scope.calcOnState { memory.read(cellFieldLValue) }
+        scope.doWithState {
+            val ref = scope.sliceLoadNextRef(slice) ?: return@doWithState
+            sliceMoveRefPtr(updatedSlice)
 
-            val refsLengthLValue = UFieldLValue(sizeSort, cell, cellRefsLengthField)
-            val refsLength = scope.calcOnState { memory.read(refsLengthLValue) }
+            stack.add(ref, TvmCellType)
+            stack.add(updatedSlice, TvmSliceType)
 
-            val correctnessConstraint = mkAnd(
-                mkSizeLeExpr(mkSizeExpr(0), refsLength),
-                mkSizeLeExpr(refsLength, mkSizeExpr(MAX_REFS_NUMBER)),
-            )
-            scope.assert(correctnessConstraint)
-                ?: error("Cannot ensure correctness for number of refs in cell $cell")
-
-            val refsPosLValue = UFieldLValue(sizeSort, slice, sliceRefPosField)
-            // TODO hack!
-            if (slice is URegisterReading) {
-                scope.doWithState { memory.write(refsPosLValue, mkSizeExpr(0)) }
-            }
-            val refsPos = scope.calcOnState { memory.read(refsPosLValue) }
-
-            val readingConstraint = mkSizeLtExpr(refsPos, refsLength)
-
-            scope.fork(
-                readingConstraint,
-                blockOnFalseState = setFailure(TvmCellUnderflow)
-            ) ?: return
-
-            scope.doWithState {
-                val ref = readCellRef(cell, refsPos)
-
-                val newRefsPos = mkSizeAddExpr(refsPos, mkSizeExpr(1))
-
-                val updatedRefsPosLValue = UFieldLValue(sizeSort, updatedSlice, sliceRefPosField)
-
-                val dataPosLValue = UFieldLValue(sizeSort, slice, sliceDataPosField)
-                val dataPos = memory.read(dataPosLValue)
-
-                memory.write(updatedRefsPosLValue, newRefsPos)
-                memory.write(UFieldLValue(sizeSort, updatedSlice, sliceDataPosField), dataPos)
-                memory.write(UFieldLValue(addressSort, updatedSlice, sliceCellField), cell)
-
-                stack.add(ref, TvmCellType)
-                stack.add(updatedSlice, TvmSliceType)
-
-                newStmt(stmt.nextStmt())
-            }
+            newStmt(stmt.nextStmt())
         }
     }
 
@@ -726,20 +678,12 @@ class TvmInterpreter(
         with(ctx) {
             val slice = scope.calcOnState { stack.takeLastSlice() }
 
-            val cellFieldLValue = UFieldLValue(addressSort, slice, sliceCellField)
-            val cell = scope.calcOnState { memory.read(cellFieldLValue) }
+            val cell = scope.calcOnState { memory.readField(slice, sliceCellField, addressSort) }
 
-            val dataLengthLValue = UFieldLValue(sizeSort, cell, cellDataLengthField)
-            val dataLength = scope.calcOnState { memory.read(dataLengthLValue) }
-
-            val dataPosLValue = UFieldLValue(sizeSort, slice, sliceDataPosField)
-            val dataPos = scope.calcOnState { memory.read(dataPosLValue) }
-
-            val refsPosLValue = UFieldLValue(sizeSort, slice, sliceRefPosField)
-            val refsPos = scope.calcOnState { memory.read(refsPosLValue) }
-
-            val refsLengthLValue = UFieldLValue(sizeSort, cell, cellRefsLengthField)
-            val refsLength = scope.calcOnState { memory.read(refsLengthLValue) }
+            val dataLength = scope.calcOnState { memory.readField(cell, cellDataLengthField, sizeSort) }
+            val refsLength = scope.calcOnState { memory.readField(cell, cellRefsLengthField, sizeSort) }
+            val dataPos = scope.calcOnState { memory.readField(slice, sliceDataPosField, sizeSort) }
+            val refsPos = scope.calcOnState { memory.readField(slice, sliceRefPosField, sizeSort) }
 
             val isRemainingDataEmptyConstraint = mkSizeGeExpr(dataPos, dataLength)
             val areRemainingRefsEmpty = mkSizeGeExpr(refsPos, refsLength)
@@ -759,59 +703,20 @@ class TvmInterpreter(
         scope: TvmStepScope,
         stmt: TvmCellParseLduInst
     ) {
-        with(ctx) {
-            val slice = scope.calcOnState { stack.takeLastSlice() }
-            val updatedSlice = scope.calcOnState { memory.allocConcrete(TvmSliceType) }
+        val slice = scope.calcOnState { stack.takeLastSlice() }
+        val updatedSlice = scope.calcOnState {
+            memory.allocConcrete(TvmSliceType).also { sliceCopy(slice, it) }
+        }
 
-            val bitsLen = stmt.c + 1
+        val bitsLen = stmt.c + 1
 
-            val cellFieldLValue = UFieldLValue(addressSort, slice, sliceCellField)
-            val cell = scope.calcOnState { memory.read(cellFieldLValue) }
+        scope.doWithState {
+            val value = scope.sliceLoadDataBits(slice, bitsLen) ?: return@doWithState
+            sliceMoveDataPtr(updatedSlice, bitsLen)
 
-            val dataFieldLValue = UFieldLValue(cellDataSort, cell, cellDataField)
-            val data = scope.calcOnState { memory.read(dataFieldLValue) }
-
-            val dataLengthLValue = UFieldLValue(sizeSort, cell, cellDataLengthField)
-            val dataLength = scope.calcOnState { memory.read(dataLengthLValue) }
-
-            val correctnessConstraint = mkAnd(
-                mkSizeLeExpr(mkSizeExpr(0), dataLength),
-                mkSizeLeExpr(dataLength, mkSizeExpr(MAX_DATA_LENGTH)),
-            )
-            scope.assert(correctnessConstraint)
-                ?: error("Cannot ensure correctness for data length in cell $cell")
-
-            val dataPosLValue = UFieldLValue(sizeSort, slice, sliceDataPosField)
-            val dataPos = scope.calcOnState { memory.read(dataPosLValue) }
-
-            val bitsSizeExpr = mkSizeExpr(bitsLen)
-            val readingEnd = mkSizeAddExpr(dataPos, bitsSizeExpr)
-            val readingConstraint = mkSizeLeExpr(readingEnd, dataLength)
-
-            scope.fork(
-                readingConstraint,
-                blockOnFalseState = setFailure(TvmCellUnderflow)
-            ) ?: return
-
-            val concreteBegin = (dataPos as? KBitVec32Value)?.intValue
-                ?: error("Unknown data pos in slice")
-            val concreteEndIncluding = concreteBegin + bitsLen - 1
-            val readBits = mkBvExtractExpr(high = concreteEndIncluding, low = concreteBegin, value = data)
-            val extendedToIntBits = mkBvZeroExtensionExpr(257 - bitsLen, readBits)
-
-            scope.doWithState {
-                val newDataPos = mkSizeAddExpr(dataPos, bitsSizeExpr)
-                val refsPosLValue = UFieldLValue(sizeSort, slice, sliceRefPosField)
-                val refsPos = memory.read(refsPosLValue)
-
-                memory.write(UFieldLValue(sizeSort, updatedSlice, sliceDataPosField), newDataPos)
-                memory.write(UFieldLValue(sizeSort, updatedSlice, sliceRefPosField), refsPos)
-                memory.write(UFieldLValue(addressSort, updatedSlice, sliceCellField), cell)
-
-                stack.add(extendedToIntBits, TvmIntegerType)
-                stack.add(updatedSlice, TvmSliceType)
-                newStmt(stmt.nextStmt())
-            }
+            stack.add(value, TvmIntegerType)
+            stack.add(updatedSlice, TvmSliceType)
+            newStmt(stmt.nextStmt())
         }
     }
 
@@ -822,7 +727,6 @@ class TvmInterpreter(
         with(ctx) {
             scope.doWithState {
                 val cell = stack.takeLastCell()
-//                ensureCellCorrectness(cell, scope)
 
                 val slice = memory.allocConcrete(TvmSliceType) // TODO concrete or static?
                 stack.add(slice, TvmSliceType)
@@ -858,7 +762,7 @@ class TvmInterpreter(
         with(ctx) {
             scope.doWithState {
                 val builder = stack.takeLastBuilder()
-                val updatedBuilder = memory.allocConcrete(TvmBuilderType)
+                val updatedBuilder = memory.allocConcrete(TvmBuilderType).also { builderCopy(builder, it) }
 
                 val bits = stmt.c + 1
                 val bvSort = mkBvSort(bits.toUInt())
@@ -869,16 +773,9 @@ class TvmInterpreter(
 
                 // TODO how to check out if range if we have already taken the value with the right sort?
 
-                val builderDataLValue = UFieldLValue(cellDataSort, builder, cellDataField)
-                val builderDataLengthLValue = UFieldLValue(sizeSort, builder, cellDataLengthField)
-                val builderRefsLengthLValue = UFieldLValue(sizeSort, builder, cellRefsLengthField)
-
-                val builderData = memory.read(builderDataLValue)
-                val builderDataLength = memory.read(builderDataLengthLValue)
-                val builderRefsLength = memory.read(builderRefsLengthLValue)
+                val builderDataLength = memory.readField(builder, cellDataLengthField, sizeSort)
 
                 val newDataLength = mkSizeAddExpr(builderDataLength, mkSizeExpr(bits))
-
                 val canWriteConstraint = mkSizeLeExpr(newDataLength, mkSizeExpr(MAX_DATA_LENGTH))
 
                 scope.fork(
@@ -886,25 +783,7 @@ class TvmInterpreter(
                     blockOnFalseState = setFailure(TvmCellOverflow)
                 ) ?: return@doWithState
 
-                val valueWithDataSort = mkBv(intValue.stringValue, MAX_DATA_LENGTH.toUInt())
-                val builderLengthWithDataSort = (builderDataLength as? KBitVecValue)
-                    ?.let { mkBv(it.stringValue, MAX_DATA_LENGTH.toUInt()) }
-                    ?: error("Not concrete builder length")
-                val shiftedValue = mkBvShiftLeftExpr(valueWithDataSort, builderLengthWithDataSort)
-                val extendedData = mkBvOrExpr(builderData, shiftedValue)
-
-                val updatedBuilderDataLValue = UFieldLValue(cellDataSort, updatedBuilder, cellDataField)
-                val updatedBuilderDataLengthLValue = UFieldLValue(sizeSort, updatedBuilder, cellDataLengthField)
-                val updatedBuilderRefsLengthLValue = UFieldLValue(sizeSort, updatedBuilder, cellRefsLengthField)
-
-                memory.write(updatedBuilderDataLValue, extendedData)
-                memory.write(updatedBuilderDataLengthLValue, newDataLength)
-                memory.write(updatedBuilderRefsLengthLValue, builderRefsLength)
-                for (i in 0 until MAX_REFS_NUMBER) {
-                    val refIdx = mkSizeExpr(i)
-                    val ref = readCellRef(builder, refIdx)
-                    writeCellRef(updatedBuilder, refIdx, ref)
-                }
+                builderStoreDataBits(updatedBuilder, mkBv(intValue.bigIntValue(), bvSort))
 
                 stack.add(updatedBuilder, TvmBuilderType)
                 newStmt(stmt.nextStmt())
@@ -932,31 +811,15 @@ class TvmInterpreter(
     }
 
     private fun visitEndCellInst(scope: TvmStepScope, stmt: TvmCellBuildEndcInst) {
-        with(ctx) {
-            val builder = scope.calcOnState { stack.takeLastBuilder() }
-            val cell = scope.calcOnState { memory.allocConcrete(TvmCellType) } // TODO static or concrete
+        val builder = scope.calcOnState { stack.takeLastBuilder() }
+        val cell = scope.calcOnState {
+            // TODO static or concrete
+            memory.allocConcrete(TvmCellType).also { builderCopy(builder, it) }
+        }
 
-            val builderDataLValue = UFieldLValue(cellDataSort, builder, cellDataField)
-            val builderDataLengthLValue = UFieldLValue(sizeSort, builder, cellDataLengthField)
-            val builderRefsLengthLValue = UFieldLValue(sizeSort, builder, cellRefsLengthField)
-
-            val builderData = scope.calcOnState { memory.read(builderDataLValue) }
-            val builderDataLength = scope.calcOnState { memory.read(builderDataLengthLValue) }
-            val builderRefsLength = scope.calcOnState { memory.read(builderRefsLengthLValue) }
-
-            scope.doWithState {
-                memory.write(UFieldLValue(cellDataSort, cell, cellDataField), builderData)
-                memory.write(UFieldLValue(sizeSort, cell, cellDataLengthField), builderDataLength)
-                memory.write(UFieldLValue(sizeSort, cell, cellRefsLengthField), builderRefsLength)
-                for (i in 0 until MAX_REFS_NUMBER) {
-                    val refIdx = mkSizeExpr(i)
-                    val ref = readCellRef(builder, refIdx)
-                    writeCellRef(cell, refIdx, ref)
-                }
-
-                stack.add(cell, TvmCellType)
-                newStmt(stmt.nextStmt())
-            }
+        scope.doWithState {
+            stack.add(cell, TvmCellType)
+            newStmt(stmt.nextStmt())
         }
     }
 
@@ -994,7 +857,7 @@ class TvmInterpreter(
             when (registerIndex) {
                 4 -> {
                     val data = registers.c4?.value?.value ?: run {
-                        val symbolicCell = mkSymbolicCell(scope)
+                        val symbolicCell = generateSymbolicRef(TvmCellType)
                         registers.c4 = C4Register(TvmCellValue(symbolicCell))
                         symbolicCell
                     }
@@ -1013,12 +876,6 @@ class TvmInterpreter(
 
         }
     }
-
-    private fun mkSymbolicCell(scope: TvmStepScope): UHeapRef =
-        scope.calcOnState {
-            val cell = memory.allocStatic(TvmCellType) // TODO static?
-            cell
-        }
 
     private fun visitTvmBasicControlFlowInst(
         scope: TvmStepScope,

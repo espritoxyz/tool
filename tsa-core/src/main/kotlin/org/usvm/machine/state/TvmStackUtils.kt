@@ -37,6 +37,10 @@ fun TvmStack.takeLastSlice(): UHeapRef =
             with(ctx) {
                 memory.writeField(it, TvmContext.sliceDataPosField, sizeSort, mkSizeExpr(0), guard = trueExpr)
                 memory.writeField(it, TvmContext.sliceRefPosField, sizeSort, mkSizeExpr(0), guard = trueExpr)
+
+                // Cell in input slices must be represented with static refs to be correctly processed in TvmCellRefsRegion
+                val cell = generateSymbolicRef(TvmCellType)
+                memory.writeField(it, TvmContext.sliceCellField, addressSort, cell, guard = trueExpr)
             }
         }
     }

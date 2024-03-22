@@ -9,16 +9,35 @@ import org.usvm.USort
 import org.usvm.api.readField
 import org.usvm.api.writeField
 import org.usvm.machine.TvmContext
+import org.usvm.machine.interpreter.TvmStepScope
 import org.usvm.memory.UWritableMemory
 import org.usvm.mkSizeAddExpr
 import org.usvm.mkSizeExpr
+import org.usvm.mkSizeLeExpr
+import org.usvm.mkSizeLtExpr
 import org.usvm.sizeSort
 
-fun TvmState.sliceLoadDataBits(slice: UHeapRef, bits: Int): UExpr<UBvSort> = with(ctx) {
+fun TvmStepScope.sliceLoadDataBits(slice: UHeapRef, bits: Int): UExpr<UBvSort>? = calcOnStateCtx {
     val cell = memory.readField(slice, TvmContext.sliceCellField, addressSort)
-    val cellData = memory.readField(cell, TvmContext.cellDataField, cellDataSort)
+    val cellDataLength = memory.readField(cell, TvmContext.cellDataLengthField, sizeSort)
 
+    val correctnessConstraint = mkAnd(
+        mkSizeLeExpr(mkSizeExpr(0), cellDataLength),
+        mkSizeLeExpr(cellDataLength, mkSizeExpr(TvmContext.MAX_DATA_LENGTH)),
+    )
+    assert(correctnessConstraint)
+        ?: error("Cannot ensure correctness for data length in cell $cell")
+
+    val cellData = memory.readField(cell, TvmContext.cellDataField, cellDataSort)
     val dataPosition = memory.readField(slice, TvmContext.sliceDataPosField, sizeSort)
+    val bitsSizeExpr = mkSizeExpr(bits)
+    val readingEnd = mkSizeAddExpr(dataPosition, bitsSizeExpr)
+    val readingConstraint = mkSizeLeExpr(readingEnd, cellDataLength)
+
+    fork(
+        readingConstraint,
+        blockOnFalseState = setFailure(TvmCellUnderflow)
+    ) ?: return@calcOnStateCtx null
 
     if (dataPosition is KBitVecValue<*>) {
         val pos = dataPosition.toBigIntegerSigned().toInt()
@@ -31,9 +50,25 @@ fun TvmState.sliceLoadDataBits(slice: UHeapRef, bits: Int): UExpr<UBvSort> = wit
     }
 }
 
-fun TvmState.sliceLoadNextRef(slice: UHeapRef): UHeapRef = with(ctx) {
+fun TvmStepScope.sliceLoadNextRef(slice: UHeapRef): UHeapRef? = calcOnStateCtx {
     val cell = memory.readField(slice, TvmContext.sliceCellField, addressSort)
+    val refsLength = memory.readField(cell, TvmContext.cellRefsLengthField, sizeSort)
+
+    val correctnessConstraint = mkAnd(
+        mkSizeLeExpr(mkSizeExpr(0), refsLength),
+        mkSizeLeExpr(refsLength, mkSizeExpr(TvmContext.MAX_REFS_NUMBER)),
+    )
+    assert(correctnessConstraint)
+        ?: error("Cannot ensure correctness for number of refs in cell $cell")
+
     val sliceRefPos = memory.readField(slice, TvmContext.sliceRefPosField, sizeSort)
+    val readingConstraint = mkSizeLtExpr(sliceRefPos, refsLength)
+
+    fork(
+        readingConstraint,
+        blockOnFalseState = setFailure(TvmCellUnderflow)
+    ) ?: return@calcOnStateCtx null
+
     readCellRef(cell, sliceRefPos)
 }
 
