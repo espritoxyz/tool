@@ -1,0 +1,137 @@
+"../fiftstdlib/Fift.fif" include
+"../fiftstdlib/Asm.fif" include
+
+PROGRAM{
+  0  DECLMETHOD f_reverse
+  1  DECLMETHOD f_blkswap
+  2  DECLMETHOD f_rot
+  3  DECLMETHOD f_blkdrop2
+  4  DECLMETHOD f_blkdrop
+  5  DECLMETHOD f_blkswx
+  6  DECLMETHOD f_blkpush
+  7  DECLMETHOD f_drop2
+  8  DECLMETHOD f_dropx
+  9  DECLMETHOD f_dup2
+  10 DECLMETHOD f_push2
+  11 DECLMETHOD f_push3
+  12 DECLMETHOD f_xchg2
+  f_reverse PROC:<{
+    0 PUSHINT
+    1 PUSHINT
+    2 PUSHINT
+    3 PUSHINT
+    4 PUSHINT
+    5 PUSHINT
+    6 PUSHINT
+    7 PUSHINT
+    8 PUSHINT
+    9 PUSHINT
+    10 PUSHINT  // 0 1 2 3 4 5 6 7 8 9 10
+    5 3 REVERSE // 0 1 2 7 6 5 4 3 8 9 10
+  }>
+  f_blkswap PROC:<{
+    0 PUSHINT
+    1 PUSHINT
+    2 PUSHINT
+    3 PUSHINT
+    4 PUSHINT
+    5 PUSHINT
+    6 PUSHINT
+    7 PUSHINT
+    8 PUSHINT
+    9 PUSHINT
+    10 PUSHINT  // 0 1 2 3 4 5 6 7 8 9 10
+    5 3 BLKSWAP // 0 1 2 8 9 10 3 4 5 6 7
+  }>
+  f_rot PROC:<{
+    0 PUSHINT
+    1 PUSHINT
+    2 PUSHINT
+    3 PUSHINT
+    4 PUSHINT
+    5 PUSHINT
+    6 PUSHINT
+    7 PUSHINT
+    8 PUSHINT
+    9 PUSHINT
+    10 PUSHINT // 0 1 2 3 4 5 6 7 8 9 10
+    ROT        // 0 1 2 3 4 5 6 7 9 10 8
+  }>
+  f_blkdrop2 PROC:<{
+    0 PUSHINT
+    1 PUSHINT
+    2 PUSHINT
+    3 PUSHINT
+    4 PUSHINT
+    5 PUSHINT     // 0 1 2 3 4 5
+    3 2 BLKDROP2  // 0 4 5
+  }>
+  f_blkdrop PROC:<{
+    0 PUSHINT
+    1 PUSHINT
+    2 PUSHINT
+    3 PUSHINT
+    4 PUSHINT
+    5 PUSHINT  // 0 1 2 3 4 5
+    3 BLKDROP  // 0 1 2
+  }>
+  f_blkswx PROC:<{
+    0 PUSHINT
+    1 PUSHINT
+    2 PUSHINT
+    3 PUSHINT
+    4 PUSHINT
+    5 PUSHINT
+    3 PUSHINT
+    2 PUSHINT  //                    0 1 2 3 4 5 3 2
+    BLKSWX     // i: 2, j: 3, stack: 0 4 5 1 2 3
+  }>
+  f_blkpush PROC:<{
+    0 PUSHINT
+    1 PUSHINT
+    2 PUSHINT
+    3 PUSHINT
+    4 PUSHINT
+    5 PUSHINT    // 0 1 2 3 4 5
+    3 2 BLKPUSH  // 0 1 2 3 4 5 3 4 5
+  }>
+  f_drop2 PROC:<{
+    0 PUSHINT
+    1 PUSHINT
+    2 PUSHINT  // 0 1 2
+    DROP2      // 0
+  }>
+  f_dropx PROC:<{
+    0 PUSHINT
+    1 PUSHINT
+    2 PUSHINT
+    2 PUSHINT
+    2 PUSHINT  //              0 1 2 2 2
+    DROPX      // i: 2, stack: 0 1
+  }>
+  f_dup2 PROC:<{
+    0 PUSHINT
+    1 PUSHINT
+    2 PUSHINT  // 0 1 2
+    DUP2       // 0 1 2 1 2
+  }>
+  f_push2 PROC:<{
+    0 PUSHINT
+    1 PUSHINT
+    2 PUSHINT   // 0 1 2
+    s1 s1 PUSH2 // 0 1 2 1 1
+  }>
+  f_push3 PROC:<{
+    0 PUSHINT
+    1 PUSHINT
+    2 PUSHINT      // 0 1 2
+    s2 s1 s0 PUSH3 // 0 1 2 0 1 2
+  }>
+  f_xchg2 PROC:<{
+    0 PUSHINT
+    1 PUSHINT
+    2 PUSHINT
+    3 PUSHINT    // 0 1 2 3
+    s3 s2 XCHG2  // 2 3 0 1
+  }>
+}END>c

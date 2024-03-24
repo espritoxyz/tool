@@ -1,10 +1,6 @@
-package org.ton.examples
+package org.ton.examples.stack
 
-import io.ksmt.expr.KBitVecValue
-import io.ksmt.utils.BvUtils.toBigIntegerSigned
 import org.ton.bytecode.TvmIntegerType
-import org.usvm.UBvSort
-import org.usvm.UExpr
 import org.usvm.machine.TvmComponents
 import org.usvm.machine.TvmContext
 import org.usvm.machine.compileAndAnalyzeFift
@@ -13,10 +9,10 @@ import kotlin.io.path.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
-class StackOperationTest {
+class StackComplexOperationsTest {
     private val ctx = TvmContext(TvmComponents())
 
-    private val stackReverseFiftPath: String = "/stack/StackReverse.fif"
+    private val stackComplexFiftPath: String = "/stack/StackComplex.fif"
     private val stackNullChecksFiftPath: String = "/stack/NullChecks.fif"
 
     @Test
@@ -32,30 +28,6 @@ class StackOperationTest {
 
         val stackState = stack.loadIntegers(originalOrder.size)
         assertEquals(reversed53Order, stackState)
-    }
-
-    @Test
-    fun testStackReverseFift(): Unit = with(ctx) {
-        val fiftResourcePath = this::class.java.getResource(stackReverseFiftPath)?.path?.let { Path(it) }
-            ?: error("Cannot find resource fift $stackReverseFiftPath")
-
-        val methodStates = compileAndAnalyzeFift(fiftResourcePath)
-
-        val expectedMethodStackValues = mapOf(
-            0 to listOf(0, 1, 2, 7, 6, 5, 4, 3, 8, 9, 10),
-            1 to listOf(0, 1, 2, 8, 9, 10, 3, 4, 5, 6, 7),
-            2 to listOf(0, 1, 2, 3, 4, 5, 6, 7, 9, 10, 8),
-        )
-
-        assertEquals(expectedMethodStackValues.keys, methodStates.keys.mapTo(hashSetOf()) { it.id })
-
-        for ((method, states) in methodStates) {
-            val state = states.single()
-
-            val expectedStackState = expectedMethodStackValues.getValue(method.id)
-            val actualStackState = state.stack.loadIntegers(expectedStackState.size)
-            assertEquals(expectedStackState, actualStackState, "Method id: ${method.id}")
-        }
     }
 
     @Test
@@ -96,9 +68,31 @@ class StackOperationTest {
         }
     }
 
-    private fun TvmStack.loadIntegers(n: Int) = List(n) {
-        takeLast(TvmIntegerType) { error("Impossible") }.intValue.intValue()
-    }.reversed()
+    @Test
+    fun testStackComplexFift(): Unit = with(ctx) {
+        val fiftResourcePath = this::class.java.getResource(stackComplexFiftPath)?.path?.let { Path(it) }
+            ?: error("Cannot find resource fift $stackComplexFiftPath")
+
+        val methodStates = compileAndAnalyzeFift(fiftResourcePath)
+
+        val expectedMethodStackValues = mapOf(
+            0 to listOf(0, 1, 2, 7, 6, 5, 4, 3, 8, 9, 10),
+            1 to listOf(0, 1, 2, 8, 9, 10, 3, 4, 5, 6, 7),
+            2 to listOf(0, 1, 2, 3, 4, 5, 6, 7, 9, 10, 8),
+            3 to listOf(0, 4, 5),
+            4 to listOf(0, 1, 2),
+            5 to listOf(0, 4, 5, 1, 2, 3),
+            6 to listOf(0, 1, 2, 3, 4, 5, 3, 4, 5),
+            7 to listOf(0),
+            8 to listOf(0, 1),
+            9 to listOf(0, 1, 2, 1, 2),
+            10 to listOf(0, 1, 2, 1, 1),
+            11 to listOf(0, 1, 2, 0, 1, 2),
+            12 to listOf(2, 3, 0, 1),
+        )
+
+        compareActualAndExpectedStack(expectedMethodStackValues, methodStates)
+    }
 
     private fun TvmStack.loadIntegersAndNulls(n: Int) = List(n) {
         if (lastIsNull()) {
@@ -109,5 +103,4 @@ class StackOperationTest {
         }
     }.reversed()
 
-    private fun UExpr<UBvSort>.intValue() = (this as KBitVecValue<*>).toBigIntegerSigned().toInt()
 }

@@ -4,12 +4,12 @@
 // Run this script using "fift -n Example.fif"
 
 <{
-    42 PUSHINT
-    17 PUSHINT
-    52 PUSHINT
-    13 PUSHINT
+    0 PUSHINT
+    1 PUSHINT
+    2 PUSHINT
+    3 PUSHINT
     DUMPSTK
-    s0 POP
+    s3 s2 XCHG2
     DUMPSTK
 }>s
 
