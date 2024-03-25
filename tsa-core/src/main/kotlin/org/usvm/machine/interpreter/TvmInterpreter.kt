@@ -31,6 +31,7 @@ import org.ton.bytecode.TvmCellParseLdrefInst
 import org.ton.bytecode.TvmCellParseLduInst
 import org.ton.bytecode.TvmCellType
 import org.ton.bytecode.TvmCellValue
+import org.ton.bytecode.TvmCodeBlock
 import org.ton.bytecode.TvmCodepageInst
 import org.ton.bytecode.TvmCompareIntEqintInst
 import org.ton.bytecode.TvmCompareIntGreaterInst
@@ -160,6 +161,7 @@ import org.usvm.USort
 import org.usvm.api.readField
 import org.usvm.api.writeField
 import org.usvm.collection.field.UFieldLValue
+import org.usvm.constraints.UPathConstraints
 import org.usvm.forkblacklists.UForkBlackList
 import org.usvm.machine.TvmContext
 import org.usvm.machine.TvmContext.Companion.MAX_DATA_LENGTH
@@ -174,6 +176,7 @@ import org.usvm.machine.state.C4Register
 import org.usvm.machine.state.TvmCellOverflow
 import org.usvm.machine.state.TvmCellUnderflow
 import org.usvm.machine.state.TvmIntegerOverflow
+import org.usvm.machine.state.TvmRefEmptyValue
 import org.usvm.machine.state.TvmRegisters
 import org.usvm.machine.state.TvmStack
 import org.usvm.machine.state.TvmState
@@ -182,7 +185,7 @@ import org.usvm.machine.state.builderCopy
 import org.usvm.machine.state.builderStoreDataBits
 import org.usvm.machine.state.calcOnStateCtx
 import org.usvm.machine.state.doWithStateCtx
-import org.usvm.machine.state.generateSymbolicRef
+import org.usvm.machine.state.generateSymbolicCell
 import org.usvm.machine.state.lastStmt
 import org.usvm.machine.state.newStmt
 import org.usvm.machine.state.nextStmt
@@ -198,6 +201,8 @@ import org.usvm.machine.state.takeLastCell
 import org.usvm.machine.state.takeLastContinuation
 import org.usvm.machine.state.takeLastInt
 import org.usvm.machine.state.takeLastSlice
+import org.usvm.memory.UMemory
+import org.usvm.memory.UWritableMemory
 import org.usvm.mkSizeAddExpr
 import org.usvm.mkSizeExpr
 import org.usvm.mkSizeGeExpr
@@ -257,7 +262,21 @@ class TvmInterpreter(
 //        registers.c4 = C4Register(TvmCellValue(contractData))
 
         val stack = TvmStack(ctx)
-        val state = TvmState(ctx, method, currentContinuation, stack, registers, targets = UTargetsSet.from(targets))
+        val pathConstraints = UPathConstraints<TvmType>(ctx)
+        val memory = UMemory<TvmType, TvmCodeBlock>(ctx, pathConstraints.typeConstraints)
+        val refEmptyValue = memory.initializeEmptyRefValues()
+
+        val state = TvmState(
+            ctx = ctx,
+            entrypoint = method,
+            currentContinuation = currentContinuation,
+            stack = stack,
+            registers = registers,
+            memory = memory,
+            pathConstraints = pathConstraints,
+            emptyRefValue = refEmptyValue,
+            targets = UTargetsSet.from(targets)
+        )
         val solver = ctx.solver<TvmType>()
 
         val model = (solver.check(state.pathConstraints) as USatResult).model
@@ -267,6 +286,25 @@ class TvmInterpreter(
         state.newStmt(method.instList.first())
 
         return state
+    }
+
+    private fun UWritableMemory<TvmType>.initializeEmptyRefValues(): TvmRefEmptyValue = with(ctx) {
+        val emptyCell = allocStatic(TvmCellType)
+        writeField(emptyCell, cellDataField, cellDataSort, mkBv(0, cellDataSort), guard = trueExpr)
+        writeField(emptyCell, cellRefsLengthField, sizeSort, mkSizeExpr(0), guard = trueExpr)
+        writeField(emptyCell, cellDataLengthField, sizeSort, mkSizeExpr(0), guard = trueExpr)
+
+        val emptyBuilder = allocStatic(TvmBuilderType)
+        writeField(emptyBuilder, cellDataField, cellDataSort, mkBv(0, cellDataSort), guard = trueExpr)
+        writeField(emptyBuilder, cellRefsLengthField, sizeSort, mkSizeExpr(0), guard = trueExpr)
+        writeField(emptyBuilder, cellDataLengthField, sizeSort, mkSizeExpr(0), guard = trueExpr)
+
+        val emptySlice = allocStatic(TvmBuilderType)
+        writeField(emptySlice, sliceCellField, addressSort, emptyCell, guard = trueExpr)
+        writeField(emptySlice, sliceRefPosField, sizeSort, mkSizeExpr(0), guard = trueExpr)
+        writeField(emptySlice, sliceDataPosField, sizeSort, mkSizeExpr(0), guard = trueExpr)
+
+        TvmRefEmptyValue(emptyCell, emptySlice, emptyBuilder)
     }
 
     override fun step(state: TvmState): StepResult<TvmState> {
@@ -971,7 +1009,7 @@ class TvmInterpreter(
             when (registerIndex) {
                 4 -> {
                     val data = registers.c4?.value?.value ?: run {
-                        val symbolicCell = generateSymbolicRef(TvmCellType)
+                        val symbolicCell = generateSymbolicCell()
                         registers.c4 = C4Register(TvmCellValue(symbolicCell))
                         symbolicCell
                     }

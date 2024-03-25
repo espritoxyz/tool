@@ -3,6 +3,7 @@ package org.usvm.machine.state
 import io.ksmt.expr.KBitVecValue
 import io.ksmt.utils.BvUtils.toBigIntegerSigned
 import org.usvm.UBvSort
+import org.usvm.UConcreteHeapRef
 import org.usvm.UExpr
 import org.usvm.UHeapRef
 import org.usvm.USort
@@ -90,16 +91,11 @@ fun TvmState.sliceMoveRefPtr(slice: UHeapRef) = with(ctx) {
     memory.writeField(slice, TvmContext.sliceRefPosField, sizeSort, updatedRefPosition, guard = trueExpr)
 }
 
-fun TvmState.builderCopy(original: UHeapRef, result: UHeapRef) = with(ctx) {
+fun TvmState.builderCopy(original: UHeapRef, result: UConcreteHeapRef) = with(ctx) {
     memory.copyField(original, result, TvmContext.cellDataField, cellDataSort)
     memory.copyField(original, result, TvmContext.cellDataLengthField, sizeSort)
     memory.copyField(original, result, TvmContext.cellRefsLengthField, sizeSort)
-
-    for (i in 0 until TvmContext.MAX_REFS_NUMBER) {
-        val refIdx = mkSizeExpr(i)
-        val ref = readCellRef(original, refIdx)
-        writeCellRef(result, refIdx, ref)
-    }
+    copyCellRefs(original, result)
 }
 
 fun TvmState.builderStoreDataBits(builder: UHeapRef, bits: UExpr<UBvSort>) = with(ctx) {

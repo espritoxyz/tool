@@ -11,11 +11,6 @@ import org.ton.bytecode.TvmTupleType
 import org.usvm.UBvSort
 import org.usvm.UExpr
 import org.usvm.UHeapRef
-import org.usvm.api.writeField
-import org.usvm.isStaticHeapRef
-import org.usvm.machine.TvmContext
-import org.usvm.mkSizeExpr
-import org.usvm.sizeSort
 
 fun TvmStack.takeLastInt(): UExpr<UBvSort> {
     val intStackValue = takeLast(TvmIntegerType) { id ->
@@ -27,39 +22,27 @@ fun TvmStack.takeLastInt(): UExpr<UBvSort> {
 
 context(TvmState)
 fun TvmStack.takeLastCell(): UHeapRef =
-    takeLastRef(this, TvmCellType, TvmStack.TvmStackValue::cellValue)
+    takeLastRef(this, TvmCellType, TvmStack.TvmStackValue::cellValue) {
+        generateSymbolicCell()
+    }
 
 context(TvmState)
 fun TvmStack.takeLastSlice(): UHeapRef =
-    takeLastRef(this, TvmSliceType, TvmStack.TvmStackValue::sliceValue).also {
-        if (it.isCellViewInputRef()) {
-            // TODO hack! Assume that all input slices were not read, that means dataPos == 0 and refsPos == 0
-            with(ctx) {
-                memory.writeField(it, TvmContext.sliceDataPosField, sizeSort, mkSizeExpr(0), guard = trueExpr)
-                memory.writeField(it, TvmContext.sliceRefPosField, sizeSort, mkSizeExpr(0), guard = trueExpr)
-
-                // Cell in input slices must be represented with static refs to be correctly processed in TvmCellRefsRegion
-                val cell = generateSymbolicRef(TvmCellType)
-                memory.writeField(it, TvmContext.sliceCellField, addressSort, cell, guard = trueExpr)
-            }
-        }
+    takeLastRef(this, TvmSliceType, TvmStack.TvmStackValue::sliceValue) {
+        generateSymbolicSlice()
     }
 
 context(TvmState)
 fun TvmStack.takeLastBuilder(): UHeapRef =
-    takeLastRef(this, TvmBuilderType, TvmStack.TvmStackValue::builderValue).also {
-        if (it.isCellViewInputRef()) {
-            // TODO hack! Assume that all input builder were not written, that means dataLength == 0 and refsLength == 0
-            with(ctx) {
-                memory.writeField(it, TvmContext.cellDataLengthField, sizeSort, mkSizeExpr(0), guard = trueExpr)
-                memory.writeField(it, TvmContext.cellRefsLengthField, sizeSort, mkSizeExpr(0), guard = trueExpr)
-            }
-        }
+    takeLastRef(this, TvmBuilderType, TvmStack.TvmStackValue::builderValue) {
+        generateSymbolicBuilder()
     }
 
 context(TvmState)
 fun TvmStack.takeLastTuple(): UHeapRef =
-    takeLastRef(this, TvmTupleType, TvmStack.TvmStackValue::tupleValue)
+    takeLastRef(this, TvmTupleType, TvmStack.TvmStackValue::tupleValue) {
+        generateSymbolicTuple()
+    }
 
 fun TvmStack.takeLastContinuation(): TvmContinuationValue {
     val continuationStackValue = takeLast(TvmContinuationType) { _ ->
@@ -73,19 +56,9 @@ context(TvmState)
 private fun takeLastRef(
     stack: TvmStack,
     referenceType: TvmReferenceType,
-    extractValue: TvmStack.TvmStackValue.() -> UHeapRef
+    extractValue: TvmStack.TvmStackValue.() -> UHeapRef,
+    generateSymbolicRef: (Int) -> UHeapRef
 ): UHeapRef {
-    val lastRefValue = stack.takeLast(referenceType) {
-        generateSymbolicRef(referenceType)
-    }
-
+    val lastRefValue = stack.takeLast(referenceType, generateSymbolicRef)
     return lastRefValue.extractValue()
 }
-
-/**
- * For now, we make static refs for all used (popped from the stack) input non-primitive values.
- * Any possible ite expressions could be made only in the [org.usvm.machine.state.TvmCellRefsRegion.readCellRef] method,
- * which is used only for cells, that do not require any input constraints. So, any cell view ([TvmSliceType] or [TvmBuilderType])
- * could be either static ref or allocated ref, that was allocated in the body of the method.
- */
-private fun UHeapRef.isCellViewInputRef(): Boolean = isStaticHeapRef(this)

@@ -1,15 +1,22 @@
 package org.usvm.machine.state
 
+import kotlinx.collections.immutable.PersistentSet
+import kotlinx.collections.immutable.persistentHashSetOf
 import kotlinx.collections.immutable.persistentListOf
 import org.ton.bytecode.TvmCodeBlock
 import org.ton.bytecode.TvmContinuationValue
 import org.ton.bytecode.TvmInst
+import org.ton.bytecode.TvmReferenceType
 import org.ton.bytecode.TvmType
 import org.ton.targets.TvmTarget
 import org.usvm.PathNode
 import org.usvm.UCallStack
+import org.usvm.UConcreteHeapAddress
+import org.usvm.UConcreteHeapRef
+import org.usvm.UHeapRef
 import org.usvm.UState
 import org.usvm.constraints.UPathConstraints
+import org.usvm.isStaticHeapRef
 import org.usvm.machine.TvmContext
 import org.usvm.memory.UMemory
 import org.usvm.model.UModelBase
@@ -22,10 +29,12 @@ class TvmState(
     var currentContinuation: TvmContinuationValue,
     var stack: TvmStack = TvmStack(ctx, persistentListOf()),
     var registers: TvmRegisters,
+    val emptyRefValue: TvmRefEmptyValue,
+    private var symbolicRefs: PersistentSet<UConcreteHeapAddress> = persistentHashSetOf(),
     // TODO codepage and gas
     callStack: UCallStack<TvmCodeBlock, TvmInst> = UCallStack(),
-    pathConstraints: UPathConstraints<TvmType> = UPathConstraints(ctx),
-    memory: UMemory<TvmType, TvmCodeBlock> = UMemory(ctx, pathConstraints.typeConstraints),
+    pathConstraints: UPathConstraints<TvmType>,
+    memory: UMemory<TvmType, TvmCodeBlock>,
     models: List<UModelBase<TvmType>> = listOf(),
     pathNode: PathNode<TvmInst> = PathNode.root(),
     var methodResult: TvmMethodResult = TvmMethodResult.NoCall,
@@ -52,6 +61,8 @@ class TvmState(
             currentContinuation, // TODO clone?
             stack.clone(), // TODO clone?
             registers.copy(),
+            emptyRefValue,
+            symbolicRefs,
             callStack.clone(),
             clonedConstraints,
             memory.clone(clonedConstraints.typeConstraints),
@@ -66,5 +77,22 @@ class TvmState(
         appendLine("Instruction: $lastStmt")
         if (isExceptional) appendLine("Exception: $methodResult")
         appendLine(callStack)
+    }
+
+    fun generateSymbolicRef(referenceType: TvmReferenceType): UConcreteHeapRef =
+        memory.allocStatic(referenceType).also { symbolicRefs = symbolicRefs.add(it.address) }
+
+    fun ensureSymbolicRefInitialized(
+        ref: UHeapRef,
+        referenceType: TvmReferenceType,
+        initializer: TvmState.(UConcreteHeapRef) -> Unit = {}
+    ) {
+        check(isStaticHeapRef(ref)) { "Symbolic ref expected, but $ref received" }
+
+        val refs = symbolicRefs.add(ref.address)
+        if (refs === symbolicRefs) return
+
+        memory.types.allocate(ref.address, referenceType)
+        initializer(ref)
     }
 }
