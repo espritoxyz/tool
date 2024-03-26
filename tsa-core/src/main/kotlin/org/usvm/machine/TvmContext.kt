@@ -13,6 +13,7 @@ import org.usvm.UBvSort
 import org.usvm.UComponents
 import org.usvm.UConcreteHeapRef
 import org.usvm.UContext
+import org.usvm.UExpr
 
 // TODO: There is no size sort in TVM because of absence of arrays, but we need to represent cell data as boolean arrays
 //  with size no more than 1023
@@ -32,6 +33,26 @@ class TvmContext(components : UComponents<TvmType, TvmSizeSort>) : UContext<TvmS
     val nullValue: UConcreteHeapRef = mkConcreteHeapRef(NULL_ADDRESS)
 
     fun Number.toBv257(): KBitVecValue<UBvSort> = mkBv(toBigInteger(), int257sort)
+
+    fun UExpr<UBvSort>.signedExtendToInteger(): UExpr<UBvSort> {
+        val extensionSize = int257sort.sizeBits - sort.sizeBits
+        check(extensionSize <= int257sort.sizeBits) {
+            "Cannot extend $this to bits more than ${int257sort.sizeBits}"
+        }
+
+        val extendedValue = mkBvSignExtensionExpr(extensionSize.toInt(), this)
+        return extendedValue
+    }
+
+    fun UExpr<UBvSort>.unsignedExtendToInteger(): UExpr<UBvSort> {
+        val extensionSize = int257sort.sizeBits - sort.sizeBits
+        check(extensionSize <= int257sort.sizeBits) {
+            "Cannot extend $this to bits more than ${int257sort.sizeBits}"
+        }
+
+        val extendedValue = mkBvZeroExtensionExpr(extensionSize.toInt(), this)
+        return extendedValue
+    }
 
     companion object {
         const val MAX_DATA_LENGTH: Int = 1023

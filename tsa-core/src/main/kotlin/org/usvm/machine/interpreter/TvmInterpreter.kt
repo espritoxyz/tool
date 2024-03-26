@@ -938,8 +938,8 @@ class TvmInterpreter(
 
         val bitsLen = stmt.c + 1
 
-        scope.doWithState {
-            val value = scope.sliceLoadDataBits(slice, bitsLen) ?: return@doWithState
+        scope.doWithStateCtx {
+            val value = scope.sliceLoadDataBits(slice, bitsLen)?.unsignedExtendToInteger() ?: return@doWithStateCtx
             sliceMoveDataPtr(updatedSlice, bitsLen)
 
             stack.add(value, TvmIntegerType)

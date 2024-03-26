@@ -142,10 +142,10 @@ import org.usvm.machine.state.ensureSymbolicCellInitialized
 import org.usvm.machine.state.ensureSymbolicSliceInitialized
 import org.usvm.machine.state.generateSymbolicCell
 import org.usvm.machine.state.generateSymbolicSlice
-import org.usvm.machine.state.sliceLoadDataBits
 import org.usvm.machine.state.newStmt
 import org.usvm.machine.state.nextStmt
 import org.usvm.machine.state.sliceCopy
+import org.usvm.machine.state.sliceLoadDataBits
 import org.usvm.machine.state.sliceLoadNextRef
 import org.usvm.machine.state.sliceMoveDataPtr
 import org.usvm.machine.state.sliceMoveRefPtr
@@ -806,14 +806,12 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
     private fun TvmState.storeKey(keyType: DictKeyType, key: UExpr<UBvSort>) = with(ctx) {
         when (keyType) {
             DictKeyType.SIGNED_INT -> {
-                val extensionSize = int257sort.sizeBits - key.sort.sizeBits
-                val keyValue = mkBvSignExtensionExpr(extensionSize.toInt(), key)
+                val keyValue = key.signedExtendToInteger()
                 stack.add(keyValue, TvmIntegerType)
             }
 
             DictKeyType.UNSIGNED_INT -> {
-                val extensionSize = int257sort.sizeBits - key.sort.sizeBits
-                val keyValue = mkBvZeroExtensionExpr(extensionSize.toInt(), key)
+                val keyValue = key.unsignedExtendToInteger()
                 stack.add(keyValue, TvmIntegerType)
             }
 
