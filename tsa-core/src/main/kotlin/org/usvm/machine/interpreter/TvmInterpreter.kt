@@ -33,12 +33,20 @@ import org.ton.bytecode.TvmCellType
 import org.ton.bytecode.TvmCellValue
 import org.ton.bytecode.TvmCodeBlock
 import org.ton.bytecode.TvmCodepageInst
+import org.ton.bytecode.TvmCompareIntChknanInst
+import org.ton.bytecode.TvmCompareIntCmpInst
 import org.ton.bytecode.TvmCompareIntEqintInst
+import org.ton.bytecode.TvmCompareIntEqualInst
+import org.ton.bytecode.TvmCompareIntGeqInst
 import org.ton.bytecode.TvmCompareIntGreaterInst
+import org.ton.bytecode.TvmCompareIntGtintInst
 import org.ton.bytecode.TvmCompareIntInst
+import org.ton.bytecode.TvmCompareIntIsnanInst
 import org.ton.bytecode.TvmCompareIntLeqInst
 import org.ton.bytecode.TvmCompareIntLessInst
+import org.ton.bytecode.TvmCompareIntLessintInst
 import org.ton.bytecode.TvmCompareIntNeqInst
+import org.ton.bytecode.TvmCompareIntNeqintInst
 import org.ton.bytecode.TvmCompareIntSgnInst
 import org.ton.bytecode.TvmCompareOtherInst
 import org.ton.bytecode.TvmCompareOtherSemptyInst
@@ -795,7 +803,7 @@ class TvmInterpreter(
         if (sort !is UBvSort) {
             return Unit
         }
-        val neqZero = mkEq(expr.cast(), mkBv(0, sort)).not()
+        val neqZero = mkEq(expr.cast(), zeroValue).not()
         scope.fork(
             neqZero,
             blockOnFalseState = setFailure(TvmIntegerOverflow)
@@ -812,31 +820,95 @@ class TvmInterpreter(
         blockOnFalseState = setFailure(TvmIntegerOverflow)
     )
 
-    private fun visitComparisonIntInst(scope: TvmStepScope, stmt: TvmCompareIntInst) {
+    private fun visitComparisonIntInst(scope: TvmStepScope, stmt: TvmCompareIntInst) = with(ctx) {
         when (stmt) {
+            is TvmAliasInst -> visit(scope, stmt.resolveAlias())
             is TvmCompareIntEqintInst -> scope.doWithState {
                 val x = stack.takeLastInt()
-                val y = ctx.mkBv(stmt.y, x.sort)
-
-                scope.fork(
-                    ctx.mkEq(x, y),
-                    blockOnFalseState = {
-                        stack.add(ctx.falseValue, TvmIntegerType)
-                        newStmt(stmt.nextStmt())
-                    },
-                    blockOnTrueState = {
-                        stack.add(ctx.trueValue, TvmIntegerType)
-                        newStmt(stmt.nextStmt())
-                    }
-                )
+                val y = stmt.y.toBv257()
+                val expr = x eq y
+                putBooleanAndToNewStmt(stmt, expr)
             }
-            is TvmCompareIntGreaterInst -> TODO()
-            is TvmCompareIntLeqInst -> TODO()
-            is TvmCompareIntLessInst -> TODO()
-            is TvmCompareIntNeqInst -> TODO()
-            is TvmCompareIntSgnInst -> TODO()
-            else -> TODO("Unknown stmt: $stmt")
+            is TvmCompareIntNeqintInst -> scope.doWithState {
+                val x = stack.takeLastInt()
+                val y = stmt.y.toBv257()
+                val expr = (x eq y).not()
+                putBooleanAndToNewStmt(stmt, expr)
+            }
+            is TvmCompareIntGtintInst -> scope.doWithState {
+                val x = stack.takeLastInt()
+                val y = stmt.y.toBv257()
+                val expr = mkBvSignedGreaterExpr(x, y)
+                putBooleanAndToNewStmt(stmt, expr)
+            }
+            is TvmCompareIntLessintInst -> scope.doWithState {
+                val x = stack.takeLastInt()
+                val y = stmt.y.toBv257()
+                val expr = mkBvSignedLessExpr(x, y)
+                putBooleanAndToNewStmt(stmt, expr)
+            }
+            is TvmCompareIntEqualInst -> scope.doWithState {
+                val y = stack.takeLastInt()
+                val x = stack.takeLastInt()
+                val expr = x eq y
+                putBooleanAndToNewStmt(stmt, expr)
+            }
+            is TvmCompareIntNeqInst -> scope.doWithState {
+                val y = stack.takeLastInt()
+                val x = stack.takeLastInt()
+                val expr = (x eq y).not()
+                putBooleanAndToNewStmt(stmt, expr)
+            }
+            is TvmCompareIntGreaterInst -> scope.doWithState {
+                val y = stack.takeLastInt()
+                val x = stack.takeLastInt()
+                val expr = mkBvSignedGreaterExpr(x, y)
+                putBooleanAndToNewStmt(stmt, expr)
+            }
+            is TvmCompareIntGeqInst -> scope.doWithState {
+                val y = stack.takeLastInt()
+                val x = stack.takeLastInt()
+                val expr = mkBvSignedGreaterOrEqualExpr(x, y)
+                putBooleanAndToNewStmt(stmt, expr)
+            }
+            is TvmCompareIntLessInst -> scope.doWithState {
+                val y = stack.takeLastInt()
+                val x = stack.takeLastInt()
+                val expr = mkBvSignedLessExpr(x, y)
+                putBooleanAndToNewStmt(stmt, expr)
+            }
+            is TvmCompareIntLeqInst -> scope.doWithState {
+                val y = stack.takeLastInt()
+                val x = stack.takeLastInt()
+                val expr = mkBvSignedLessOrEqualExpr(x, y)
+                putBooleanAndToNewStmt(stmt, expr)
+            }
+            is TvmCompareIntCmpInst -> scope.doWithState {
+                val y = stack.takeLastInt()
+                val x = stack.takeLastInt()
+                doCmp(stmt, x, y)
+            }
+            is TvmCompareIntSgnInst -> scope.doWithState {
+                val x = stack.takeLastInt()
+                doCmp(stmt, x, zeroValue)
+            }
+            is TvmCompareIntChknanInst -> TODO()
+            is TvmCompareIntIsnanInst -> TODO()
         }
+    }
+
+    private fun TvmState.doCmp(stmt: TvmInst, x: UExpr<UBvSort>, y: UExpr<UBvSort>) {
+        val value = with(ctx) {
+            mkIte(x eq y, zeroValue, mkIte(mkBvSignedLessExpr(x, y), minusOneValue, oneValue))
+        }
+        stack.add(value, TvmIntegerType)
+        newStmt(stmt.nextStmt())
+    }
+
+    private fun TvmState.putBooleanAndToNewStmt(stmt: TvmInst, expr: UBoolExpr) {
+        val value = ctx.mkIte(expr, ctx.trueValue, ctx.falseValue)
+        stack.add(value, TvmIntegerType)
+        newStmt(stmt.nextStmt())
     }
 
     private fun visitComparisonOtherInst(scope: TvmStepScope, stmt: TvmCompareOtherInst) {

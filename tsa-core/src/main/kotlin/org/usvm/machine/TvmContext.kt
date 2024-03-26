@@ -29,6 +29,7 @@ class TvmContext(components : UComponents<TvmType, TvmSizeSort>) : UContext<TvmS
     val falseValue: KBitVecValue<UBvSort> = 0.toBv257()
     val oneValue: KBitVecValue<UBvSort> = 1.toBv257()
     val zeroValue: KBitVecValue<UBvSort> = falseValue
+    val minusOneValue = trueValue
 
     val nullValue: UConcreteHeapRef = mkConcreteHeapRef(NULL_ADDRESS)
 

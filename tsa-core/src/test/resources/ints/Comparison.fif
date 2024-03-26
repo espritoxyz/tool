@@ -1,0 +1,85 @@
+"../fiftstdlib/Fift.fif" include
+"../fiftstdlib/Asm.fif" include
+
+
+PROGRAM{
+  0 DECLMETHOD f_cmp_1
+  1 DECLMETHOD f_cmp_2
+  2 DECLMETHOD f_cmp_3
+  3 DECLMETHOD f_sgn_1
+  4 DECLMETHOD f_sgn_2
+  5 DECLMETHOD f_sgn_3
+  6 DECLMETHOD f_gt
+  7 DECLMETHOD f_ge
+  8 DECLMETHOD f_lt
+  9 DECLMETHOD f_le
+  10 DECLMETHOD f_eq
+  11 DECLMETHOD f_neq
+  12 DECLMETHOD f_eqint
+  13 DECLMETHOD f_neqint
+  f_cmp_1 PROC:<{
+      0 PUSHINT
+      1 PUSHINT
+      CMP
+  }>
+  f_cmp_2 PROC:<{
+      0 PUSHINT
+      0 PUSHINT
+      CMP
+  }>
+  f_cmp_3 PROC:<{
+      1 PUSHINT
+      0 PUSHINT
+      CMP
+  }>
+  f_sgn_1 PROC:<{
+      10 PUSHINT
+      SGN
+  }>
+  f_sgn_2 PROC:<{
+      0 PUSHINT
+      SGN
+  }>
+  f_sgn_3 PROC:<{
+      -10 PUSHINT
+      SGN
+  }>
+  f_gt PROC:<{
+      0 PUSHINT
+      1 PUSHINT
+      GREATER
+  }>
+  f_ge PROC:<{
+      0 PUSHINT
+      1 PUSHINT
+      GEQ
+  }>
+  f_lt PROC:<{
+      0 PUSHINT
+      1 PUSHINT
+      LESS
+  }>
+  f_le PROC:<{
+      0 PUSHINT
+      1 PUSHINT
+      LEQ
+  }>
+  f_eq PROC:<{
+      0 PUSHINT
+      1 PUSHINT
+      EQUAL
+  }>
+  f_neq PROC:<{
+      0 PUSHINT
+      1 PUSHINT
+      NEQ
+  }>
+  f_eqint PROC:<{
+      0 PUSHINT
+      1 EQINT
+  }>
+  f_neqint PROC:<{
+      0 PUSHINT
+      1 NEQINT
+  }>
+}END>c
