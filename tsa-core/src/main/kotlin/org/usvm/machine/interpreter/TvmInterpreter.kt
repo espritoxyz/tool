@@ -76,6 +76,7 @@ import org.ton.bytecode.TvmContConditionalIfretInst
 import org.ton.bytecode.TvmContConditionalInst
 import org.ton.bytecode.TvmContDictCalldictInst
 import org.ton.bytecode.TvmContDictInst
+import org.ton.bytecode.TvmContLoopsInst
 import org.ton.bytecode.TvmContRegistersInst
 import org.ton.bytecode.TvmContRegistersPopctrInst
 import org.ton.bytecode.TvmContRegistersPushctrInst
@@ -234,6 +235,7 @@ class TvmInterpreter(
     }
 
     private val dictOperationInterpreter = TvmDictOperationInterpreter(ctx)
+    private val loopsInterpreter = TvmLoopsInterpreter(ctx)
 
     fun getInitialState(contractCode: TvmContractCode, contractData: Cell, methodId: Int, targets: List<TvmTarget> = emptyList()): TvmState {
         /*val contract = contractCode.methods[0]!!
@@ -356,6 +358,7 @@ class TvmInterpreter(
             is TvmDictSpecialInst -> visitDictControlFlowInst(scope, stmt)
             is TvmTupleInst -> visitTvmTupleInst(scope, stmt)
             is TvmDictInst -> dictOperationInterpreter.visitTvmDictInst(scope, stmt)
+            is TvmContLoopsInst -> loopsInterpreter.visitTvmContLoopsInst(scope, stmt)
             else -> TODO("$stmt")
         }
     }
@@ -657,11 +660,10 @@ class TvmInterpreter(
 
     private fun visitPushContShortInst(scope: TvmStepScope, stmt: TvmConstDataPushcontShortInst) {
         scope.doWithState {
-            val lambda = TvmLambda(stmt.s)
+            val lambda = TvmLambda(stmt.s.toMutableList())
             val continuationValue = TvmContinuationValue(lambda, stack, registers)
 
             stack += continuationValue
-            currentContinuation = continuationValue
             newStmt(stmt.nextStmt())
         }
     }

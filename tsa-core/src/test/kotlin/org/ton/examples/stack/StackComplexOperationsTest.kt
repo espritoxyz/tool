@@ -1,6 +1,9 @@
 package org.ton.examples.stack
 
 import org.ton.bytecode.TvmIntegerType
+import org.ton.examples.compareActualAndExpectedStack
+import org.ton.examples.intValue
+import org.ton.examples.loadIntegers
 import org.usvm.machine.TvmComponents
 import org.usvm.machine.TvmContext
 import org.usvm.machine.compileAndAnalyzeFift

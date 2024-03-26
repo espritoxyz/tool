@@ -19,9 +19,14 @@ sealed class TvmCodeBlock {
 @SerialName("TvmMethod")
 data class TvmMethod(
     val id: Int,
-    override val instList: List<TvmInst>
+    @SerialName("instList")
+    private val instListRaw: MutableList<TvmInst>
 ) : TvmCodeBlock() {
+    override val instList: List<TvmInst>
+        get() = instListRaw
+
     init {
+        instListRaw += TvmContBasicRetInst(TvmInstMethodLocation(id, instListRaw.size))
         initLocationsCodeBlock()
     }
 }
@@ -30,9 +35,14 @@ data class TvmMethod(
 @Serializable
 @SerialName("TvmLambda")
 data class TvmLambda(
-    override val instList: List<TvmInst>
+    @SerialName("instList")
+    private val instListRaw: MutableList<TvmInst>
 ) : TvmCodeBlock() {
+    override val instList: List<TvmInst>
+        get() = instListRaw
+
     init {
+        instListRaw += TvmContBasicRetInst(TvmInstLambdaLocation(instListRaw.size))
         initLocationsCodeBlock()
     }
 }

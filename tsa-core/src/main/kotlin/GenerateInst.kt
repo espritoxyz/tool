@@ -137,7 +137,7 @@ private fun tvmInstSubSliceOperandGetter(
 
 private fun tvmInstCategoryDeclaration(category: String): String {
     var additionalCategories = ""
-    if (category !=  ADDITIONAL_CATEGORY_DICT && category.lowercase().startsWith(ADDITIONAL_CATEGORY_DICT)) {
+    if (category != ADDITIONAL_CATEGORY_DICT && category.lowercase().startsWith(ADDITIONAL_CATEGORY_DICT)) {
         additionalCategories += ", ${tvmInstCategoryClassName(ADDITIONAL_CATEGORY_DICT)}"
     }
 

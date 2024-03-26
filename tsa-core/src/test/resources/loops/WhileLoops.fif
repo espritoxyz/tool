@@ -1,0 +1,55 @@
+"../fiftstdlib/Fift.fif" include
+"../fiftstdlib/Asm.fif" include
+
+PROGRAM{
+  0 DECLMETHOD f_while
+  1 DECLMETHOD f_while_with_arg
+  2 DECLMETHOD f_whileend
+  f_while PROC:<{
+    0 PUSHINT
+    1 PUSHINT
+    CONT:<{
+      OVER
+      5 NEQINT
+    }>
+    CONT:<{
+      2 PUSHINT
+      MUL
+      SWAP
+      INC
+      SWAP
+    }>
+    WHILE
+    // 5 32
+  }>
+f_while_with_arg PROC:<{
+    0 PUSHINT
+    1 PUSHINT
+    WHILE:<{
+      OVER
+      5 NEQINT
+    }>DO<{
+      2 PUSHINT
+      MUL
+      SWAP
+      INC
+      SWAP
+    }>
+    // 5 32
+  }>
+  f_whileend PROC:<{
+    0 PUSHINT
+    1 PUSHINT
+    CONT:<{
+      OVER
+      5 NEQINT
+    }>
+    WHILEEND
+      2 PUSHINT
+      MUL
+      SWAP
+      INC
+      SWAP
+    // 5 32
+  }>
+}END>c

@@ -1,0 +1,50 @@
+"../fiftstdlib/Fift.fif" include
+"../fiftstdlib/Asm.fif" include
+
+PROGRAM{
+  0 DECLMETHOD f_until
+  1 DECLMETHOD f_until_with_arg
+  2 DECLMETHOD f_untilend
+  f_until PROC:<{
+    0 PUSHINT
+    1 PUSHINT
+    CONT:<{
+        2 PUSHINT
+        MUL
+        SWAP
+        INC
+        DUP
+        5 EQINT
+        s1 s2 XCHG
+    }>
+    UNTIL
+    // 5 32
+  }>
+  f_until_with_arg PROC:<{
+    0 PUSHINT
+    1 PUSHINT
+    UNTIL:<{
+        2 PUSHINT
+        MUL
+        SWAP
+        INC
+        DUP
+        5 EQINT
+        s1 s2 XCHG
+    }>
+    // 5 32
+  }>
+  f_untilend PROC:<{
+    0 PUSHINT
+    1 PUSHINT
+    UNTIL:
+        2 PUSHINT
+        MUL
+        SWAP
+        INC
+        DUP
+        5 EQINT
+        s1 s2 XCHG
+    // 5 32
+  }>
+}END>c

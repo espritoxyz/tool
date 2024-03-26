@@ -67,6 +67,9 @@ data class TvmContinuationValue(
     var currentInstIndex: Int = 0
 ) : TvmValue {
     override val type: TvmContinuationType = TvmContinuationType
+
+    fun takeCurrentStmt(): TvmInst = codeBlock.instList.getOrNull(currentInstIndex)
+        ?: error("No instruction with index $currentInstIndex in code block $codeBlock")
 }
 
 /*data class TvmCell(

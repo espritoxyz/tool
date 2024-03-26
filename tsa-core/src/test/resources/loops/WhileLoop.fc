@@ -1,0 +1,19 @@
+#include "../imports/stdlib.fc";
+
+int while_loop() method_id {
+    int i = 0;
+    int x = 1;
+    while (i != 5) {
+        x *= 2;
+        i += 1;
+    }
+
+    return x;
+}
+
+() recv_internal(int msg_value, cell in_msg, slice in_msg_body) impure {
+    if (in_msg_body.slice_empty?()) {
+        return ();
+    }
+    int op = in_msg_body~load_uint(32);
+}

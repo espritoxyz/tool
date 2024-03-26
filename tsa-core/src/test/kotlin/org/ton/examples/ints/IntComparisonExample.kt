@@ -1,8 +1,8 @@
 package org.ton.examples.ints
 
 import org.junit.jupiter.api.Test
-import org.ton.examples.stack.compareActualAndExpectedStack
-import org.ton.examples.stack.intValue
+import org.ton.examples.compareActualAndExpectedStack
+import org.ton.examples.intValue
 import org.usvm.machine.compileAndAnalyzeAllMethods
 import org.usvm.machine.compileAndAnalyzeFift
 import org.usvm.machine.state.takeLastInt

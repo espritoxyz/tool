@@ -46,7 +46,7 @@ object TvmIntegerOutOfRange : TvmFailure {
 object TvmCellOverflow : TvmFailure {
     override val exitCode: UInt = 8u
 
-    override fun toString(): String = "TVM cell underflow, exit code: $exitCode"
+    override fun toString(): String = "TVM cell overflow, exit code: $exitCode"
 }
 
 object TvmCellUnderflow : TvmFailure {

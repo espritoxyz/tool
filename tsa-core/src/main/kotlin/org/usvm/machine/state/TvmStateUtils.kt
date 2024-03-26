@@ -1,43 +1,37 @@
 package org.usvm.machine.state
 
+import io.ksmt.utils.powerOfTwo
 import org.ton.bytecode.TvmBuilderType
 import org.ton.bytecode.TvmCellType
-import org.ton.bytecode.TvmContBasicRetInst
 import org.ton.bytecode.TvmContinuationValue
 import org.ton.bytecode.TvmInst
-import org.ton.bytecode.TvmInstLambdaLocation
-import org.ton.bytecode.TvmInstMethodLocation
-import org.usvm.UBoolExpr
 import org.ton.bytecode.TvmSliceType
 import org.ton.bytecode.TvmTupleType
+import org.usvm.UBoolExpr
+import org.usvm.UBvSort
 import org.usvm.UConcreteHeapRef
+import org.usvm.UExpr
 import org.usvm.UHeapRef
 import org.usvm.api.writeField
 import org.usvm.machine.TvmContext
 import org.usvm.machine.interpreter.TvmStepScope
 import org.usvm.mkSizeExpr
 import org.usvm.sizeSort
+import java.math.BigInteger
 
 val TvmState.lastStmt get() = pathNode.statement
 fun TvmState.newStmt(stmt: TvmInst) {
     pathNode += stmt
 }
 
-fun TvmInst.nextStmt(): TvmInst = when (location) {
-    is TvmInstMethodLocation -> (location as TvmInstMethodLocation).run {
-        codeBlock.instList.getOrNull(location.index + 1)
-            ?: TvmContBasicRetInst(TvmInstMethodLocation(methodId, location.index + 1))
-    }
-    is TvmInstLambdaLocation -> (location as TvmInstLambdaLocation).run {
-        codeBlock.instList.getOrNull(location.index + 1)
-            ?: TvmContBasicRetInst(TvmInstLambdaLocation(location.index + 1))
-    }
-}
+fun TvmInst.nextStmt(): TvmInst = location.codeBlock.instList.getOrNull(location.index + 1)
+    ?: error("Unexpected end of the code block ${location.codeBlock}")
 
 fun setFailure(failure: TvmMethodResult.TvmFailure): (TvmState) -> Unit = { state ->
     state.methodResult = failure
 }
 
+// TODO support RETALT
 fun TvmState.returnFromMethod() {
     val returnFromMethod = callStack.lastMethod()
     // TODO: think about it later
@@ -109,3 +103,12 @@ fun TvmStepScope.assertIfSat(
     val (stateWithConstraint) = originalState.ctx.statesForkProvider.forkMulti(originalState, listOf(constraint))
     return stateWithConstraint != null
 }
+
+fun TvmContext.signedIntegerFitsBits(value: UExpr<UBvSort>, bits: UInt): UBoolExpr = mkAnd(
+    mkBvSignedLessOrEqualExpr(value, powerOfTwo(bits - 1u).minus(BigInteger.ONE).toBv257()),
+    mkBvSignedGreaterOrEqualExpr(value, powerOfTwo(bits - 1u).negate().toBv257()),
+)
+
+fun TvmContext.unsignedIntegerFitsBits(value: UExpr<UBvSort>, bits: UInt): UBoolExpr = mkAnd(
+    mkBvUnsignedLessOrEqualExpr(value, powerOfTwo(bits).minus(BigInteger.ONE).toBv257()),
+)

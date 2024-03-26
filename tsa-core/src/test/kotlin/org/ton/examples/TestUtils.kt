@@ -1,4 +1,4 @@
-package org.ton.examples.stack
+package org.ton.examples
 
 import io.ksmt.expr.KBitVecValue
 import io.ksmt.utils.BvUtils.toBigIntegerSigned

@@ -1,6 +1,7 @@
 package org.ton.examples.stack
 
 import org.junit.jupiter.api.Test
+import org.ton.examples.compareActualAndExpectedStack
 import org.usvm.machine.compileAndAnalyzeFift
 import kotlin.io.path.Path
 

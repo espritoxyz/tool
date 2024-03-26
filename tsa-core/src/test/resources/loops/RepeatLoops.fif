@@ -1,0 +1,32 @@
+"../fiftstdlib/Fift.fif" include
+"../fiftstdlib/Asm.fif" include
+
+PROGRAM{
+  0 DECLMETHOD f_repeat
+  1 DECLMETHOD f_repeat_with_arg
+  2 DECLMETHOD f_repeatend
+  f_repeat PROC:<{
+    1 PUSHINT
+    5 PUSHINT
+    CONT:<{
+        2 PUSHINT
+        MUL
+    }>
+    REPEAT
+  }>
+  f_repeat_with_arg PROC:<{
+    1 PUSHINT
+    5 PUSHINT
+    REPEAT:<{
+        2 PUSHINT
+        MUL
+    }>
+  }>
+  f_repeatend PROC:<{
+    1 PUSHINT
+    5 PUSHINT
+    REPEAT:
+        2 PUSHINT
+        MUL
+  }>
+}END>c
