@@ -4,6 +4,8 @@ import io.ksmt.expr.KBitVecValue
 import io.ksmt.expr.KInterpretedValue
 import io.ksmt.sort.KBvSort
 import io.ksmt.utils.BvUtils.bigIntValue
+import io.ksmt.utils.BvUtils.bvMaxValueSigned
+import io.ksmt.utils.BvUtils.bvMinValueSigned
 import io.ksmt.utils.BvUtils.toBigIntegerSigned
 import io.ksmt.utils.cast
 import mu.KLogging
@@ -221,6 +223,35 @@ import org.usvm.solver.USatResult
 import org.usvm.targets.UTargetsSet
 import org.usvm.util.write
 import java.math.BigInteger
+import org.ton.bytecode.TvmArithmLogicalAbsInst
+import org.ton.bytecode.TvmArithmLogicalAndInst
+import org.ton.bytecode.TvmArithmLogicalBitsizeInst
+import org.ton.bytecode.TvmArithmLogicalChkbitAliasInst
+import org.ton.bytecode.TvmArithmLogicalChkboolAliasInst
+import org.ton.bytecode.TvmArithmLogicalFitsInst
+import org.ton.bytecode.TvmArithmLogicalFitsxInst
+import org.ton.bytecode.TvmArithmLogicalInst
+import org.ton.bytecode.TvmArithmLogicalLshiftInst
+import org.ton.bytecode.TvmArithmLogicalLshiftVarInst
+import org.ton.bytecode.TvmArithmLogicalMaxInst
+import org.ton.bytecode.TvmArithmLogicalMinInst
+import org.ton.bytecode.TvmArithmLogicalMinmaxInst
+import org.ton.bytecode.TvmArithmLogicalNotInst
+import org.ton.bytecode.TvmArithmLogicalOrInst
+import org.ton.bytecode.TvmArithmLogicalPow2Inst
+import org.ton.bytecode.TvmArithmLogicalRshiftInst
+import org.ton.bytecode.TvmArithmLogicalRshiftVarInst
+import org.ton.bytecode.TvmArithmLogicalUbitsizeInst
+import org.ton.bytecode.TvmArithmLogicalUfitsInst
+import org.ton.bytecode.TvmArithmLogicalUfitsxInst
+import org.ton.bytecode.TvmArithmLogicalXorInst
+import org.usvm.api.makeSymbolicPrimitive
+import org.usvm.machine.state.TvmIntegerOutOfRange
+import org.usvm.machine.state.bvMaxValueSignedExtended
+import org.usvm.machine.state.bvMaxValueUnsignedExtended
+import org.usvm.machine.state.bvMinValueSignedExtended
+import org.usvm.machine.state.signedIntegerFitsBits
+import org.usvm.machine.state.unsignedIntegerFitsBits
 
 typealias TvmStepScope = StepScope<TvmState, TvmType, TvmInst, TvmContext>
 
@@ -344,6 +375,7 @@ class TvmInterpreter(
             is TvmConstDataInst -> visitConstantDataInst(scope, stmt)
             is TvmArithmBasicInst -> visitArithmeticInst(scope, stmt)
             is TvmArithmDivInst -> visitArithmeticDivInst(scope, stmt)
+            is TvmArithmLogicalInst -> visitArithmeticLogicalInst(scope, stmt)
             is TvmCompareIntInst -> visitComparisonIntInst(scope, stmt)
             is TvmCompareOtherInst -> visitComparisonOtherInst(scope, stmt)
             is TvmCellBuildInst -> visitCellBuildInst(scope, stmt)
@@ -676,10 +708,10 @@ class TvmInterpreter(
                         stack.takeLastInt() to stack.takeLastInt()
                     }
                     // TODO optimize using ksmt implementation?
-                    val resOverflow = mkBvAddNoOverflowExpr(firstOperand, secondOperand, isSigned = true)
-                    checkOverflow(resOverflow, scope) ?: return
-                    val resUnderflow = mkBvAddNoUnderflowExpr(firstOperand, secondOperand)
-                    checkUnderflow(resUnderflow, scope) ?: return
+                    val resNoOverflow = mkBvAddNoOverflowExpr(firstOperand, secondOperand, isSigned = true)
+                    checkOverflow(resNoOverflow, scope) ?: return
+                    val resNoUnderflow = mkBvAddNoUnderflowExpr(firstOperand, secondOperand)
+                    checkUnderflow(resNoUnderflow, scope) ?: return
 
                     mkBvAddExpr(firstOperand, secondOperand)
                 }
@@ -689,10 +721,10 @@ class TvmInterpreter(
                         stack.takeLastInt() to stack.takeLastInt()
                     }
                     // TODO optimize using ksmt implementation?
-                    val resOverflow = mkBvSubNoOverflowExpr(firstOperand, secondOperand)
-                    checkOverflow(resOverflow, scope) ?: return
-                    val resUnderflow = mkBvSubNoUnderflowExpr(firstOperand, secondOperand, isSigned = true)
-                    checkUnderflow(resUnderflow, scope) ?: return
+                    val resNoOverflow = mkBvSubNoOverflowExpr(firstOperand, secondOperand)
+                    checkOverflow(resNoOverflow, scope) ?: return
+                    val resNoUnderflow = mkBvSubNoUnderflowExpr(firstOperand, secondOperand, isSigned = true)
+                    checkUnderflow(resNoUnderflow, scope) ?: return
 
                     mkBvSubExpr(firstOperand, secondOperand)
                 }
@@ -702,10 +734,10 @@ class TvmInterpreter(
                         stack.takeLastInt() to stack.takeLastInt()
                     }
                     // TODO optimize using ksmt implementation?
-                    val resOverflow = mkBvMulNoOverflowExpr(firstOperand, secondOperand, isSigned = true)
-                    checkOverflow(resOverflow, scope) ?: return
-                    val resUnderflow = mkBvMulNoUnderflowExpr(firstOperand, secondOperand)
-                    checkUnderflow(resUnderflow, scope) ?: return
+                    val resNoOverflow = mkBvMulNoOverflowExpr(firstOperand, secondOperand, isSigned = true)
+                    checkOverflow(resNoOverflow, scope) ?: return
+                    val resNoUnderflow = mkBvMulNoUnderflowExpr(firstOperand, secondOperand)
+                    checkUnderflow(resNoUnderflow, scope) ?: return
 
                     mkBvMulExpr(firstOperand, secondOperand)
                 }
@@ -715,10 +747,10 @@ class TvmInterpreter(
                     val secondOperand = stmt.c.toBv257()
 
                     // TODO optimize using ksmt implementation?
-                    val resOverflow = mkBvAddNoOverflowExpr(firstOperand, secondOperand, isSigned = true)
-                    checkOverflow(resOverflow, scope) ?: return
-                    val resUnderflow = mkBvAddNoUnderflowExpr(firstOperand, secondOperand)
-                    checkUnderflow(resUnderflow, scope) ?: return
+                    val resNoOverflow = mkBvAddNoOverflowExpr(firstOperand, secondOperand, isSigned = true)
+                    checkOverflow(resNoOverflow, scope) ?: return
+                    val resNoUnderflow = mkBvAddNoUnderflowExpr(firstOperand, secondOperand)
+                    checkUnderflow(resNoUnderflow, scope) ?: return
 
                     mkBvAddExpr(firstOperand, secondOperand)
                 }
@@ -727,10 +759,10 @@ class TvmInterpreter(
                     val secondOperand = stmt.c.toBv257()
 
                     // TODO optimize using ksmt implementation?
-                    val resOverflow = mkBvMulNoOverflowExpr(firstOperand, secondOperand, isSigned = true)
-                    checkOverflow(resOverflow, scope) ?: return
-                    val resUnderflow = mkBvMulNoUnderflowExpr(firstOperand, secondOperand)
-                    checkUnderflow(resUnderflow, scope) ?: return
+                    val resNoOverflow = mkBvMulNoOverflowExpr(firstOperand, secondOperand, isSigned = true)
+                    checkOverflow(resNoOverflow, scope) ?: return
+                    val resNoUnderflow = mkBvMulNoUnderflowExpr(firstOperand, secondOperand)
+                    checkUnderflow(resNoUnderflow, scope) ?: return
 
                     mkBvMulExpr(firstOperand, secondOperand)
                 }
@@ -740,10 +772,10 @@ class TvmInterpreter(
                     val secondOperand = oneValue
 
                     // TODO optimize using ksmt implementation?
-                    val resOverflow = mkBvAddNoOverflowExpr(firstOperand, secondOperand, isSigned = true)
-                    checkOverflow(resOverflow, scope) ?: return
-                    val resUnderflow = mkBvAddNoUnderflowExpr(firstOperand, secondOperand)
-                    checkUnderflow(resUnderflow, scope) ?: return
+                    val resNoOverflow = mkBvAddNoOverflowExpr(firstOperand, secondOperand, isSigned = true)
+                    checkOverflow(resNoOverflow, scope) ?: return
+                    val resNoUnderflow = mkBvAddNoUnderflowExpr(firstOperand, secondOperand)
+                    checkUnderflow(resNoUnderflow, scope) ?: return
 
                     mkBvAddExpr(firstOperand, secondOperand)
                 }
@@ -752,10 +784,10 @@ class TvmInterpreter(
                     val secondOperand = oneValue
 
                     // TODO optimize using ksmt implementation?
-                    val resOverflow = mkBvSubNoOverflowExpr(firstOperand, secondOperand)
-                    checkOverflow(resOverflow, scope) ?: return
-                    val resUnderflow = mkBvSubNoUnderflowExpr(firstOperand, secondOperand, isSigned = true)
-                    checkUnderflow(resUnderflow, scope) ?: return
+                    val resNoOverflow = mkBvSubNoOverflowExpr(firstOperand, secondOperand)
+                    checkOverflow(resNoOverflow, scope) ?: return
+                    val resNoUnderflow = mkBvSubNoUnderflowExpr(firstOperand, secondOperand, isSigned = true)
+                    checkUnderflow(resNoUnderflow, scope) ?: return
 
                     mkBvSubExpr(firstOperand, secondOperand)
                 }
@@ -812,15 +844,270 @@ class TvmInterpreter(
         )
     }
 
-    private fun checkOverflow(overflowExpr: UBoolExpr, scope: TvmStepScope): Unit? = scope.fork(
-        overflowExpr,
+    private fun checkOverflow(noOverflowExpr: UBoolExpr, scope: TvmStepScope): Unit? = scope.fork(
+        noOverflowExpr,
         blockOnFalseState = setFailure(TvmIntegerOverflow)
     )
 
-    private fun checkUnderflow(underflowExpr: UBoolExpr, scope: TvmStepScope): Unit? = scope.fork(
-        underflowExpr,
+    private fun checkUnderflow(noUnderflowExpr: UBoolExpr, scope: TvmStepScope): Unit? = scope.fork(
+        noUnderflowExpr,
         blockOnFalseState = setFailure(TvmIntegerOverflow)
     )
+
+    private fun checkOutOfRange(notOutOfRangeExpr: UBoolExpr, scope: TvmStepScope): Unit? = scope.fork(
+        condition = notOutOfRangeExpr,
+        blockOnFalseState = setFailure(TvmIntegerOutOfRange)
+    )
+
+    private fun visitArithmeticLogicalInst(scope: TvmStepScope, stmt: TvmArithmLogicalInst): Unit = with(ctx) {
+        val result: UExpr<UBvSort> = when (stmt) {
+            is TvmArithmLogicalOrInst -> {
+                val (secondOperand, firstOperand) = scope.calcOnState { stack.takeLastInt() to stack.takeLastInt() }
+                mkBvOrExpr(firstOperand, secondOperand)
+            }
+            is TvmArithmLogicalXorInst -> {
+                val (secondOperand, firstOperand) = scope.calcOnState { stack.takeLastInt() to stack.takeLastInt() }
+                mkBvXorExpr(firstOperand, secondOperand)
+            }
+            is TvmArithmLogicalAndInst -> {
+                val (secondOperand, firstOperand) = scope.calcOnState { stack.takeLastInt() to stack.takeLastInt() }
+                mkBvAndExpr(firstOperand, secondOperand)
+            }
+            is TvmArithmLogicalNotInst -> {
+                val value = scope.calcOnState { stack.takeLastInt() }
+                mkBvNotExpr(value)
+            }
+            is TvmArithmLogicalAbsInst -> {
+                val value = scope.calcOnState { stack.takeLastInt() }
+                checkOverflow(mkBvNegationNoOverflowExpr(value), scope) ?: return
+
+                mkIte(
+                    mkBvSignedLessExpr(value, zeroValue),
+                    mkBvNegationExpr(value),
+                    value
+                )
+            }
+            is TvmArithmLogicalMaxInst -> {
+                val (secondOperand, firstOperand) = scope.calcOnState { stack.takeLastInt() to stack.takeLastInt() }
+
+                mkIte(
+                    condition = mkBvSignedGreaterOrEqualExpr(firstOperand, secondOperand),
+                    trueBranch = firstOperand,
+                    falseBranch = secondOperand
+                )
+            }
+            is TvmArithmLogicalMinInst -> {
+                val (secondOperand, firstOperand) = scope.calcOnState { stack.takeLastInt() to stack.takeLastInt() }
+
+                mkIte(
+                    condition = mkBvSignedGreaterOrEqualExpr(firstOperand, secondOperand),
+                    trueBranch = secondOperand,
+                    falseBranch = firstOperand
+                )
+            }
+            is TvmArithmLogicalMinmaxInst -> {
+                val (secondOperand, firstOperand) = scope.calcOnState { stack.takeLastInt() to stack.takeLastInt() }
+
+                val min = mkIte(
+                    condition = mkBvSignedGreaterOrEqualExpr(firstOperand, secondOperand),
+                    trueBranch = secondOperand,
+                    falseBranch = firstOperand
+                )
+                val max = mkIte(
+                    condition = mkBvSignedGreaterOrEqualExpr(firstOperand, secondOperand),
+                    trueBranch = firstOperand,
+                    falseBranch = secondOperand
+                )
+
+                scope.doWithState {
+                    stack.add(min, TvmIntegerType)
+                    stack.add(max, TvmIntegerType)
+                    newStmt(stmt.nextStmt())
+                }
+
+                return
+            }
+            is TvmArithmLogicalPow2Inst -> {
+                val exp = scope.calcOnState { stack.takeLastInt() }
+                val notOutOfRangeExpr = unsignedIntegerFitsBits(exp, 10u)
+                checkOutOfRange(notOutOfRangeExpr, scope) ?: return
+
+                val resNoOverflow = unsignedIntegerFitsBits(exp, 8u)
+                checkOverflow(resNoOverflow, scope) ?: return
+
+                mkBvShiftLeftExpr(oneValue, exp)
+            }
+            is TvmArithmLogicalLshiftInst -> {
+                val value = scope.calcOnState { stack.takeLastInt() }
+                val shift = stmt.c + 1
+                val shiftValue = shift.toBv257()
+                check(shift in 1..256) { "Unexpected shift $shift" }
+
+                val maxArgValue = mkBvArithShiftRightExpr(bvMaxValueSigned(TvmContext.INT_BITS), shiftValue)
+                val minArgValue = mkBvArithShiftRightExpr(bvMinValueSigned(TvmContext.INT_BITS), shiftValue)
+                val resNoOverflow = mkAnd(
+                    mkBvSignedLessOrEqualExpr(minArgValue, value),
+                    mkBvSignedLessOrEqualExpr(value, maxArgValue)
+                )
+                checkOverflow(resNoOverflow, scope) ?: return
+
+                mkBvShiftLeftExpr(value, shift.toBv257())
+            }
+            is TvmArithmLogicalLshiftVarInst -> {
+                val (shift, value) = scope.calcOnState { stack.takeLastInt() to stack.takeLastInt() }
+                val notOutOfRangeExpr = unsignedIntegerFitsBits(shift, 10u)
+                checkOutOfRange(notOutOfRangeExpr, scope) ?: return
+
+                val maxArgValue = mkBvArithShiftRightExpr(bvMaxValueSigned(TvmContext.INT_BITS), shift)
+                val minArgValue = mkBvArithShiftRightExpr(bvMinValueSigned(TvmContext.INT_BITS), shift)
+                val resNoOverflow = mkAnd(
+                    mkBvSignedLessOrEqualExpr(shift, 256.toBv257()),
+                    mkBvSignedLessOrEqualExpr(minArgValue, value),
+                    mkBvSignedLessOrEqualExpr(value, maxArgValue),
+                )
+
+                checkOverflow(resNoOverflow, scope) ?: return
+
+                mkBvShiftLeftExpr(value, shift)
+            }
+            is TvmArithmLogicalRshiftInst -> {
+                val value = scope.calcOnState { stack.takeLastInt() }
+                val shift = stmt.c + 1
+                check(shift in 1..256) { "Unexpected shift $shift" }
+
+                mkBvArithShiftRightExpr(value, shift.toBv257())
+            }
+            is TvmArithmLogicalRshiftVarInst -> {
+                val (shift, value) = scope.calcOnState { stack.takeLastInt() to stack.takeLastInt() }
+                val notOutOfRangeExpr = unsignedIntegerFitsBits(shift, 10u)
+                checkOutOfRange(notOutOfRangeExpr, scope) ?: return
+
+                mkBvArithShiftRightExpr(value, shift)
+            }
+            is TvmArithmLogicalFitsInst -> {
+                val value = scope.calcOnState { stack.takeLastInt() }
+                val sizeBits = stmt.c + 1
+                check(sizeBits in 1..256) { "Unexpected sizeBits $sizeBits" }
+
+                val resNoOverflow = signedIntegerFitsBits(value, sizeBits.toUInt())
+                checkOverflow(resNoOverflow, scope) ?: return
+
+                value
+            }
+            is TvmArithmLogicalFitsxInst -> {
+                val (sizeBits, value) = scope.calcOnState { stack.takeLastInt() to stack.takeLastInt() }
+                val notOutOfRangeExpr = unsignedIntegerFitsBits(sizeBits, 10u)
+                checkOutOfRange(notOutOfRangeExpr, scope) ?: return
+
+                val resNoOverflow = mkOr(
+                    mkBvSignedGreaterOrEqualExpr(sizeBits, intBitsValue),
+                    mkAnd(
+                        mkBvSignedLessOrEqualExpr(bvMinValueSignedExtended(sizeBits), value),
+                        mkBvSignedLessOrEqualExpr(value, bvMaxValueSignedExtended(sizeBits)),
+                    ),
+                )
+                checkOverflow(resNoOverflow, scope) ?: return
+
+                value
+            }
+            is TvmArithmLogicalUfitsInst -> {
+                val value = scope.calcOnState { stack.takeLastInt() }
+                val sizeBits = stmt.c + 1
+                check(sizeBits in 1..256) { "Unexpected sizeBits $sizeBits" }
+
+                val resNoOverflow = unsignedIntegerFitsBits(value, sizeBits.toUInt())
+                checkOverflow(resNoOverflow, scope) ?: return
+
+                value
+            }
+            is TvmArithmLogicalUfitsxInst -> {
+                val (sizeBits, value) = scope.calcOnState { stack.takeLastInt() to stack.takeLastInt() }
+                val notOutOfRangeExpr = unsignedIntegerFitsBits(sizeBits, 10u)
+                checkOutOfRange(notOutOfRangeExpr, scope) ?: return
+                
+                val sizeBitsUpperBound = mkBvSubExpr(intBitsValue, oneValue)
+
+                val notNegativeValue = mkBvSignedGreaterOrEqualExpr(value, zeroValue)
+                val resNoOverflow = mkAnd(
+                    notNegativeValue,
+                    mkOr(
+                        mkBvSignedGreaterOrEqualExpr(sizeBits, sizeBitsUpperBound),
+                        mkBvSignedLessOrEqualExpr(value, bvMaxValueUnsignedExtended(sizeBits)),
+                    ),
+                )
+                checkOverflow(resNoOverflow, scope) ?: return
+
+                value
+            }
+            is TvmArithmLogicalBitsizeInst -> {
+                val value = scope.calcOnState { stack.takeLastInt() }
+                val symbolicSizeBits = scope.calcOnState { makeSymbolicPrimitive(int257sort) }
+
+                val disjArgs = mutableListOf(
+                    mkAnd(signedIntegerFitsBits(value, 0u), symbolicSizeBits eq zeroValue)
+                )
+                var prevMinValue: UExpr<UBvSort> = bvMinValueSignedExtended(zeroValue)
+                var prevMaxValue: UExpr<UBvSort> = bvMaxValueSignedExtended(zeroValue)
+                for (sizeBits in 1..TvmContext.INT_BITS.toInt()) {
+                    val minValue = bvMinValueSignedExtended(sizeBits.toBv257())
+                    val maxValue = bvMaxValueSignedExtended(sizeBits.toBv257())
+                    val smallestCond = mkOr(
+                        mkBvSignedLessExpr(value, prevMinValue),
+                        mkBvSignedGreaterExpr(value, prevMaxValue),
+                    )
+                    val arg = mkAnd(
+                        smallestCond,
+                        signedIntegerFitsBits(value, sizeBits.toUInt()),
+                        symbolicSizeBits eq sizeBits.toBv257(),
+                    )
+
+                    disjArgs.add(arg)
+
+                    prevMinValue = minValue
+                    prevMaxValue = maxValue
+                }
+
+                scope.assert(mkOr(disjArgs))
+                symbolicSizeBits
+            }
+            is TvmArithmLogicalUbitsizeInst -> {
+                val value = scope.calcOnState { stack.takeLastInt() }
+                val notOutOfRangeExpr = mkBvSignedGreaterOrEqualExpr(value, zeroValue)
+                checkOutOfRange(notOutOfRangeExpr, scope) ?: return
+
+                val symbolicSizeBits = scope.calcOnState { makeSymbolicPrimitive(int257sort) }
+
+                val disjArgs = mutableListOf(
+                    mkAnd(unsignedIntegerFitsBits(value, 0u), symbolicSizeBits eq zeroValue)
+                )
+                var prevMaxValue: UExpr<UBvSort> = bvMaxValueUnsignedExtended(zeroValue)
+                for (sizeBits in 1 until TvmContext.INT_BITS.toInt()) {
+                    val maxValue = bvMaxValueUnsignedExtended(sizeBits.toBv257())
+                    val smallestCond = mkBvSignedGreaterExpr(value, prevMaxValue)
+                    val arg = mkAnd(
+                        smallestCond,
+                        unsignedIntegerFitsBits(value, sizeBits.toUInt()),
+                        symbolicSizeBits eq sizeBits.toBv257(),
+                    )
+
+                    disjArgs.add(arg)
+
+                    prevMaxValue = maxValue
+                }
+
+                scope.assert(mkOr(disjArgs))
+                symbolicSizeBits
+            }
+
+            is TvmArithmLogicalChkbitAliasInst -> return visitArithmeticLogicalInst(scope, stmt.resolveAlias())
+            is TvmArithmLogicalChkboolAliasInst -> return visitArithmeticLogicalInst(scope, stmt.resolveAlias())
+        }
+
+        scope.doWithState {
+            stack.add(result, TvmIntegerType)
+            newStmt(stmt.nextStmt())
+        }
+    }
 
     private fun visitComparisonIntInst(scope: TvmStepScope, stmt: TvmCompareIntInst) = with(ctx) {
         when (stmt) {

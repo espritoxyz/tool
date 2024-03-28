@@ -1,0 +1,194 @@
+"../fiftstdlib/Fift.fif" include
+"../fiftstdlib/Asm.fif" include
+
+PROGRAM{
+  0  DECLMETHOD f_or
+  1  DECLMETHOD f_xor
+  2  DECLMETHOD f_and
+  3  DECLMETHOD f_not
+  4  DECLMETHOD f_abs
+  5  DECLMETHOD f_max
+  6  DECLMETHOD f_min
+  7  DECLMETHOD f_minmax
+  8  DECLMETHOD f_pow2
+  9  DECLMETHOD f_lshift
+  10 DECLMETHOD f_lshiftvar
+  11 DECLMETHOD f_rshift
+  12 DECLMETHOD f_rshiftvar
+  13 DECLMETHOD f_fits
+  14 DECLMETHOD f_fitsx
+  15 DECLMETHOD f_ufits
+  16 DECLMETHOD f_ufitsx
+  17 DECLMETHOD f_bitsize
+  18 DECLMETHOD f_ubitsize
+  f_or PROC:<{
+    -1 PUSHINT
+    5 PUSHINT
+    OR          // -1
+    1 PUSHINT
+    8 PUSHINT
+    OR          // 9
+    1 PUSHINT
+    9 PUSHINT
+    OR          // 9
+  }>
+  f_xor PROC:<{
+    -1 PUSHINT
+    5 PUSHINT
+    XOR         // -6
+    1 PUSHINT
+    8 PUSHINT
+    XOR         // 9
+    1 PUSHINT
+    9 PUSHINT
+    XOR         // 8
+  }>
+  f_and PROC:<{
+    -1 PUSHINT
+    5 PUSHINT
+    AND         // 5
+    1 PUSHINT
+    8 PUSHINT
+    AND         // 0
+    1 PUSHINT
+    9 PUSHINT
+    AND         // 1
+  }>
+  f_not PROC:<{
+    -1 PUSHINT
+    NOT         // 0
+    1 PUSHINT
+    NOT         // -2
+  }>
+  f_abs PROC:<{
+    -11 PUSHINT
+    ABS         // 11
+    11 PUSHINT
+    ABS         // 11
+    0 PUSHINT
+    ABS         // 0
+  }>
+  f_max PROC:<{
+    -11 PUSHINT
+    1 PUSHINT
+    MAX         // 1
+  }>
+  f_min PROC:<{
+    -11 PUSHINT
+    1 PUSHINT
+    MIN         // -11
+  }>
+  f_minmax PROC:<{
+    -11 PUSHINT
+    1 PUSHINT
+    MINMAX      // -11 1
+    1 PUSHINT
+    -11 PUSHINT
+    MINMAX      // -11 1
+  }>
+  f_pow2 PROC:<{
+    0 PUSHINT
+    POW2        // 1
+    255 PUSHINT
+    POW2        // 2^255
+  }>
+  f_lshift PROC:<{
+    -1 PUSHINT
+    256 LSHIFT#      // -2^256
+    3 PUSHINT
+    254 LSHIFT#      // 2^255 + 2^254
+  }>
+  f_lshiftvar PROC:<{
+    -1 PUSHINT
+    256 PUSHINT
+    LSHIFT      // -2^256
+    3 PUSHINT
+    254 PUSHINT
+    LSHIFT      // 2^255 + 2^254
+    1 PUSHINT
+    0 PUSHINT
+    LSHIFT      // 1
+  }>
+  f_rshift PROC:<{
+    -5 PUSHINT
+    1 RSHIFT#   // -3
+    -1 PUSHINT
+    256 RSHIFT# // -1
+    5 PUSHINT
+    1 RSHIFT#   // 2
+  }>
+  f_rshiftvar PROC:<{
+    -5 PUSHINT
+    1 PUSHINT
+    RSHIFT      // -3
+    -1 PUSHINT
+    256 PUSHINT
+    RSHIFT      // -1
+    5 PUSHINT
+    1 PUSHINT
+    RSHIFT      // 2
+    5 PUSHINT
+    0 PUSHINT
+    RSHIFT      // 5
+  }>
+  f_fits PROC:<{
+    -1 PUSHINT
+    1 FITS      // -1
+    3 PUSHINT
+    3 FITS      // 3
+  }>
+  f_fitsx PROC:<{
+    -1 PUSHINT
+    1 PUSHINT
+    FITSX       // -1
+    3 PUSHINT
+    3 PUSHINT
+    FITSX       // 3
+    0 PUSHINT
+    0 PUSHINT
+    FITSX       // 0
+    0 PUSHINT
+    1023 PUSHINT
+    FITSX       // 0
+  }>
+  f_ufits PROC:<{
+    1 PUSHINT
+    1 UFITS     // 1
+    3 PUSHINT
+    2 UFITS     // 3
+  }>
+  f_ufitsx PROC:<{
+    1 PUSHINT
+    1 PUSHINT
+    UFITSX      // 1
+    3 PUSHINT
+    2 PUSHINT
+    UFITSX      // 3
+    0 PUSHINT
+    0 PUSHINT
+    UFITSX      // 0
+    0 PUSHINT
+    1023 PUSHINT
+    UFITSX      // 0
+  }>
+  f_bitsize PROC:<{
+    0 PUSHINT
+    BITSIZE     // 0
+    3 PUSHINT
+    BITSIZE     // 3
+    -1 PUSHINT
+    BITSIZE     // 1
+    -115792089237316195423570985008687907853269984665640564039457584007913129639936 PUSHINT
+    BITSIZE     // 257
+    115792089237316195423570985008687907853269984665640564039457584007913129639935 PUSHINT
+    BITSIZE     // 257
+  }>
+  f_ubitsize PROC:<{
+    0 PUSHINT
+    UBITSIZE    // 0
+    3 PUSHINT
+    UBITSIZE    // 2
+    115792089237316195423570985008687907853269984665640564039457584007913129639935 PUSHINT
+    UBITSIZE    // 256
+  }>
+}END>c

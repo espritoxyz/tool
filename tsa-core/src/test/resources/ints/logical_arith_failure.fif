@@ -1,0 +1,88 @@
+"../fiftstdlib/Fift.fif" include
+"../fiftstdlib/Asm.fif" include
+
+PROGRAM{
+  0  DECLMETHOD f_abs_overflow
+  1  DECLMETHOD f_pow2_overflow
+  2  DECLMETHOD f_lshift_overflow_pos
+  3  DECLMETHOD f_lshift_overflow_neg
+  4  DECLMETHOD f_lshiftvar_overflow_pos
+  5  DECLMETHOD f_lshiftvar_overflow_neg
+  6  DECLMETHOD f_lshiftvar_outofrange
+  7  DECLMETHOD f_rshiftvar_outofrange
+  8  DECLMETHOD f_fits_overflow
+  9  DECLMETHOD f_fitsx_overflow
+  10  DECLMETHOD f_fitsx_outofrange
+  11  DECLMETHOD f_ufits_overflow
+  12  DECLMETHOD f_ufitsx_overflow
+  13  DECLMETHOD f_ufitsx_outofrange
+  14  DECLMETHOD f_ubitsize_outofrange
+  f_abs_overflow PROC:<{
+    -115792089237316195423570985008687907853269984665640564039457584007913129639936 PUSHINT
+    ABS         // overflow
+  }>
+  f_pow2_overflow PROC:<{
+    256 PUSHINT
+    POW2        // overflow
+  }>
+  f_lshift_overflow_pos PROC:<{
+    5 PUSHINT
+    255 LSHIFT# // overflow
+  }>
+  f_lshift_overflow_neg PROC:<{
+    -2 PUSHINT
+    256 LSHIFT# // overflow
+  }>
+  f_lshiftvar_overflow_pos PROC:<{
+    5 PUSHINT
+    255 PUSHINT
+    LSHIFT      // overflow
+  }>
+  f_lshiftvar_overflow_neg PROC:<{
+    -2 PUSHINT
+    256 PUSHINT
+    LSHIFT      // overflow
+  }>
+  f_lshiftvar_outofrange PROC:<{
+    -2 PUSHINT
+    1024 PUSHINT
+    LSHIFT      // out of range
+  }>
+  f_rshiftvar_outofrange PROC:<{
+    -2 PUSHINT
+    1024 PUSHINT
+    RSHIFT      // out of range
+  }>
+  f_fits_overflow PROC:<{
+    1 PUSHINT
+    1 FITS      // overflow
+  }>
+  f_fitsx_overflow PROC:<{
+    1 PUSHINT
+    1 PUSHINT
+    FITSX       // overflow
+  }>
+  f_fitsx_outofrange PROC:<{
+    1 PUSHINT
+    1024 PUSHINT
+    FITSX       // out of range
+  }>
+  f_ufits_overflow PROC:<{
+    2 PUSHINT
+    1 UFITS     // overflow
+  }>
+  f_ufitsx_overflow PROC:<{
+    -1 PUSHINT
+    1023 PUSHINT
+    UFITSX      // overflow
+  }>
+  f_ufitsx_outofrange PROC:<{
+    1 PUSHINT
+    1024 PUSHINT
+    UFITSX      // out of range
+  }>
+  f_ubitsize_outofrange PROC:<{
+    -1 PUSHINT
+    UBITSIZE    // out of range
+  }>
+}END>c

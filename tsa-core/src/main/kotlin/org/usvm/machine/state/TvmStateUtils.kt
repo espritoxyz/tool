@@ -104,11 +104,55 @@ fun TvmStepScope.assertIfSat(
     return stateWithConstraint != null
 }
 
-fun TvmContext.signedIntegerFitsBits(value: UExpr<UBvSort>, bits: UInt): UBoolExpr = mkAnd(
-    mkBvSignedLessOrEqualExpr(value, powerOfTwo(bits - 1u).minus(BigInteger.ONE).toBv257()),
-    mkBvSignedGreaterOrEqualExpr(value, powerOfTwo(bits - 1u).negate().toBv257()),
-)
+fun TvmContext.signedIntegerFitsBits(value: UExpr<UBvSort>, bits: UInt): UBoolExpr =
+    when {
+        bits == 0u -> value eq zeroValue
+        bits >= TvmContext.INT_BITS -> trueExpr
+        else -> mkAnd(
+            mkBvSignedLessOrEqualExpr(value, powerOfTwo(bits - 1u).minus(BigInteger.ONE).toBv257()),
+            mkBvSignedGreaterOrEqualExpr(value, powerOfTwo(bits - 1u).negate().toBv257()),
+        )
+    }
 
-fun TvmContext.unsignedIntegerFitsBits(value: UExpr<UBvSort>, bits: UInt): UBoolExpr = mkAnd(
-    mkBvUnsignedLessOrEqualExpr(value, powerOfTwo(bits).minus(BigInteger.ONE).toBv257()),
-)
+/**
+ * Since TVM integers have a signed representation only, every non-negative integer fits in 256 bits
+ */
+fun TvmContext.unsignedIntegerFitsBits(value: UExpr<UBvSort>, bits: UInt): UBoolExpr =
+    when {
+        bits == 0u -> value eq zeroValue
+        bits >= TvmContext.INT_BITS - 1u -> mkBvSignedGreaterOrEqualExpr(value, zeroValue)
+        else -> mkAnd(
+            mkBvSignedLessOrEqualExpr(value, powerOfTwo(bits).minus(BigInteger.ONE).toBv257()),
+            mkBvSignedGreaterOrEqualExpr(value, zeroValue),
+        )
+    }
+
+
+/**
+ * 0 <= [sizeBits] <= 257
+ */
+fun TvmContext.bvMinValueSignedExtended(sizeBits: UExpr<UBvSort>): UExpr<UBvSort> =
+    mkIte(
+        condition = sizeBits eq zeroValue,
+        trueBranch = zeroValue,
+        falseBranch = mkBvNegationExpr(mkBvShiftLeftExpr(oneValue, mkBvSubExpr(sizeBits, oneValue)))
+    )
+
+
+/**
+ * 0 <= [sizeBits] <= 257
+ */
+fun TvmContext.bvMaxValueSignedExtended(sizeBits: UExpr<UBvSort>): UExpr<UBvSort> =
+    mkIte(
+        condition = sizeBits eq zeroValue,
+        trueBranch = zeroValue,
+        falseBranch = mkBvSubExpr(mkBvShiftLeftExpr(oneValue, mkBvSubExpr(sizeBits, oneValue)), oneValue)
+    )
+
+/**
+ * 0 <= [sizeBits] <= 256
+ *
+ * @see unsignedIntegerFitsBits
+ */
+fun TvmContext.bvMaxValueUnsignedExtended(sizeBits: UExpr<UBvSort>): UExpr<UBvSort> =
+    mkBvSubExpr(mkBvShiftLeftExpr(oneValue, sizeBits), oneValue)
