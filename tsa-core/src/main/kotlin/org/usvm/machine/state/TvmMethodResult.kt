@@ -2,7 +2,6 @@ package org.usvm.machine.state
 
 import org.usvm.machine.state.TvmMethodResult.*
 import org.ton.bytecode.TvmCodeBlock
-import org.usvm.machine.state.TvmStack
 
 /**
  * Represents a result of a method invocation.

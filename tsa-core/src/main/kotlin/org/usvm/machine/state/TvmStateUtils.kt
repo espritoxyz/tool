@@ -86,9 +86,9 @@ fun TvmState.ensureSymbolicBuilderInitialized(ref: UHeapRef) =
     ensureSymbolicRefInitialized(ref, TvmBuilderType) { initializeSymbolicBuilder(it) }
 
 fun TvmState.initializeSymbolicBuilder(ref: UConcreteHeapRef) = with(ctx) {
-    // TODO hack! Assume that all input builder were not written, that means dataLength == 0 and refsLength == 0
-    memory.writeField(ref, TvmContext.cellDataLengthField, sizeSort, mkSizeExpr(0), guard = trueExpr)
-    memory.writeField(ref, TvmContext.cellRefsLengthField, sizeSort, mkSizeExpr(0), guard = trueExpr)
+//    // TODO hack! Assume that all input builder were not written, that means dataLength == 0 and refsLength == 0
+//    memory.writeField(ref, TvmContext.cellDataLengthField, sizeSort, mkSizeExpr(0), guard = trueExpr)
+//    memory.writeField(ref, TvmContext.cellRefsLengthField, sizeSort, mkSizeExpr(0), guard = trueExpr)
 }
 
 fun TvmState.generateSymbolicTuple(): UHeapRef = generateSymbolicRef(TvmTupleType)

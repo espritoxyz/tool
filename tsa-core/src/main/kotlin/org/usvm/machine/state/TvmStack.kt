@@ -22,8 +22,8 @@ import kotlin.math.max
 class TvmStack(
     val ctx: TvmContext,
     private var stack: PersistentList<TvmStackEntry> = persistentListOf(), // [n n-1 n-2 ... 2 1 0]
+    var inputElements: PersistentList<TvmInputStackEntry> = persistentListOf(),
 ) {
-    private var inputElements: PersistentList<TvmInputStackEntry> = persistentListOf()
     private inline val size: Int get() = stack.size
 
     fun takeLast(expectedType: TvmType, createEntry: (Int) -> UExpr<out USort>): TvmStackValue {
@@ -151,7 +151,7 @@ class TvmStack(
         stack = stack.set(second, tmp)
     }
 
-    fun clone(): TvmStack = TvmStack(ctx, stack)
+    fun clone(): TvmStack = TvmStack(ctx, stack, inputElements)
 
     // TODO continuations
     sealed interface TvmStackValue {

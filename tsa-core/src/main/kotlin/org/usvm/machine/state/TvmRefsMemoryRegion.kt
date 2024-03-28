@@ -66,6 +66,8 @@ class TvmRefsMemoryRegion<LValue, KeySort : USort, ValueSort: USort>(
             blockOnSymbolic = { _, (ref, _) -> error("Unexpected input ref $ref") }
         )
 
+    fun getRefsUpdateNode(cell: UConcreteHeapRef): TvmRefsRegionUpdateNode<KeySort, ValueSort>? = refValue[cell.address]
+
     private fun readRefValue(
         ref: UConcreteHeapAddress,
         key: UExpr<KeySort>,
