@@ -1,0 +1,588 @@
+"../fiftstdlib/Fift.fif" include
+"../fiftstdlib/Asm.fif" include
+
+PROGRAM{
+  0 DECLMETHOD div_neg_pos_1
+  1 DECLMETHOD div_neg_pos_2
+  2 DECLMETHOD div_pos_neg_1
+  3 DECLMETHOD div_pos_neg_2
+  4 DECLMETHOD div_neg_neg
+  5 DECLMETHOD div_zero_neg
+  6 DECLMETHOD div_pos_pos_1
+  7 DECLMETHOD div_pos_pos_2
+  8 DECLMETHOD mod_1
+  9 DECLMETHOD mod_2
+  10 DECLMETHOD mod_3
+  11 DECLMETHOD div_overflow
+  12 DECLMETHOD divc_neg_pos_1
+  13 DECLMETHOD divc_neg_pos_2
+  14 DECLMETHOD divc_pos_neg_1
+  15 DECLMETHOD divc_pos_neg_2
+  16 DECLMETHOD divc_neg_neg
+  17 DECLMETHOD divc_zero_neg
+  18 DECLMETHOD divc_pos_pos_1
+  19 DECLMETHOD divc_pos_pos_2
+  20 DECLMETHOD divr_neg_pos_1
+  21 DECLMETHOD divr_neg_pos_2
+  22 DECLMETHOD divr_pos_neg_1
+  23 DECLMETHOD divr_pos_neg_2
+  24 DECLMETHOD divr_pos_neg_3
+  25 DECLMETHOD divr_neg_neg_1
+  26 DECLMETHOD divr_neg_neg_2
+  27 DECLMETHOD divr_zero_neg
+  28 DECLMETHOD divr_pos_pos_1
+  29 DECLMETHOD divr_pos_pos_2
+  30 DECLMETHOD divr_pos_pos_3
+  31 DECLMETHOD divmod
+  32 DECLMETHOD divmodc
+  33 DECLMETHOD divmodr_1
+  34 DECLMETHOD divmodr_2
+  35 DECLMETHOD modc
+  36 DECLMETHOD modr_1
+  37 DECLMETHOD modr_2
+  38 DECLMETHOD adddivmod
+  39 DECLMETHOD adddivmodc
+  40 DECLMETHOD adddivmodr_1
+  41 DECLMETHOD adddivmodr_2
+  42 DECLMETHOD modpow2
+  43 DECLMETHOD modpow2c
+  44 DECLMETHOD modpow2r
+  45 DECLMETHOD modpow2_var
+  46 DECLMETHOD modpow2c_var
+  47 DECLMETHOD modpow2r_var
+  48 DECLMETHOD adddivmod_overflow_1
+  49 DECLMETHOD adddivmod_overflow_2
+  50 DECLMETHOD adddivmod_overflow_3
+  51 DECLMETHOD adddivmod_overflow_4
+  52 DECLMETHOD adddivmodc_overflow_1
+  53 DECLMETHOD adddivmodc_overflow_2
+  54 DECLMETHOD adddivmodc_overflow_3
+  55 DECLMETHOD adddivmodc_overflow_4
+  56 DECLMETHOD adddivmodr_overflow_1
+  57 DECLMETHOD adddivmodr_overflow_2
+  58 DECLMETHOD adddivmodr_overflow_3
+  59 DECLMETHOD adddivmodr_overflow_4
+  60 DECLMETHOD adddivmodr_overflow_5
+  61 DECLMETHOD adddivmodr_overflow_6
+  62 DECLMETHOD adddivmod_overflow_5
+  63 DECLMETHOD mod_overflow
+  64 DECLMETHOD modc_overflow
+  65 DECLMETHOD modr_overflow
+  66 DECLMETHOD rshiftc_1
+  67 DECLMETHOD rshiftc_2
+  68 DECLMETHOD rshiftc_3
+  69 DECLMETHOD rshiftc_4
+  70 DECLMETHOD rshiftr_1
+  71 DECLMETHOD rshiftr_2
+  72 DECLMETHOD rshiftr_3
+  73 DECLMETHOD rshiftr_4
+  74 DECLMETHOD modpow2_overflow
+  75 DECLMETHOD modpow2c_overflow
+  76 DECLMETHOD modpow2r_overflow
+  77 DECLMETHOD modpow2_var_overflow
+  78 DECLMETHOD modpow2c_var_overflow
+  79 DECLMETHOD modpow2r_var_overflow
+  80 DECLMETHOD rshiftc_var
+  81 DECLMETHOD rshiftr_var
+  82 DECLMETHOD rshiftmod
+  83 DECLMETHOD rshiftcmod
+  84 DECLMETHOD rshiftrmod_1
+  85 DECLMETHOD rshiftrmod_2
+  86 DECLMETHOD rshiftmod_var
+  87 DECLMETHOD rshiftcmod_var
+  88 DECLMETHOD rshiftrmod_var_1
+  89 DECLMETHOD rshiftrmod_var_2
+  div_neg_pos_1 PROC:<{
+      -3 PUSHINT
+      2 PUSHINT
+      DIV
+  }>
+  div_neg_pos_2 PROC:<{
+      -2 PUSHINT
+      2 PUSHINT
+      DIV
+  }>
+  div_pos_neg_1 PROC:<{
+      2 PUSHINT
+      -3 PUSHINT
+      DIV
+  }>
+  div_pos_neg_2 PROC:<{
+      2 PUSHINT
+      -1 PUSHINT
+      DIV
+  }>
+  div_neg_neg PROC:<{
+      -2 PUSHINT
+      -3 PUSHINT
+      DIV
+  }>
+  div_zero_neg PROC:<{
+      0 PUSHINT
+      -3 PUSHINT
+      DIV
+  }>
+  div_pos_pos_1 PROC:<{
+      3 PUSHINT
+      5 PUSHINT
+      DIV
+  }>
+  div_pos_pos_2 PROC:<{
+      5 PUSHINT
+      5 PUSHINT
+      DIV
+  }>
+  mod_1 PROC:<{
+      -1 PUSHINT
+      3 PUSHINT
+      MOD
+  }>
+  mod_2 PROC:<{
+      1 PUSHINT
+      -3 PUSHINT
+      MOD
+  }>
+  mod_3 PROC:<{
+      -1 PUSHINT
+      -3 PUSHINT
+      MOD
+  }>
+  div_overflow PROC:<{
+     255 PUSHPOW2
+     -1 PUSHINT
+     ADD
+     255 PUSHPOW2
+     -2 PUSHINT
+     MUL
+     DIV
+  }>
+  divc_neg_pos_1 PROC:<{
+      -3 PUSHINT
+      2 PUSHINT
+      DIVC
+  }>
+  divc_neg_pos_2 PROC:<{
+      -2 PUSHINT
+      2 PUSHINT
+      DIVC
+  }>
+  divc_pos_neg_1 PROC:<{
+      2 PUSHINT
+      -3 PUSHINT
+      DIVC
+  }>
+  divc_pos_neg_2 PROC:<{
+      2 PUSHINT
+      -1 PUSHINT
+      DIVC
+  }>
+  divc_neg_neg PROC:<{
+      -2 PUSHINT
+      -3 PUSHINT
+      DIVC
+  }>
+  divc_zero_neg PROC:<{
+      0 PUSHINT
+      -3 PUSHINT
+      DIVC
+  }>
+  divc_pos_pos_1 PROC:<{
+      3 PUSHINT
+      5 PUSHINT
+      DIVC
+  }>
+  divc_pos_pos_2 PROC:<{
+      5 PUSHINT
+      5 PUSHINT
+      DIVC
+  }>
+  divr_neg_pos_1 PROC:<{
+      -3 PUSHINT
+      2 PUSHINT
+      DIVR
+  }>
+  divr_neg_pos_2 PROC:<{
+      -2 PUSHINT
+      2 PUSHINT
+      DIVR
+  }>
+  divr_pos_neg_1 PROC:<{
+      2 PUSHINT
+      -3 PUSHINT
+      DIVR
+  }>
+  divr_pos_neg_2 PROC:<{
+      1 PUSHINT
+      -3 PUSHINT
+      DIVR
+  }>
+  divr_pos_neg_3 PROC:<{
+      2 PUSHINT
+      -1 PUSHINT
+      DIVR
+  }>
+  divr_neg_neg_1 PROC:<{
+      -2 PUSHINT
+      -3 PUSHINT
+      DIVR
+  }>
+  divr_neg_neg_2 PROC:<{
+      -1 PUSHINT
+      -3 PUSHINT
+      DIVR
+  }>
+  divr_zero_neg PROC:<{
+      0 PUSHINT
+      -3 PUSHINT
+      DIVR
+  }>
+  divr_pos_pos_1 PROC:<{
+      3 PUSHINT
+      5 PUSHINT
+      DIVR
+  }>
+  divr_pos_pos_2 PROC:<{
+      2 PUSHINT
+      5 PUSHINT
+      DIVR
+  }>
+  divr_pos_pos_3 PROC:<{
+      5 PUSHINT
+      5 PUSHINT
+      DIVR
+  }>
+  divmod PROC:<{
+      13 PUSHINT
+      5 PUSHINT
+      DIVMOD  // 2 3
+  }>
+  divmodc PROC:<{
+      13 PUSHINT
+      5 PUSHINT
+      DIVMODC  // 3 -2
+  }>
+  divmodr_1 PROC:<{
+      13 PUSHINT
+      5 PUSHINT
+      DIVMODR  // 3 -2
+  }>
+  divmodr_2 PROC:<{
+      12 PUSHINT
+      5 PUSHINT
+      DIVMODR  // 2 2
+  }>
+  modc PROC:<{
+      13 PUSHINT
+      5 PUSHINT
+      MODC  // -2
+  }>
+  modr_1 PROC:<{
+      13 PUSHINT
+      5 PUSHINT
+      MODR  // -2
+  }>
+  modr_2 PROC:<{
+      12 PUSHINT
+      5 PUSHINT
+      MODR  // 2
+  }>
+  adddivmod PROC:<{
+      3 PUSHINT
+      10 PUSHINT
+      5 PUSHINT
+      ADDDIVMOD  // 2 3
+  }>
+  adddivmodc PROC:<{
+      3 PUSHINT
+      10 PUSHINT
+      5 PUSHINT
+      ADDDIVMODC  // 3 -2
+  }>
+  adddivmodr_1 PROC:<{
+      3 PUSHINT
+      10 PUSHINT
+      5 PUSHINT
+      ADDDIVMODR  // 3 -2
+  }>
+  adddivmodr_2 PROC:<{
+      2 PUSHINT
+      10 PUSHINT
+      5 PUSHINT
+      ADDDIVMODR  // 2 2
+  }>
+  modpow2 PROC:<{
+      10 PUSHINT
+      3 MODPOW2#   // 2
+  }>
+  modpow2c PROC:<{
+      10 PUSHINT
+      3 MODPOW2C#  // -6
+  }>
+  modpow2r PROC:<{
+      10 PUSHINT
+      3 MODPOW2R#  // 2
+  }>
+  modpow2_var PROC:<{
+      10 PUSHINT
+      3 PUSHINT
+      MODPOW2   // 2
+  }>
+  modpow2c_var PROC:<{
+      10 PUSHINT
+      3 PUSHINT
+      MODPOW2C  // -6
+  }>
+  modpow2r_var PROC:<{
+      10 PUSHINT
+      3 PUSHINT
+      MODPOW2R  // 2
+  }>
+  adddivmod_overflow_1 PROC:<{
+      255 PUSHPOW2
+      255 PUSHPOW2
+      2 PUSHINT
+      ADDDIVMOD  // 2^255 0
+  }>
+  adddivmod_overflow_2 PROC:<{
+      255 PUSHPOW2
+      -1 PUSHINT
+      MUL
+      255 PUSHPOW2
+      -2 PUSHINT
+      MUL
+      2 PUSHINT
+      ADDDIVMOD  // -(2^254 + 2^255) 0
+  }>
+  adddivmod_overflow_3 PROC:<{
+      255 PUSHPOW2
+      255 PUSHPOW2
+      3 PUSHINT
+      ADDDIVMOD  //  38597363079105398474523661669562635951089994888546854679819194669304376546645 1
+  }>
+  adddivmod_overflow_4 PROC:<{
+      255 PUSHPOW2
+      -2 PUSHINT
+      MUL
+      255 PUSHPOW2
+      -2 PUSHINT
+      MUL
+      5 PUSHINT
+      ADDDIVMOD  // -46316835694926478169428394003475163141307993866256225615783033603165251855975 3
+  }>
+  adddivmodc_overflow_1 PROC:<{
+      255 PUSHPOW2
+      255 PUSHPOW2
+      2 PUSHINT
+      ADDDIVMODC  // 2^255 0
+  }>
+  adddivmodc_overflow_2 PROC:<{
+      255 PUSHPOW2
+      -1 PUSHINT
+      MUL
+      255 PUSHPOW2
+      -2 PUSHINT
+      MUL
+      2 PUSHINT
+      ADDDIVMODC  // -(2^254 + 2^255) 0
+  }>
+  adddivmodc_overflow_3 PROC:<{
+      255 PUSHPOW2
+      255 PUSHPOW2
+      3 PUSHINT
+      ADDDIVMODC  // 38597363079105398474523661669562635951089994888546854679819194669304376546646 -2
+  }>
+  adddivmodc_overflow_4 PROC:<{
+      255 PUSHPOW2
+      -2 PUSHINT
+      MUL
+      255 PUSHPOW2
+      -2 PUSHINT
+      MUL
+      5 PUSHINT
+      ADDDIVMODC  // -46316835694926478169428394003475163141307993866256225615783033603165251855974 -2
+  }>
+  adddivmodr_overflow_1 PROC:<{
+      255 PUSHPOW2
+      255 PUSHPOW2
+      2 PUSHINT
+      ADDDIVMODR  // 2^255 0
+  }>
+  adddivmodr_overflow_2 PROC:<{
+      255 PUSHPOW2
+      -1 PUSHINT
+      MUL
+      255 PUSHPOW2
+      -2 PUSHINT
+      MUL
+      2 PUSHINT
+      ADDDIVMODR  // -(2^254 + 2^255) 0
+  }>
+  adddivmodr_overflow_3 PROC:<{
+      255 PUSHPOW2
+      255 PUSHPOW2
+      3 PUSHINT
+      ADDDIVMODR  // 38597363079105398474523661669562635951089994888546854679819194669304376546645 1
+  }>
+  adddivmodr_overflow_4 PROC:<{
+      255 PUSHPOW2
+      -2 PUSHINT
+      MUL
+      255 PUSHPOW2
+      -2 PUSHINT
+      MUL
+      5 PUSHINT
+      ADDDIVMODR  // -46316835694926478169428394003475163141307993866256225615783033603165251855974 -2
+  }>
+  adddivmodr_overflow_5 PROC:<{
+      255 PUSHPOW2
+      255 PUSHPOW2
+      11 PUSHINT
+      ADDDIVMODR  // 10526553567028745038506453182607991623024544060512778549041598546173920876358 -2
+  }>
+  adddivmodr_overflow_6 PROC:<{
+      255 PUSHPOW2
+      -2 PUSHINT
+      MUL
+      255 PUSHPOW2
+      -2 PUSHINT
+      MUL
+      3 PUSHINT
+      ADDDIVMODR  // -77194726158210796949047323339125271902179989777093709359638389338608753093291 1
+  }>
+  adddivmod_overflow_5 PROC:<{
+      255 PUSHPOW2
+      255 PUSHPOW2
+      -1 PUSHINT
+      ADDDIVMOD  // -2^256 0
+  }>
+  mod_overflow PROC:<{
+      255 PUSHPOW2
+      -2 PUSHINT
+      MUL
+      -1 PUSHINT
+      MOD       // 0
+  }>
+  modc_overflow PROC:<{
+      255 PUSHPOW2
+      -2 PUSHINT
+      MUL
+      -1 PUSHINT
+      MODC      // 0
+  }>
+  modr_overflow PROC:<{
+      255 PUSHPOW2
+      -2 PUSHINT
+      MUL
+      -1 PUSHINT
+      MODR      // 0
+  }>
+  rshiftc_1 PROC:<{
+      8 PUSHINT
+      1 RSHIFTC#  // 4
+  }>
+  rshiftc_2 PROC:<{
+      -9 PUSHINT
+      1 RSHIFTC#  // -4
+  }>
+  rshiftc_3 PROC:<{
+      9 PUSHINT
+      1 RSHIFTC#  // 5
+  }>
+  rshiftc_4 PROC:<{
+      255 PUSHPOW2
+      -2 PUSHINT
+      MUL
+      256 RSHIFTC#  // -1
+  }>
+  rshiftr_1 PROC:<{
+      8 PUSHINT
+      1 RSHIFTR#  // 4
+  }>
+  rshiftr_2 PROC:<{
+      -9 PUSHINT
+      2 RSHIFTR#  // -2
+  }>
+  rshiftr_3 PROC:<{
+      9 PUSHINT
+      2 RSHIFTR#  // 2
+  }>
+  rshiftr_4 PROC:<{
+      255 PUSHPOW2
+      -2 PUSHINT
+      MUL
+      256 RSHIFTR#  // -1
+  }>
+  modpow2_overflow PROC:<{
+      255 PUSHPOW2
+      256 MODPOW2#   // 57896044618658097711785492504343953926634992332820282019728792003956564819968
+  }>
+  modpow2c_overflow PROC:<{
+      255 PUSHPOW2
+      256 MODPOW2C#   // -57896044618658097711785492504343953926634992332820282019728792003956564819968
+  }>
+  modpow2r_overflow PROC:<{
+      255 PUSHPOW2
+      256 MODPOW2R#   // -57896044618658097711785492504343953926634992332820282019728792003956564819968
+  }>
+  modpow2_var_overflow PROC:<{
+      255 PUSHPOW2
+      256 PUSHINT
+      MODPOW2   // 57896044618658097711785492504343953926634992332820282019728792003956564819968
+  }>
+  modpow2c_var_overflow PROC:<{
+      255 PUSHPOW2
+      256 PUSHINT
+      MODPOW2C   // -57896044618658097711785492504343953926634992332820282019728792003956564819968
+  }>
+  modpow2r_var_overflow PROC:<{
+      255 PUSHPOW2
+      256 PUSHINT
+      MODPOW2R   // -57896044618658097711785492504343953926634992332820282019728792003956564819968
+  }>
+  rshiftc_var PROC:<{
+      9 PUSHINT
+      2 PUSHINT
+      RSHIFTC   // 3
+  }>
+  rshiftr_var PROC:<{
+      9 PUSHINT
+      2 PUSHINT
+      RSHIFTR   // 2
+  }>
+  rshiftmod PROC:<{
+      -7 PUSHINT
+      1 RSHIFT#MOD  // -4 1
+  }>
+  rshiftcmod PROC:<{
+      -7 PUSHINT
+      1 RSHIFTC#MOD  // -3 -1
+  }>
+  rshiftrmod_1 PROC:<{
+      -7 PUSHINT
+      1 RSHIFTR#MOD  // -3 -1
+  }>
+  rshiftrmod_2 PROC:<{
+      5 PUSHINT
+      2 RSHIFTR#MOD  // 1 1
+  }>
+  rshiftmod_var PROC:<{
+      -7 PUSHINT
+      1 PUSHINT
+      RSHIFTMOD  // -4 1
+  }>
+  rshiftcmod_var PROC:<{
+      -7 PUSHINT
+      1 PUSHINT
+      RSHIFTMODC  // -3 -1
+  }>
+  rshiftrmod_var_1 PROC:<{
+      -7 PUSHINT
+      1 PUSHINT
+      RSHIFTMODR  // -3 -1
+  }>
+  rshiftrmod_var_2 PROC:<{
+      5 PUSHINT
+      2 PUSHINT
+      RSHIFTMODR  // 1 1
+  }>
+}END>c

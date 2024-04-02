@@ -28,6 +28,7 @@ class TvmContext(components : UComponents<TvmType, TvmSizeSort>) : UContext<TvmS
     val trueValue: KBitVecValue<UBvSort> = (-1).toBv257()
     val falseValue: KBitVecValue<UBvSort> = 0.toBv257()
     val oneValue: KBitVecValue<UBvSort> = 1.toBv257()
+    val twoValue: KBitVecValue<UBvSort> = 2.toBv257()
     val zeroValue: KBitVecValue<UBvSort> = falseValue
     val minusOneValue = trueValue
     val intBitsValue = INT_BITS.toInt().toBv257()

@@ -7,7 +7,6 @@ import io.ksmt.utils.BvUtils.bigIntValue
 import io.ksmt.utils.BvUtils.bvMaxValueSigned
 import io.ksmt.utils.BvUtils.bvMinValueSigned
 import io.ksmt.utils.BvUtils.toBigIntegerSigned
-import io.ksmt.utils.cast
 import mu.KLogging
 import org.ton.bytecode.TvmAliasInst
 import org.ton.bytecode.TvmArithmBasicAddInst
@@ -18,9 +17,29 @@ import org.ton.bytecode.TvmArithmBasicInst
 import org.ton.bytecode.TvmArithmBasicMulInst
 import org.ton.bytecode.TvmArithmBasicMulconstInst
 import org.ton.bytecode.TvmArithmBasicSubInst
-import org.ton.bytecode.TvmArithmDivDivInst
 import org.ton.bytecode.TvmArithmDivInst
-import org.ton.bytecode.TvmArithmDivModInst
+import org.ton.bytecode.TvmArithmLogicalAbsInst
+import org.ton.bytecode.TvmArithmLogicalAndInst
+import org.ton.bytecode.TvmArithmLogicalBitsizeInst
+import org.ton.bytecode.TvmArithmLogicalChkbitAliasInst
+import org.ton.bytecode.TvmArithmLogicalChkboolAliasInst
+import org.ton.bytecode.TvmArithmLogicalFitsInst
+import org.ton.bytecode.TvmArithmLogicalFitsxInst
+import org.ton.bytecode.TvmArithmLogicalInst
+import org.ton.bytecode.TvmArithmLogicalLshiftInst
+import org.ton.bytecode.TvmArithmLogicalLshiftVarInst
+import org.ton.bytecode.TvmArithmLogicalMaxInst
+import org.ton.bytecode.TvmArithmLogicalMinInst
+import org.ton.bytecode.TvmArithmLogicalMinmaxInst
+import org.ton.bytecode.TvmArithmLogicalNotInst
+import org.ton.bytecode.TvmArithmLogicalOrInst
+import org.ton.bytecode.TvmArithmLogicalPow2Inst
+import org.ton.bytecode.TvmArithmLogicalRshiftInst
+import org.ton.bytecode.TvmArithmLogicalRshiftVarInst
+import org.ton.bytecode.TvmArithmLogicalUbitsizeInst
+import org.ton.bytecode.TvmArithmLogicalUfitsInst
+import org.ton.bytecode.TvmArithmLogicalUfitsxInst
+import org.ton.bytecode.TvmArithmLogicalXorInst
 import org.ton.bytecode.TvmBuilderType
 import org.ton.bytecode.TvmCellBuildEndcInst
 import org.ton.bytecode.TvmCellBuildInst
@@ -168,7 +187,7 @@ import org.usvm.UBoolExpr
 import org.usvm.UBvSort
 import org.usvm.UExpr
 import org.usvm.UInterpreter
-import org.usvm.USort
+import org.usvm.api.makeSymbolicPrimitive
 import org.usvm.api.readField
 import org.usvm.api.writeField
 import org.usvm.collection.field.UFieldLValue
@@ -186,6 +205,7 @@ import org.usvm.machine.state.C3Register
 import org.usvm.machine.state.C4Register
 import org.usvm.machine.state.TvmCellOverflow
 import org.usvm.machine.state.TvmCellUnderflow
+import org.usvm.machine.state.TvmIntegerOutOfRange
 import org.usvm.machine.state.TvmIntegerOverflow
 import org.usvm.machine.state.TvmRefEmptyValue
 import org.usvm.machine.state.TvmRegisters
@@ -194,6 +214,9 @@ import org.usvm.machine.state.TvmState
 import org.usvm.machine.state.TvmUnknownFailure
 import org.usvm.machine.state.builderCopy
 import org.usvm.machine.state.builderStoreDataBits
+import org.usvm.machine.state.bvMaxValueSignedExtended
+import org.usvm.machine.state.bvMaxValueUnsignedExtended
+import org.usvm.machine.state.bvMinValueSignedExtended
 import org.usvm.machine.state.calcOnStateCtx
 import org.usvm.machine.state.doWithStateCtx
 import org.usvm.machine.state.generateSymbolicCell
@@ -202,6 +225,7 @@ import org.usvm.machine.state.newStmt
 import org.usvm.machine.state.nextStmt
 import org.usvm.machine.state.returnFromMethod
 import org.usvm.machine.state.setFailure
+import org.usvm.machine.state.signedIntegerFitsBits
 import org.usvm.machine.state.sliceCopy
 import org.usvm.machine.state.sliceLoadDataBits
 import org.usvm.machine.state.sliceLoadNextRef
@@ -212,6 +236,7 @@ import org.usvm.machine.state.takeLastCell
 import org.usvm.machine.state.takeLastContinuation
 import org.usvm.machine.state.takeLastInt
 import org.usvm.machine.state.takeLastSlice
+import org.usvm.machine.state.unsignedIntegerFitsBits
 import org.usvm.memory.UMemory
 import org.usvm.memory.UWritableMemory
 import org.usvm.mkSizeAddExpr
@@ -223,35 +248,6 @@ import org.usvm.solver.USatResult
 import org.usvm.targets.UTargetsSet
 import org.usvm.util.write
 import java.math.BigInteger
-import org.ton.bytecode.TvmArithmLogicalAbsInst
-import org.ton.bytecode.TvmArithmLogicalAndInst
-import org.ton.bytecode.TvmArithmLogicalBitsizeInst
-import org.ton.bytecode.TvmArithmLogicalChkbitAliasInst
-import org.ton.bytecode.TvmArithmLogicalChkboolAliasInst
-import org.ton.bytecode.TvmArithmLogicalFitsInst
-import org.ton.bytecode.TvmArithmLogicalFitsxInst
-import org.ton.bytecode.TvmArithmLogicalInst
-import org.ton.bytecode.TvmArithmLogicalLshiftInst
-import org.ton.bytecode.TvmArithmLogicalLshiftVarInst
-import org.ton.bytecode.TvmArithmLogicalMaxInst
-import org.ton.bytecode.TvmArithmLogicalMinInst
-import org.ton.bytecode.TvmArithmLogicalMinmaxInst
-import org.ton.bytecode.TvmArithmLogicalNotInst
-import org.ton.bytecode.TvmArithmLogicalOrInst
-import org.ton.bytecode.TvmArithmLogicalPow2Inst
-import org.ton.bytecode.TvmArithmLogicalRshiftInst
-import org.ton.bytecode.TvmArithmLogicalRshiftVarInst
-import org.ton.bytecode.TvmArithmLogicalUbitsizeInst
-import org.ton.bytecode.TvmArithmLogicalUfitsInst
-import org.ton.bytecode.TvmArithmLogicalUfitsxInst
-import org.ton.bytecode.TvmArithmLogicalXorInst
-import org.usvm.api.makeSymbolicPrimitive
-import org.usvm.machine.state.TvmIntegerOutOfRange
-import org.usvm.machine.state.bvMaxValueSignedExtended
-import org.usvm.machine.state.bvMaxValueUnsignedExtended
-import org.usvm.machine.state.bvMinValueSignedExtended
-import org.usvm.machine.state.signedIntegerFitsBits
-import org.usvm.machine.state.unsignedIntegerFitsBits
 
 typealias TvmStepScope = StepScope<TvmState, TvmType, TvmInst, TvmContext>
 
@@ -267,6 +263,7 @@ class TvmInterpreter(
 
     private val dictOperationInterpreter = TvmDictOperationInterpreter(ctx)
     private val loopsInterpreter = TvmLoopsInterpreter(ctx)
+    private val arithDivInterpreter = TvmArithDivInterpreter(ctx)
 
     fun getInitialState(contractCode: TvmContractCode, contractData: Cell, methodId: Int, targets: List<TvmTarget> = emptyList()): TvmState {
         /*val contract = contractCode.methods[0]!!
@@ -374,7 +371,7 @@ class TvmInterpreter(
             is TvmConstIntInst -> visitConstantIntInst(scope, stmt)
             is TvmConstDataInst -> visitConstantDataInst(scope, stmt)
             is TvmArithmBasicInst -> visitArithmeticInst(scope, stmt)
-            is TvmArithmDivInst -> visitArithmeticDivInst(scope, stmt)
+            is TvmArithmDivInst -> arithDivInterpreter.visitArithmeticDivInst(scope, stmt)
             is TvmArithmLogicalInst -> visitArithmeticLogicalInst(scope, stmt)
             is TvmCompareIntInst -> visitComparisonIntInst(scope, stmt)
             is TvmCompareOtherInst -> visitComparisonOtherInst(scope, stmt)
@@ -799,49 +796,6 @@ class TvmInterpreter(
                 newStmt(stmt.nextStmt())
             }
         }
-    }
-
-    private fun visitArithmeticDivInst(scope: TvmStepScope, stmt: TvmArithmDivInst) {
-        with(ctx) {
-            val result = when (stmt) {
-                is TvmArithmDivDivInst -> {
-                    val (secondOperand, firstOperand) = scope.calcOnState {
-                        stack.takeLastInt() to stack.takeLastInt()
-                    }
-                    checkDivisionByZero(secondOperand, scope) ?: return
-
-                    mkBvSignedDivExpr(firstOperand, secondOperand)
-                }
-
-                is TvmArithmDivModInst -> {
-                    val (secondOperand, firstOperand) = scope.calcOnState {
-                        stack.takeLastInt() to stack.takeLastInt()
-                    }
-                    checkDivisionByZero(secondOperand, scope) ?: return
-
-                    mkBvSignedModExpr(firstOperand, secondOperand)
-                }
-
-                else -> TODO("$stmt")
-            }
-
-            scope.doWithState {
-                stack.add(result, TvmIntegerType)
-                newStmt(stmt.nextStmt())
-            }
-        }
-    }
-
-    private fun checkDivisionByZero(expr: UExpr<out USort>, scope: TvmStepScope) = with(ctx) {
-        val sort = expr.sort
-        if (sort !is UBvSort) {
-            return Unit
-        }
-        val neqZero = mkEq(expr.cast(), zeroValue).not()
-        scope.fork(
-            neqZero,
-            blockOnFalseState = setFailure(TvmIntegerOverflow)
-        )
     }
 
     private fun checkOverflow(noOverflowExpr: UBoolExpr, scope: TvmStepScope): Unit? = scope.fork(
