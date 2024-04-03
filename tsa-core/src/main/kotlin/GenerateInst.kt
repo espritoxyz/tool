@@ -10,9 +10,18 @@ private val instructionsListPath = Path("tvm-disasm/dist/tvm-spec/cp0.json")
 private val generatedInstPath = Path("tsa-core/src/main/kotlin/org/ton/bytecode/TvmInstructions.kt")
 
 private val instructionOperandType = mapOf(
-    "PUSHCONT_SHORT" to mapOf("s" to "List<TvmInst>"),
-    "PUSHCONT" to mapOf("s" to "List<TvmInst>"),
-    "PUSHREFCONT" to mapOf("c" to "List<TvmInst>"),
+    "PUSHCONT_SHORT" to mapOf("s" to "TvmInstList"),
+    "PUSHCONT" to mapOf("s" to "TvmInstList"),
+    "PUSHREFCONT" to mapOf("c" to "TvmInstList"),
+    "IFREF" to mapOf("c" to "TvmInstList"),
+    "IFNOTREF" to mapOf("c" to "TvmInstList"),
+    "IFJMPREF" to mapOf("c" to "TvmInstList"),
+    "IFNOTJMPREF" to mapOf("c" to "TvmInstList"),
+    "IFREFELSE" to mapOf("c" to "TvmInstList"),
+    "IFELSEREF" to mapOf("c" to "TvmInstList"),
+    "IFREFELSEREF" to mapOf("c1" to "TvmInstList", "c2" to "TvmInstList"),
+    "IFBITJMPREF" to mapOf("c" to "TvmInstList"),
+    "IFNBITJMPREF" to mapOf("c" to "TvmInstList"),
 )
 
 private const val ADDITIONAL_CATEGORY_DICT = "dict"

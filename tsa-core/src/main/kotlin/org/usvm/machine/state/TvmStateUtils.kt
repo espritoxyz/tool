@@ -5,6 +5,7 @@ import org.ton.bytecode.TvmBuilderType
 import org.ton.bytecode.TvmCellType
 import org.ton.bytecode.TvmContinuationValue
 import org.ton.bytecode.TvmInst
+import org.ton.bytecode.TvmIntegerType
 import org.ton.bytecode.TvmSliceType
 import org.ton.bytecode.TvmTupleType
 import org.usvm.UBoolExpr
@@ -28,8 +29,9 @@ fun TvmInst.nextStmt(): TvmInst = location.codeBlock.instList.getOrNull(location
     ?: error("Unexpected end of the code block ${location.codeBlock}")
 
 fun setFailure(failure: TvmMethodResult.TvmFailure): (TvmState) -> Unit = { state ->
-    state.setGasUsage(IMPLICIT_EXCEPTION_THROW_GAS)
+    state.consumeGas(IMPLICIT_EXCEPTION_THROW_GAS)
     state.methodResult = failure
+    state.stack.add(state.ctx.zeroValue, TvmIntegerType) // Push default zero parameter to the stack
 }
 
 // TODO support RETALT

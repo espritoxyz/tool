@@ -1,7 +1,6 @@
 package org.ton.examples.ints
 
-import org.ton.examples.compareMethodStateResult
-import org.ton.examples.compareMethodStateStackNumbers
+import org.ton.examples.compareMethodStateStack
 import org.usvm.machine.compileAndAnalyzeFift
 import org.usvm.machine.runFiftMethod
 import kotlin.io.path.Path
@@ -19,7 +18,7 @@ class LogicalArithmeticTest {
         val methodStates = compileAndAnalyzeFift(fiftResourcePath)
 
         val methodIds = (0..18).toSet()
-        compareMethodStateStackNumbers(methodIds, methodStates) { method ->
+        compareMethodStateStack(methodIds, methodStates) { method ->
             runFiftMethod(fiftResourcePath, method.id)
         }
     }
@@ -32,7 +31,7 @@ class LogicalArithmeticTest {
         val methodStates = compileAndAnalyzeFift(fiftResourcePath)
 
         val methodIds = (0..14).toSet()
-        compareMethodStateResult(methodIds, methodStates) { method ->
+        compareMethodStateStack(methodIds, methodStates) { method ->
             runFiftMethod(fiftResourcePath, method.id)
         }
     }

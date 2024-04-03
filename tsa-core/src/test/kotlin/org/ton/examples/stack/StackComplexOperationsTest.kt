@@ -1,8 +1,7 @@
 package org.ton.examples.stack
 
 import org.ton.bytecode.TvmIntegerType
-import org.ton.examples.compareMethodStateStackNumbers
-import org.ton.examples.compareMethodStateStackNumbersAndNulls
+import org.ton.examples.compareMethodStateStack
 import org.ton.examples.loadIntegers
 import org.usvm.machine.TvmComponents
 import org.usvm.machine.TvmContext
@@ -42,7 +41,7 @@ class StackComplexOperationsTest {
         val methodStates = compileAndAnalyzeFift(fiftResourcePath)
 
         val methodIds = (0..15).toSet()
-        compareMethodStateStackNumbersAndNulls(methodIds, methodStates) { method ->
+        compareMethodStateStack(methodIds, methodStates) { method ->
             runFiftMethod(fiftResourcePath, method.id)
         }
     }
@@ -55,7 +54,7 @@ class StackComplexOperationsTest {
         val methodStates = compileAndAnalyzeFift(fiftResourcePath)
 
         val methodIds = (0..30).toSet()
-        compareMethodStateStackNumbers(methodIds, methodStates) { method ->
+        compareMethodStateStack(methodIds, methodStates) { method ->
             runFiftMethod(fiftResourcePath, method.id)
         }
     }

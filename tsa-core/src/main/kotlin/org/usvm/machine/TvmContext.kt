@@ -32,6 +32,10 @@ class TvmContext(components : UComponents<TvmType, TvmSizeSort>) : UContext<TvmS
     val zeroValue: KBitVecValue<UBvSort> = falseValue
     val minusOneValue = trueValue
     val intBitsValue = INT_BITS.toInt().toBv257()
+    val maxTupleSizeValue = MAX_TUPLE_SIZE.toBv257()
+
+    private var inputStackEntryCounter: Int = 0
+    fun nextInputStackEntryId(): Int = inputStackEntryCounter++
 
     val nullValue: UConcreteHeapRef = mkConcreteHeapRef(NULL_ADDRESS)
 
@@ -61,7 +65,9 @@ class TvmContext(components : UComponents<TvmType, TvmSizeSort>) : UContext<TvmS
         const val MAX_DATA_LENGTH: Int = 1023
         const val MAX_REFS_NUMBER: Int = 4
 
-        const val INT_BITS = 257u
+        const val MAX_TUPLE_SIZE: Int = 255
+
+        const val INT_BITS: UInt = 257u
 
         val cellDataField: TvmField = TvmFieldImpl(TvmCellType, "data")
         val cellDataLengthField: TvmField = TvmFieldImpl(TvmCellType, "dataLength")

@@ -116,7 +116,6 @@ import org.ton.bytecode.TvmExceptionsThrowargInst
 import org.ton.bytecode.TvmInst
 import org.ton.bytecode.TvmIntegerType
 import org.ton.bytecode.TvmLambda
-import org.ton.bytecode.TvmNullType
 import org.ton.bytecode.TvmSliceType
 import org.ton.bytecode.TvmStackBasicInst
 import org.ton.bytecode.TvmStackBasicNopInst
@@ -170,16 +169,6 @@ import org.ton.bytecode.TvmStackComplexXcpuInst
 import org.ton.bytecode.TvmStackComplexXcpuxcInst
 import org.ton.bytecode.TvmSubSliceSerializedLoader
 import org.ton.bytecode.TvmTupleInst
-import org.ton.bytecode.TvmTupleIsnullInst
-import org.ton.bytecode.TvmTupleNullInst
-import org.ton.bytecode.TvmTupleNullrotrif2Inst
-import org.ton.bytecode.TvmTupleNullrotrifInst
-import org.ton.bytecode.TvmTupleNullrotrifnot2Inst
-import org.ton.bytecode.TvmTupleNullrotrifnotInst
-import org.ton.bytecode.TvmTupleNullswapif2Inst
-import org.ton.bytecode.TvmTupleNullswapifInst
-import org.ton.bytecode.TvmTupleNullswapifnot2Inst
-import org.ton.bytecode.TvmTupleNullswapifnotInst
 import org.ton.bytecode.TvmType
 import org.ton.cell.Cell
 import org.ton.targets.TvmTarget
@@ -219,16 +208,15 @@ import org.usvm.machine.state.builderStoreDataBits
 import org.usvm.machine.state.bvMaxValueSignedExtended
 import org.usvm.machine.state.bvMaxValueUnsignedExtended
 import org.usvm.machine.state.bvMinValueSignedExtended
-import org.usvm.machine.state.calcOnStateCtx
 import org.usvm.machine.state.doWithStateCtx
 import org.usvm.machine.state.generateSymbolicCell
 import org.usvm.machine.state.lastStmt
 import org.usvm.machine.state.newStmt
 import org.usvm.machine.state.nextStmt
 import org.usvm.machine.state.returnFromMethod
-import org.usvm.machine.state.setDefaultGasUsage
+import org.usvm.machine.state.consumeDefaultGas
 import org.usvm.machine.state.setFailure
-import org.usvm.machine.state.setGasUsage
+import org.usvm.machine.state.consumeGas
 import org.usvm.machine.state.signedIntegerFitsBits
 import org.usvm.machine.state.sliceCopy
 import org.usvm.machine.state.sliceLoadDataBits
@@ -265,6 +253,7 @@ class TvmInterpreter(
         val logger = object : KLogging() {}.logger
     }
 
+    private val tupleInterpreter = TvmTupleInterpreter(ctx)
     private val dictOperationInterpreter = TvmDictOperationInterpreter(ctx)
     private val loopsInterpreter = TvmLoopsInterpreter(ctx)
     private val arithDivInterpreter = TvmArithDivInterpreter(ctx)
@@ -396,7 +385,7 @@ class TvmInterpreter(
             is TvmDebugInst -> visitDebugInst(scope, stmt)
             is TvmCodepageInst -> visitCodepageInst(scope, stmt)
             is TvmDictSpecialInst -> visitDictControlFlowInst(scope, stmt)
-            is TvmTupleInst -> visitTvmTupleInst(scope, stmt)
+            is TvmTupleInst -> tupleInterpreter.visitTvmTupleInst(scope, stmt)
             is TvmDictInst -> dictOperationInterpreter.visitTvmDictInst(scope, stmt)
             is TvmContLoopsInst -> loopsInterpreter.visitTvmContLoopsInst(scope, stmt)
             else -> TODO("$stmt")
@@ -404,7 +393,7 @@ class TvmInterpreter(
     }
 
     private fun visitBasicStackInst(scope: TvmStepScope, stmt: TvmStackBasicInst) {
-        scope.setDefaultGasUsage(stmt)
+        scope.consumeDefaultGas(stmt)
 
         when (stmt) {
             is TvmStackBasicNopInst -> {
@@ -446,7 +435,7 @@ class TvmInterpreter(
         scope: TvmStepScope,
         stmt: TvmStackComplexInst
     ) {
-        scope.setDefaultGasUsage(stmt)
+        scope.consumeDefaultGas(stmt)
 
         when (stmt) {
             is TvmStackComplexBlkdrop2Inst -> scope.doWithState {
@@ -627,7 +616,7 @@ class TvmInterpreter(
     }
 
     private fun visitConstantIntInst(scope: TvmStepScope, stmt: TvmConstIntInst) {
-        scope.setDefaultGasUsage(stmt)
+        scope.consumeDefaultGas(stmt)
         scope.doWithState {
             val value = stmt.bv257value(ctx)
             stack.add(value, TvmIntegerType)
@@ -674,7 +663,7 @@ class TvmInterpreter(
     }
 
     private fun visitConstantDataInst(scope: TvmStepScope, stmt: TvmConstDataInst) {
-        scope.setDefaultGasUsage(stmt)
+        scope.consumeDefaultGas(stmt)
 
         when (stmt) {
             is TvmConstDataPushcontShortInst -> visitPushContShortInst(scope, stmt)
@@ -710,13 +699,13 @@ class TvmInterpreter(
             val lambda = TvmLambda(stmt.s.toMutableList())
             val continuationValue = TvmContinuationValue(lambda, stack, registers)
 
-            stack += continuationValue
+            stack.addContinuation(continuationValue)
             newStmt(stmt.nextStmt())
         }
     }
 
     private fun visitArithmeticInst(scope: TvmStepScope, stmt: TvmArithmBasicInst) {
-        scope.setDefaultGasUsage(stmt)
+        scope.consumeDefaultGas(stmt)
 
         with(ctx) {
             val result = when (stmt) {
@@ -836,31 +825,31 @@ class TvmInterpreter(
     private fun visitArithmeticLogicalInst(scope: TvmStepScope, stmt: TvmArithmLogicalInst): Unit = with(ctx) {
         val result: UExpr<UBvSort> = when (stmt) {
             is TvmArithmLogicalOrInst -> {
-                scope.setDefaultGasUsage(stmt)
+                scope.consumeDefaultGas(stmt)
 
                 val (secondOperand, firstOperand) = scope.calcOnState { stack.takeLastInt() to stack.takeLastInt() }
                 mkBvOrExpr(firstOperand, secondOperand)
             }
             is TvmArithmLogicalXorInst -> {
-                scope.setDefaultGasUsage(stmt)
+                scope.consumeDefaultGas(stmt)
 
                 val (secondOperand, firstOperand) = scope.calcOnState { stack.takeLastInt() to stack.takeLastInt() }
                 mkBvXorExpr(firstOperand, secondOperand)
             }
             is TvmArithmLogicalAndInst -> {
-                scope.setDefaultGasUsage(stmt)
+                scope.consumeDefaultGas(stmt)
 
                 val (secondOperand, firstOperand) = scope.calcOnState { stack.takeLastInt() to stack.takeLastInt() }
                 mkBvAndExpr(firstOperand, secondOperand)
             }
             is TvmArithmLogicalNotInst -> {
-                scope.doWithState { setGasUsage(18) } // todo: 26 in docs, but 18 in concrete execution
+                scope.doWithState { consumeGas(18) } // todo: 26 in docs, but 18 in concrete execution
 
                 val value = scope.calcOnState { stack.takeLastInt() }
                 mkBvNotExpr(value)
             }
             is TvmArithmLogicalAbsInst -> {
-                scope.setDefaultGasUsage(stmt)
+                scope.consumeDefaultGas(stmt)
 
                 val value = scope.calcOnState { stack.takeLastInt() }
                 checkOverflow(mkBvNegationNoOverflowExpr(value), scope) ?: return
@@ -872,7 +861,7 @@ class TvmInterpreter(
                 )
             }
             is TvmArithmLogicalMaxInst -> {
-                scope.setDefaultGasUsage(stmt)
+                scope.consumeDefaultGas(stmt)
 
                 val (secondOperand, firstOperand) = scope.calcOnState { stack.takeLastInt() to stack.takeLastInt() }
 
@@ -883,7 +872,7 @@ class TvmInterpreter(
                 )
             }
             is TvmArithmLogicalMinInst -> {
-                scope.setDefaultGasUsage(stmt)
+                scope.consumeDefaultGas(stmt)
 
                 val (secondOperand, firstOperand) = scope.calcOnState { stack.takeLastInt() to stack.takeLastInt() }
 
@@ -894,7 +883,7 @@ class TvmInterpreter(
                 )
             }
             is TvmArithmLogicalMinmaxInst -> {
-                scope.setDefaultGasUsage(stmt)
+                scope.consumeDefaultGas(stmt)
 
                 val (secondOperand, firstOperand) = scope.calcOnState { stack.takeLastInt() to stack.takeLastInt() }
 
@@ -918,7 +907,7 @@ class TvmInterpreter(
                 return
             }
             is TvmArithmLogicalPow2Inst -> {
-                scope.setDefaultGasUsage(stmt)
+                scope.consumeDefaultGas(stmt)
 
                 val exp = scope.calcOnState { stack.takeLastInt() }
                 val notOutOfRangeExpr = unsignedIntegerFitsBits(exp, 10u)
@@ -930,7 +919,7 @@ class TvmInterpreter(
                 mkBvShiftLeftExpr(oneValue, exp)
             }
             is TvmArithmLogicalLshiftInst -> {
-                scope.setDefaultGasUsage(stmt)
+                scope.consumeDefaultGas(stmt)
 
                 val value = scope.calcOnState { stack.takeLastInt() }
                 val shift = stmt.c + 1
@@ -948,7 +937,7 @@ class TvmInterpreter(
                 mkBvShiftLeftExpr(value, shift.toBv257())
             }
             is TvmArithmLogicalLshiftVarInst -> {
-                scope.setDefaultGasUsage(stmt)
+                scope.consumeDefaultGas(stmt)
 
                 val (shift, value) = scope.calcOnState { stack.takeLastInt() to stack.takeLastInt() }
                 val notOutOfRangeExpr = unsignedIntegerFitsBits(shift, 10u)
@@ -967,7 +956,7 @@ class TvmInterpreter(
                 mkBvShiftLeftExpr(value, shift)
             }
             is TvmArithmLogicalRshiftInst -> {
-                scope.doWithState { setGasUsage(26) } // todo: 18 in docs, but 26 in concrete execution
+                scope.doWithState { consumeGas(26) } // todo: 18 in docs, but 26 in concrete execution
 
                 val value = scope.calcOnState { stack.takeLastInt() }
                 val shift = stmt.c + 1
@@ -976,7 +965,7 @@ class TvmInterpreter(
                 mkBvArithShiftRightExpr(value, shift.toBv257())
             }
             is TvmArithmLogicalRshiftVarInst -> {
-                scope.setDefaultGasUsage(stmt)
+                scope.consumeDefaultGas(stmt)
 
                 val (shift, value) = scope.calcOnState { stack.takeLastInt() to stack.takeLastInt() }
                 val notOutOfRangeExpr = unsignedIntegerFitsBits(shift, 10u)
@@ -985,7 +974,7 @@ class TvmInterpreter(
                 mkBvArithShiftRightExpr(value, shift)
             }
             is TvmArithmLogicalFitsInst -> {
-                scope.doWithState { setGasUsage(26) }
+                scope.doWithState { consumeGas(26) }
 
                 val value = scope.calcOnState { stack.takeLastInt() }
                 val sizeBits = stmt.c + 1
@@ -997,7 +986,7 @@ class TvmInterpreter(
                 value
             }
             is TvmArithmLogicalFitsxInst -> {
-                scope.doWithState { setGasUsage(26) }
+                scope.doWithState { consumeGas(26) }
 
                 val (sizeBits, value) = scope.calcOnState { stack.takeLastInt() to stack.takeLastInt() }
                 val notOutOfRangeExpr = unsignedIntegerFitsBits(sizeBits, 10u)
@@ -1015,7 +1004,7 @@ class TvmInterpreter(
                 value
             }
             is TvmArithmLogicalUfitsInst -> {
-                scope.doWithState { setGasUsage(26) }
+                scope.doWithState { consumeGas(26) }
 
                 val value = scope.calcOnState { stack.takeLastInt() }
                 val sizeBits = stmt.c + 1
@@ -1027,7 +1016,7 @@ class TvmInterpreter(
                 value
             }
             is TvmArithmLogicalUfitsxInst -> {
-                scope.doWithState { setGasUsage(26) }
+                scope.doWithState { consumeGas(26) }
 
                 val (sizeBits, value) = scope.calcOnState { stack.takeLastInt() to stack.takeLastInt() }
                 val notOutOfRangeExpr = unsignedIntegerFitsBits(sizeBits, 10u)
@@ -1048,7 +1037,7 @@ class TvmInterpreter(
                 value
             }
             is TvmArithmLogicalBitsizeInst -> {
-                scope.setDefaultGasUsage(stmt)
+                scope.consumeDefaultGas(stmt)
 
                 val value = scope.calcOnState { stack.takeLastInt() }
                 val symbolicSizeBits = scope.calcOnState { makeSymbolicPrimitive(int257sort) }
@@ -1081,7 +1070,7 @@ class TvmInterpreter(
                 symbolicSizeBits
             }
             is TvmArithmLogicalUbitsizeInst -> {
-                scope.setDefaultGasUsage(stmt)
+                scope.consumeDefaultGas(stmt)
 
                 val value = scope.calcOnState { stack.takeLastInt() }
                 val notOutOfRangeExpr = mkBvSignedGreaterOrEqualExpr(value, zeroValue)
@@ -1122,7 +1111,7 @@ class TvmInterpreter(
     }
 
     private fun visitComparisonIntInst(scope: TvmStepScope, stmt: TvmCompareIntInst) = with(ctx) {
-        scope.setDefaultGasUsage(stmt)
+        scope.consumeDefaultGas(stmt)
 
         when (stmt) {
             is TvmAliasInst -> visit(scope, stmt.resolveAlias())
@@ -1217,7 +1206,7 @@ class TvmInterpreter(
     private fun visitComparisonOtherInst(scope: TvmStepScope, stmt: TvmCompareOtherInst) {
         when (stmt) {
             is TvmCompareOtherSemptyInst -> {
-                scope.setDefaultGasUsage(stmt)
+                scope.consumeDefaultGas(stmt)
 
                 with(ctx) {
                     val slice = scope.calcOnState { stack.takeLastSlice() }
@@ -1263,7 +1252,7 @@ class TvmInterpreter(
     }
 
     private fun visitLoadRefInst(scope: TvmStepScope, stmt: TvmCellParseLdrefInst) {
-        scope.setDefaultGasUsage(stmt)
+        scope.consumeDefaultGas(stmt)
 
         val slice = scope.calcOnState { stack.takeLastSlice() }
         val updatedSlice = scope.calcOnState {
@@ -1282,7 +1271,7 @@ class TvmInterpreter(
     }
 
     private fun visitEndSliceInst(scope: TvmStepScope, stmt: TvmCellParseEndsInst) {
-        scope.setDefaultGasUsage(stmt)
+        scope.consumeDefaultGas(stmt)
 
         with(ctx) {
             val slice = scope.calcOnState { stack.takeLastSlice() }
@@ -1312,7 +1301,7 @@ class TvmInterpreter(
         scope: TvmStepScope,
         stmt: TvmCellParseLduInst
     ) {
-        scope.setDefaultGasUsage(stmt)
+        scope.consumeDefaultGas(stmt)
 
         val slice = scope.calcOnState { stack.takeLastSlice() }
         val updatedSlice = scope.calcOnState {
@@ -1339,7 +1328,7 @@ class TvmInterpreter(
          * todo: Transforming a cell into a slice costs 100 gas units if the cell is loading
          * for the first time and 25 for subsequent loads during the same transaction
          * */
-        scope.doWithState { setGasUsage(118) }
+        scope.doWithState { consumeGas(118) }
 
         with(ctx) {
             scope.doWithState {
@@ -1376,7 +1365,7 @@ class TvmInterpreter(
     }
 
     private fun visitStoreUnsignedIntInst(scope: TvmStepScope, stmt: TvmCellBuildStuInst) {
-        scope.setDefaultGasUsage(stmt)
+        scope.consumeDefaultGas(stmt)
 
         with(ctx) {
             scope.doWithState {
@@ -1411,7 +1400,7 @@ class TvmInterpreter(
     }
 
     private fun visitNewCellInst(scope: TvmStepScope, stmt: TvmCellBuildNewcInst) {
-        scope.setDefaultGasUsage(stmt)
+        scope.consumeDefaultGas(stmt)
 
         with(ctx) {
             scope.doWithState {
@@ -1432,7 +1421,7 @@ class TvmInterpreter(
     }
 
     private fun visitEndCellInst(scope: TvmStepScope, stmt: TvmCellBuildEndcInst) {
-        scope.setDefaultGasUsage(stmt)
+        scope.consumeDefaultGas(stmt)
 
         val builder = scope.calcOnState { stack.takeLastBuilder() }
         val cell = scope.calcOnState {
@@ -1450,7 +1439,7 @@ class TvmInterpreter(
         scope: TvmStepScope,
         stmt: TvmContRegistersInst
     ) {
-        scope.setDefaultGasUsage(stmt)
+        scope.consumeDefaultGas(stmt)
 
         when (stmt) {
             is TvmContRegistersPushctrInst -> visitTvmPushCtrInst(scope, stmt)
@@ -1473,7 +1462,7 @@ class TvmInterpreter(
     }
 
     private fun visitTvmPushCtrInst(scope: TvmStepScope, stmt: TvmContRegistersPushctrInst) {
-        scope.setDefaultGasUsage(stmt)
+        scope.consumeDefaultGas(stmt)
 
         scope.doWithState {
             // TODO use it!
@@ -1495,7 +1484,7 @@ class TvmInterpreter(
                     val mainMethod = contractCode.methods[Int.MAX_VALUE]
                         ?: error("No main method found")
                     val continuationValue = TvmContinuationValue(mainMethod, stack, registers)
-                    stack += continuationValue
+                    stack.addContinuation(continuationValue)
                     newStmt(stmt.nextStmt())
                 }
                 else -> TODO("Not yet implemented")
@@ -1508,7 +1497,7 @@ class TvmInterpreter(
         scope: TvmStepScope,
         stmt: TvmContBasicInst
     ) {
-        scope.setDefaultGasUsage(stmt)
+        scope.consumeDefaultGas(stmt)
 
         when (stmt) {
             is TvmContBasicExecuteInst -> {
@@ -1537,7 +1526,7 @@ class TvmInterpreter(
         scope: TvmStepScope,
         stmt: TvmContConditionalInst
     ) {
-        scope.setDefaultGasUsage(stmt)
+        scope.consumeDefaultGas(stmt)
 
         when (stmt) {
             is TvmContConditionalIfretInst -> {
@@ -1620,7 +1609,7 @@ class TvmInterpreter(
     }
 
     private fun visitTvmDictionaryJumpInst(scope: TvmStepScope, stmt: TvmContDictInst) {
-        scope.setDefaultGasUsage(stmt)
+        scope.consumeDefaultGas(stmt)
 
         when (stmt) {
             is TvmContDictCalldictInst -> {
@@ -1651,11 +1640,17 @@ class TvmInterpreter(
     }
 
     private fun visitExceptionInst(scope: TvmStepScope, stmt: TvmExceptionsInst) {
-        scope.setDefaultGasUsage(stmt)
+        scope.consumeDefaultGas(stmt)
 
         when (stmt) {
-            is TvmExceptionsThrowargInst -> scope.doWithState { methodResult = TvmUnknownFailure(stmt.n.toUInt()) }
-            is TvmExceptionsThrowShortInst -> scope.doWithState { methodResult = TvmUnknownFailure(stmt.n.toUInt()) }
+            is TvmExceptionsThrowargInst -> scope.doWithState {
+                // TODO push parameter to the stack
+                methodResult = TvmUnknownFailure(stmt.n.toUInt())
+            }
+            is TvmExceptionsThrowShortInst -> scope.doWithState {
+                // TODO push parameter to the stack
+                methodResult = TvmUnknownFailure(stmt.n.toUInt())
+            }
             else -> TODO("Unknown stmt: $stmt")
         }
     }
@@ -1664,7 +1659,7 @@ class TvmInterpreter(
         scope: TvmStepScope,
         stmt: TvmDictSpecialInst
     ) {
-        scope.setDefaultGasUsage(stmt)
+        scope.consumeDefaultGas(stmt)
 
         when (stmt) {
             is TvmDictSpecialDictigetjmpzInst -> {
@@ -1698,75 +1693,15 @@ class TvmInterpreter(
         }
     }
 
-    private fun visitTvmTupleInst(scope: TvmStepScope, stmt: TvmTupleInst) {
-        scope.setDefaultGasUsage(stmt)
-
-        when (stmt) {
-            is TvmAliasInst -> return visitTvmTupleInst(scope, stmt.resolveAlias() as TvmTupleInst)
-            is TvmTupleNullInst -> scope.doWithStateCtx {
-                stack.add(nullValue, TvmNullType)
-                newStmt(stmt.nextStmt())
-            }
-            is TvmTupleIsnullInst -> scope.doWithStateCtx {
-                val isNull = stack.lastIsNull()
-                stack.pop(0)
-                stack.add(if (isNull) trueValue else falseValue, TvmIntegerType)
-                newStmt(stmt.nextStmt())
-            }
-            is TvmTupleNullswapifInst -> doPushNullIf(scope, stmt, swapIfZero = false, nullsCount = 1, skipOneEntryUnderTop = false)
-            is TvmTupleNullswapif2Inst -> doPushNullIf(scope, stmt, swapIfZero = false, nullsCount = 2, skipOneEntryUnderTop = false)
-            is TvmTupleNullrotrifInst -> doPushNullIf(scope, stmt, swapIfZero = false, nullsCount = 1, skipOneEntryUnderTop = true)
-            is TvmTupleNullrotrif2Inst -> doPushNullIf(scope, stmt, swapIfZero = false, nullsCount = 2, skipOneEntryUnderTop = true)
-            is TvmTupleNullswapifnotInst -> doPushNullIf(scope, stmt, swapIfZero = true, nullsCount = 1, skipOneEntryUnderTop = false)
-            is TvmTupleNullswapifnot2Inst -> doPushNullIf(scope, stmt, swapIfZero = true, nullsCount = 2, skipOneEntryUnderTop = false)
-            is TvmTupleNullrotrifnotInst -> doPushNullIf(scope, stmt, swapIfZero = true, nullsCount = 1, skipOneEntryUnderTop = true)
-            is TvmTupleNullrotrifnot2Inst -> doPushNullIf(scope, stmt, swapIfZero = true, nullsCount = 2, skipOneEntryUnderTop = true)
-            else -> TODO("$stmt")
-        }
-    }
-
-    private fun doPushNullIf(
-        scope: TvmStepScope,
-        stmt: TvmTupleInst,
-        swapIfZero: Boolean,
-        nullsCount: Int,
-        skipOneEntryUnderTop: Boolean
-    ) {
-        val value = scope.calcOnState { stack.takeLastInt() }
-        val condition = scope.calcOnStateCtx {
-            val cond = mkEq(value, zeroValue)
-            if (swapIfZero) cond else cond.not()
-        }
-        scope.fork(
-            condition,
-            blockOnTrueState = {
-                val entryUnderTop = if (skipOneEntryUnderTop) stack.takeLastEntry() else null
-
-                repeat(nullsCount) {
-                    stack.add(ctx.nullValue, TvmNullType)
-                }
-
-                if (entryUnderTop != null) stack.addStackEntry(entryUnderTop)
-
-                stack.add(value, TvmIntegerType)
-                newStmt(stmt.nextStmt())
-            },
-            blockOnFalseState = {
-                stack.add(value, TvmIntegerType)
-                newStmt(stmt.nextStmt())
-            }
-        )
-    }
-
     private fun visitDebugInst(scope: TvmStepScope, stmt: TvmDebugInst) {
-        scope.setDefaultGasUsage(stmt)
+        scope.consumeDefaultGas(stmt)
 
         // Do nothing
         scope.doWithState { newStmt(stmt.nextStmt()) }
     }
 
     private fun visitCodepageInst(scope: TvmStepScope, stmt: TvmCodepageInst) {
-        scope.setDefaultGasUsage(stmt)
+        scope.consumeDefaultGas(stmt)
 
         // Do nothing
         scope.doWithState { newStmt(stmt.nextStmt()) }

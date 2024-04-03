@@ -10,25 +10,15 @@ import org.usvm.machine.FiftInterpreterResult
 import org.usvm.machine.state.TvmMethodResult
 import org.usvm.machine.state.TvmStack
 import org.usvm.machine.state.TvmState
+import org.usvm.test.TvmTestIntegerValue
+import org.usvm.test.TvmTestNullValue
+import org.usvm.test.TvmTestStateResolver
+import org.usvm.test.TvmTestTupleValue
+import org.usvm.test.TvmTestValue
 import kotlin.test.assertEquals
 
 internal fun TvmStack.loadIntegers(n: Int) = List(n) {
     takeLast(TvmIntegerType) { error("Impossible") }.intValue.intValue()
-}.reversed()
-
-internal fun TvmStack.evalBigIntegers(n: Int, state: TvmState) = List(n) {
-    takeLast(TvmIntegerType) { error("Impossible") }.intValue
-        .let { state.models.first().eval(it) }.bigIntegerValue()
-}.reversed()
-
-internal fun TvmStack.evalBigIntegersAndNulls(n: Int, state: TvmState) = List(n) {
-    if (lastIsNull()) {
-        pop(0)
-        return@List null
-    }
-
-    takeLast(TvmIntegerType) { error("Impossible") }.intValue
-        .let { state.models.first().eval(it) }.bigIntegerValue()
 }.reversed()
 
 internal fun TvmState.executionCode(): Int = when (val res = methodResult) {
@@ -44,42 +34,52 @@ internal fun TvmState.gasUsageValue(): Int {
 
 internal fun UExpr<out UBvSort>.intValue() = (this as KBitVecValue<*>).toBigIntegerSigned().toInt()
 
-internal fun UExpr<out UBvSort>.bigIntegerValue() =
-    (this as? KBitVecValue<*>)?.toBigIntegerSigned() ?: error("Unexpected expr $this")
-
-internal fun compareMethodStateStackNumbersAndNulls(
+internal fun compareMethodStateStack(
     methodIds: Set<Int>,
     methodStates: Map<TvmMethod, List<TvmState>>,
     expectedState: (TvmMethod) -> FiftInterpreterResult,
 ) = compareMethodStateStack(methodIds, methodStates, expectedState,
     stateStack = { state, expectedStackSize ->
-        state.stack.evalBigIntegersAndNulls(expectedStackSize, state)
+        val resolver = TvmTestStateResolver(state.ctx, state.models.first(), state)
+        List(expectedStackSize) { resolver.resolveEntry(state.stack.takeLastEntry()) }.reversed()
     },
-    concreteStack = { state ->
-        state.stack.map { if (it == "(null)") null else it.toBigInteger() }
+    concreteStack = { fiftResult ->
+        val result = mutableListOf<TvmTestValue>()
+        parseFiftStack(fiftResult.stack, result, initialIndex = 0)
+        result
     }
 )
 
-internal fun compareMethodStateStackNumbers(
-    methodIds: Set<Int>,
-    methodStates: Map<TvmMethod, List<TvmState>>,
-    expectedState: (TvmMethod) -> FiftInterpreterResult,
-) = compareMethodStateStack(methodIds, methodStates, expectedState,
-    stateStack = { state, expectedStackSize ->
-        state.stack.evalBigIntegers(expectedStackSize, state)
-    },
-    concreteStack = { state ->
-        state.stack.map { it.toBigInteger() }
-    }
-)
+private fun parseFiftStack(entries: List<String>, result: MutableList<TvmTestValue>, initialIndex: Int): Int {
+    var index = initialIndex
+    while (index < entries.size) {
+        when (entries[index]) {
+            "[" -> {
+                // tuple start
+                val tupleElements = mutableListOf<TvmTestValue>()
+                index = parseFiftStack(entries, tupleElements, index + 1)
+                result += TvmTestTupleValue(tupleElements)
+            }
 
-internal fun compareMethodStateResult(
-    methodIds: Set<Int>,
-    methodStates: Map<TvmMethod, List<TvmState>>,
-    expectedState: (TvmMethod) -> FiftInterpreterResult,
-) = compareMethodStates(methodIds, methodStates, expectedState) { method, actualState, concreteState ->
-    val actualStatus = actualState.executionCode()
-    assertEquals(concreteState.exitCode, actualStatus, "Method id: ${method.id}")
+            "]" -> {
+                // tuple end
+                return index + 1
+            }
+
+            "(null)" -> {
+                result += TvmTestNullValue
+                index++
+            }
+
+            else -> {
+                val number = entries[index].toBigInteger()
+                result += TvmTestIntegerValue(number)
+                index++
+            }
+        }
+    }
+
+    return index
 }
 
 internal fun <T> compareMethodStateStack(
@@ -89,9 +89,12 @@ internal fun <T> compareMethodStateStack(
     stateStack: (TvmState, Int) -> List<T>,
     concreteStack: (FiftInterpreterResult) -> List<T>,
 ) = compareMethodStates(methodIds, methodStates, expectedState) { method, actualState, concreteState ->
+    val actualStatus = actualState.executionCode()
+    assertEquals(concreteState.exitCode, actualStatus, "Wrong exit code for method id: ${method.id}")
+
     val concreteStackValue = concreteStack(concreteState)
     val actualStack = stateStack(actualState, concreteStackValue.size)
-    assertEquals(concreteStackValue, actualStack, "Method id: ${method.id}")
+    assertEquals(concreteStackValue, actualStack, "Wrong stack for method id: ${method.id}")
 }
 
 internal fun compareMethodStates(

@@ -1,7 +1,7 @@
 package org.ton.examples.stack
 
 import org.junit.jupiter.api.Test
-import org.ton.examples.compareMethodStateStackNumbers
+import org.ton.examples.compareMethodStateStack
 import org.usvm.machine.compileAndAnalyzeFift
 import org.usvm.machine.runFiftMethod
 import kotlin.io.path.Path
@@ -16,7 +16,7 @@ class StackPopTest {
 
         val methodStates = compileAndAnalyzeFift(fiftResourcePath)
 
-        compareMethodStateStackNumbers(methodIds = setOf(0, 1), methodStates) { method ->
+        compareMethodStateStack(methodIds = setOf(0, 1), methodStates) { method ->
             runFiftMethod(fiftResourcePath, method.id)
         }
     }

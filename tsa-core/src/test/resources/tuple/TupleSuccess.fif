@@ -1,0 +1,122 @@
+"../fiftstdlib/Fift.fif" include
+"../fiftstdlib/Asm.fif" include
+
+PROGRAM{
+  0  DECLMETHOD f_tuple
+  1  DECLMETHOD f_untuple
+  2  DECLMETHOD f_tlen
+  14  DECLMETHOD f_qtlen
+  3  DECLMETHOD f_index
+  4  DECLMETHOD f_index2
+  5  DECLMETHOD f_index3
+  6  DECLMETHOD f_indexq
+  7  DECLMETHOD f_set
+  8  DECLMETHOD f_setq
+  9  DECLMETHOD f_null
+  10  DECLMETHOD f_isnull_1
+  11  DECLMETHOD f_isnull_2
+  12  DECLMETHOD f_istuple_1
+  13  DECLMETHOD f_istuple_2
+  f_tuple PROC:<{
+    1 PUSHINT
+    2 PUSHINT
+    3 PUSHINT
+    2 TUPLE // 1, (2, 3)
+  }>
+  f_untuple PROC:<{
+    1 PUSHINT
+    2 PUSHINT
+    3 PUSHINT
+    2 TUPLE
+
+    2 UNTUPLE // 1 2 3
+  }>
+  f_tlen PROC:<{
+    1 PUSHINT
+    2 PUSHINT
+    3 PUSHINT
+    2 TUPLE
+
+    TLEN // 2
+  }>
+  f_qtlen PROC:<{
+    1 PUSHINT
+    2 PUSHINT
+
+    QTLEN // -1
+  }>
+  f_index PROC:<{
+    1 PUSHINT
+    2 PUSHINT
+    3 PUSHINT
+    2 TUPLE
+
+    0 INDEX // 2
+  }>
+  f_index2 PROC:<{
+    1 PUSHINT
+    2 PUSHINT
+    3 PUSHINT
+    2 TUPLE
+    2 TUPLE // [1, [2, 3]]
+
+    1 0 INDEX2 // 2
+  }>
+  f_index3 PROC:<{
+    1 PUSHINT
+    2 PUSHINT
+    3 PUSHINT
+    2 TUPLE // 1, [2, 3]
+    42 PUSHINT // 1, [2, 3], 42
+    2 TUPLE // 1, [[2, 3], 42]
+    2 TUPLE // [1, [[2, 3], 42]]
+
+    1 0 1 INDEX3 // 3
+  }>
+  f_indexq PROC:<{
+    1 PUSHINT
+    2 PUSHINT
+    3 PUSHINT
+    2 TUPLE
+
+    14 INDEXQ // 1 null
+  }>
+  f_set PROC:<{
+    1 PUSHINT
+    2 PUSHINT
+    3 PUSHINT
+    2 TUPLE
+
+    14 PUSHINT
+    1 SETINDEX // 1 (2, 14)
+  }>
+  f_setq PROC:<{
+    1 PUSHINT
+    2 PUSHINT
+    3 PUSHINT
+    2 TUPLE
+
+    14 PUSHINT
+    1 SETINDEXQ // 1 (2, 14)
+  }>
+  f_null PROC:<{
+    NULL // null
+  }>
+  f_isnull_1 PROC:<{
+    NULL
+    ISNULL // -1
+  }>
+  f_isnull_2 PROC:<{
+    1 PUSHINT
+    ISNULL // 0
+  }>
+  f_istuple_1 PROC:<{
+    1 PUSHINT
+    1 TUPLE // (1)
+    ISTUPLE // -1
+  }>
+  f_istuple_2 PROC:<{
+    1 PUSHINT
+    ISTUPLE // 0
+  }>
+}END>c

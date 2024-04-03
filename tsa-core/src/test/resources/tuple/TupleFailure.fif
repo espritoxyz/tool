@@ -1,0 +1,108 @@
+"../fiftstdlib/Fift.fif" include
+"../fiftstdlib/Asm.fif" include
+
+PROGRAM{
+  0  DECLMETHOD f_untuple_fail_1
+  1  DECLMETHOD f_untuple_fail_2
+  2  DECLMETHOD f_tlen_fail
+  3  DECLMETHOD f_index_fail_1
+  4  DECLMETHOD f_index_fail_2
+  5  DECLMETHOD f_index2_fail_1
+  6  DECLMETHOD f_index2_fail_2
+  7  DECLMETHOD f_index3_fail_1
+  8  DECLMETHOD f_index3_fail_2
+  9  DECLMETHOD f_indexq_fail
+  10  DECLMETHOD f_set_fail_1
+  11  DECLMETHOD f_set_fail_2
+  12  DECLMETHOD f_setq_fail
+  f_untuple_fail_1 PROC:<{
+    1 PUSHINT
+
+    2 UNTUPLE
+  }>
+  f_untuple_fail_2 PROC:<{
+    1 PUSHINT
+    2 PUSHINT
+    3 PUSHINT
+    2 TUPLE
+
+    1 UNTUPLE
+  }>
+  f_tlen_fail PROC:<{
+    1 PUSHINT
+    2 PUSHINT
+
+    TLEN
+  }>
+  f_index_fail_1 PROC:<{
+    1 PUSHINT
+    2 PUSHINT
+    3 PUSHINT
+    2 TUPLE
+
+    14 INDEX
+  }>
+  f_index_fail_2 PROC:<{
+    1 PUSHINT
+    2 PUSHINT
+
+    0 INDEX
+  }>
+  f_index2_fail_1 PROC:<{
+    1 PUSHINT
+    2 PUSHINT
+
+    1 0 INDEX2
+  }>
+  f_index2_fail_2 PROC:<{
+    1 PUSHINT
+    2 PUSHINT
+    3 PUSHINT
+    2 TUPLE
+
+    3 0 INDEX2
+  }>
+  f_index3_fail_1 PROC:<{
+    1 PUSHINT
+    2 PUSHINT
+
+    1 0 1 INDEX3
+  }>
+  f_index3_fail_2 PROC:<{
+    1 PUSHINT
+    2 PUSHINT
+    3 PUSHINT
+    2 TUPLE
+
+    3 0 2 INDEX3
+  }>
+  f_indexq_fail PROC:<{
+    1 PUSHINT
+    2 PUSHINT
+
+    14 INDEXQ
+  }>
+  f_set_fail_1 PROC:<{
+    1 PUSHINT
+    2 PUSHINT
+
+    14 PUSHINT
+    1 SETINDEX
+  }>
+  f_set_fail_2 PROC:<{
+    1 PUSHINT
+    2 PUSHINT
+    3 PUSHINT
+    2 TUPLE
+
+    42 PUSHINT
+    14 SETINDEX
+  }>
+  f_setq_fail PROC:<{
+    1 PUSHINT
+    2 PUSHINT
+
+    14 PUSHINT
+    1 SETINDEXQ
+  }>
+}END>c

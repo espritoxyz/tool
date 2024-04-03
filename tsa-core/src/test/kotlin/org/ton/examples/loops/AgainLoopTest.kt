@@ -1,6 +1,6 @@
 package org.ton.examples.loops
 
-import org.ton.examples.compareMethodStateResult
+import org.ton.examples.compareMethodStateStack
 import org.usvm.machine.TvmComponents
 import org.usvm.machine.TvmContext
 import org.usvm.machine.compileAndAnalyzeFift
@@ -21,7 +21,7 @@ class AgainLoopTest {
         val methodStates = compileAndAnalyzeFift(fiftResourcePath)
 
         val methodIds = (0..2).toSet()
-        compareMethodStateResult(methodIds, methodStates) { method ->
+        compareMethodStateStack(methodIds, methodStates) { method ->
             runFiftMethod(fiftResourcePath, method.id)
         }
     }

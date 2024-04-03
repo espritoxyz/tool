@@ -1,8 +1,7 @@
 package org.ton.examples.division
 
 import org.junit.jupiter.api.Test
-import org.ton.examples.compareMethodStateResult
-import org.ton.examples.compareMethodStateStackNumbers
+import org.ton.examples.compareMethodStateStack
 import org.usvm.machine.compileAndAnalyzeFift
 import org.usvm.machine.runFiftMethod
 import kotlin.io.path.Path
@@ -19,7 +18,7 @@ class IntDivisionTest {
         val methodStates = compileAndAnalyzeFift(fiftResourcePath)
 
         val methodIds = (0..89).toSet()
-        compareMethodStateStackNumbers(methodIds, methodStates) { method ->
+        compareMethodStateStack(methodIds, methodStates) { method ->
             runFiftMethod(fiftResourcePath, method.id)
         }
     }
@@ -32,7 +31,7 @@ class IntDivisionTest {
         val methodStates = compileAndAnalyzeFift(fiftResourcePath)
 
         val methodIds = (0..27).toSet()
-        compareMethodStateResult(methodIds, methodStates) { method ->
+        compareMethodStateStack(methodIds, methodStates) { method ->
             runFiftMethod(fiftResourcePath, method.id)
         }
     }

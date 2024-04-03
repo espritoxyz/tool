@@ -23,3 +23,7 @@ data class TvmTestSliceValue(
 ): TvmTestValue
 
 data object TvmTestNullValue: TvmTestValue
+
+data class TvmTestTupleValue(
+    val elements: List<TvmTestValue>
+) : TvmTestValue

@@ -2,7 +2,6 @@ package org.usvm.test
 
 import io.ksmt.expr.KBitVecValue
 import io.ksmt.utils.BvUtils.toBigIntegerSigned
-import java.math.BigInteger
 import org.ton.bytecode.TvmCodeBlock
 import org.ton.bytecode.TvmType
 import org.usvm.NULL_ADDRESS
@@ -15,11 +14,15 @@ import org.usvm.api.readField
 import org.usvm.machine.TvmContext
 import org.usvm.machine.state.TvmRefsMemoryRegion
 import org.usvm.machine.state.TvmStack
+import org.usvm.machine.state.TvmStack.TvmStackEntry
+import org.usvm.machine.state.TvmStack.TvmStackTupleValue
+import org.usvm.machine.state.TvmStack.TvmStackTupleValueConcreteNew
 import org.usvm.machine.state.TvmState
 import org.usvm.machine.state.tvmCellRefsRegion
 import org.usvm.memory.UMemory
 import org.usvm.model.UModelBase
 import org.usvm.sizeSort
+import java.math.BigInteger
 
 class TvmTestStateResolver(
     private val ctx: TvmContext,
@@ -34,22 +37,43 @@ class TvmTestStateResolver(
 
     private val resolvedCache = mutableMapOf<UConcreteHeapAddress, TvmTestCellValue>()
 
-    fun resolveParameters(): List<TvmTestValue> =
-        stack.inputElements.mapNotNull { entry ->
-            val stackValue = entry.cell ?: return@mapNotNull null
+    fun resolveParameters(): List<TvmTestValue> = stack.inputElements.mapNotNull { resolveEntry(it) }.reversed()
 
-            when (stackValue) {
-                is TvmStack.TvmStackIntValue -> resolveInt257(stackValue.intValue)
-                is TvmStack.TvmStackCellValue -> resolveCell(stackValue.cellValue)
-                is TvmStack.TvmStackSliceValue -> resolveSlice(stackValue.sliceValue)
-                is TvmStack.TvmStackBuilderValue -> resolveBuilder(stackValue.builderValue)
-                is TvmStack.TvmStackNullValue -> TvmTestNullValue
-                is TvmStack.TvmStackContinuationValue -> TODO()
-                is TvmStack.TvmStackTupleValue -> TODO()
-            }
-        }.reversed()
+    fun resolveEntry(entry: TvmStackEntry): TvmTestValue? {
+        val stackValue = entry.cell ?: return null
+
+        return when (stackValue) {
+            is TvmStack.TvmStackIntValue -> resolveInt257(stackValue.intValue)
+            is TvmStack.TvmStackCellValue -> resolveCell(stackValue.cellValue)
+            is TvmStack.TvmStackSliceValue -> resolveSlice(stackValue.sliceValue)
+            is TvmStack.TvmStackBuilderValue -> resolveBuilder(stackValue.builderValue)
+            is TvmStack.TvmStackNullValue -> TvmTestNullValue
+            is TvmStack.TvmStackContinuationValue -> TODO()
+            is TvmStackTupleValue -> resolveTuple(stackValue)
+        }
+    }
 
     private fun <T : USort> evaluateInModel(expr: UExpr<T>): UExpr<T> = model.eval(expr)
+
+    private fun resolveTuple(tuple: TvmStackTupleValue): TvmTestTupleValue = when (tuple) {
+        is TvmStackTupleValueConcreteNew -> {
+            val elements = tuple.entries.map {
+                resolveEntry(it)
+                    ?: TvmTestNullValue // We do not care what is its real value as it was never used
+            }
+
+            TvmTestTupleValue(elements)
+        }
+        is TvmStack.TvmStackTupleValueInputValue -> {
+            val size = resolveInt(tuple.size)
+            val elements = (0 ..< size).map {
+                resolveEntry(tuple[it, stack])
+                    ?: TvmTestNullValue // We do not care what is its real value as it was never used
+            }
+
+            TvmTestTupleValue(elements)
+        }
+    }
 
     private fun resolveBuilder(builder: UHeapRef): TvmTestBuilderValue {
         val cell = resolveCell(builder)

@@ -31,7 +31,7 @@ import org.usvm.machine.state.TvmState
 import org.usvm.machine.state.newStmt
 import org.usvm.machine.state.nextStmt
 import org.usvm.machine.state.returnFromMethod
-import org.usvm.machine.state.setDefaultGasUsage
+import org.usvm.machine.state.consumeDefaultGas
 import org.usvm.machine.state.setFailure
 import org.usvm.machine.state.signedIntegerFitsBits
 import org.usvm.machine.state.takeLastContinuation
@@ -39,7 +39,7 @@ import org.usvm.machine.state.takeLastInt
 
 class TvmLoopsInterpreter(private val ctx: TvmContext) {
     fun visitTvmContLoopsInst(scope: TvmStepScope, stmt: TvmContLoopsInst) {
-        scope.setDefaultGasUsage(stmt)
+        scope.consumeDefaultGas(stmt)
 
         when (stmt) {
             is TvmContLoopsRepeatInst -> visitRepeatInst(scope, stmt, continuationExtractor = STACK, executeUntilEnd = false)

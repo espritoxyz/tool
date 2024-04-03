@@ -1,7 +1,7 @@
 package org.ton.examples.ints
 
 import org.junit.jupiter.api.Test
-import org.ton.examples.compareMethodStateStackNumbers
+import org.ton.examples.compareMethodStateStack
 import org.ton.examples.intValue
 import org.usvm.machine.compileAndAnalyzeAllMethods
 import org.usvm.machine.compileAndAnalyzeFift
@@ -36,7 +36,7 @@ class IntComparisonExample {
         val methodStates = compileAndAnalyzeFift(fiftResourcePath)
 
         val methodIds = (0..13).toSet()
-        compareMethodStateStackNumbers(methodIds, methodStates) { method ->
+        compareMethodStateStack(methodIds, methodStates) { method ->
             runFiftMethod(fiftResourcePath, method.id)
         }
     }

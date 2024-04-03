@@ -7,10 +7,13 @@ import org.ton.bytecode.TvmContinuationValue
 import org.ton.bytecode.TvmIntegerType
 import org.ton.bytecode.TvmReferenceType
 import org.ton.bytecode.TvmSliceType
-import org.ton.bytecode.TvmTupleType
 import org.usvm.UBvSort
 import org.usvm.UExpr
 import org.usvm.UHeapRef
+import org.usvm.machine.interpreter.TvmStepScope
+import org.usvm.machine.state.TvmStack.TvmConcreteStackEntry
+import org.usvm.machine.state.TvmStack.TvmInputStackEntry
+import org.usvm.machine.state.TvmStack.TvmStackTupleValue
 
 fun TvmStack.takeLastInt(): UExpr<UBvSort> {
     val intStackValue = takeLast(TvmIntegerType) { id ->
@@ -38,11 +41,30 @@ fun TvmStack.takeLastBuilder(): UHeapRef =
         generateSymbolicBuilder()
     }
 
-context(TvmState)
-fun TvmStack.takeLastTuple(): UHeapRef =
-    takeLastRef(this, TvmTupleType, TvmStack.TvmStackValue::tupleValue) {
-        generateSymbolicTuple()
+fun TvmStepScope.takeLastTuple(): TvmStackTupleValue? = calcOnStateCtx {
+    val lastEntry = stack.takeLastEntry()
+
+    when (lastEntry) {
+        is TvmConcreteStackEntry -> lastEntry.cell as? TvmStackTupleValue
+        is TvmInputStackEntry -> {
+            val cell = lastEntry.cell
+            if (cell != null) {
+                return@calcOnStateCtx cell as? TvmStackTupleValue
+            }
+
+            val size = ctx.mkRegisterReading(lastEntry.id, ctx.int257sort)
+            val sizeConstraint = mkAnd(
+                mkBvSignedLessOrEqualExpr(zeroValue, size),
+                mkBvSignedLessOrEqualExpr(size, maxTupleSizeValue)
+            )
+            assert(sizeConstraint)
+                ?: error("Cannot assert tuple size constraints")
+
+            val symbolicTuple = TvmStack.TvmStackTupleValueInputNew(entries = mutableMapOf(), size = size)
+            symbolicTuple.also { lastEntry.cell = it }
+        }
     }
+}
 
 fun TvmStack.takeLastContinuation(): TvmContinuationValue {
     val continuationStackValue = takeLast(TvmContinuationType) { _ ->

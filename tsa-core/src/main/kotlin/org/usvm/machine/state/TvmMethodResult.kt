@@ -42,6 +42,12 @@ object TvmIntegerOutOfRange : TvmFailure {
     override fun toString(): String = "TVM integer out of expected range, exit code: $exitCode" // TODO add expected range to the message?
 }
 
+object TvmTypeCheckError : TvmFailure {
+    override val exitCode: UInt = 7u
+
+    override fun toString(): String = "TVM type check error, exit code: $exitCode"
+}
+
 object TvmCellOverflow : TvmFailure {
     override val exitCode: UInt = 8u
 

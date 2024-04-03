@@ -1,8 +1,12 @@
 package org.usvm.machine.state
 
 import kotlinx.collections.immutable.PersistentList
+import kotlinx.collections.immutable.PersistentMap
+import kotlinx.collections.immutable.PersistentSet
 import kotlinx.collections.immutable.mutate
+import kotlinx.collections.immutable.persistentHashSetOf
 import kotlinx.collections.immutable.persistentListOf
+import kotlinx.collections.immutable.toPersistentMap
 import org.ton.bytecode.TvmBuilderType
 import org.ton.bytecode.TvmCellType
 import org.ton.bytecode.TvmContinuationType
@@ -27,12 +31,9 @@ class TvmStack(
     private inline val size: Int get() = stack.size
 
     fun takeLast(expectedType: TvmType, createEntry: (Int) -> UExpr<out USort>): TvmStackValue {
-        extendStack(1)
+        val lastEntry = takeLastEntry()
 
-        val lastStackEntry = stack.last()
-        stack = stack.removeAt(size - 1)
-
-        return getStackValue(lastStackEntry, expectedType, createEntry)
+        return getStackValue(lastEntry, expectedType, createEntry)
     }
 
     fun takeLastEntry(): TvmStackEntry {
@@ -55,8 +56,12 @@ class TvmStack(
         stack = stack.add(value.toStackValue(type).toStackEntry())
     }
 
-    operator fun plusAssign(value: TvmContinuationValue) {
+    fun addContinuation(value: TvmContinuationValue) {
         stack = stack.add(TvmStackContinuationValue(value).toStackEntry())
+    }
+
+    fun addTuple(value: TvmStackTupleValue) {
+        stack = stack.add(value.toStackEntry())
     }
 
     fun swap(first: Int, second: Int) {
@@ -137,7 +142,7 @@ class TvmStack(
 
         val newValuesSize = newSize - size
         val newValues = List(newValuesSize) {
-            TvmInputStackEntry(id = inputElements.size + it, cell = null)
+            TvmInputStackEntry(id = ctx.nextInputStackEntryId(), cell = null)
         }
         inputElements = inputElements.addAll(newValues)
         stack = stack.addAll(0, newValues.asReversed()) // reversed because the "newest" values are at the beginning
@@ -157,7 +162,7 @@ class TvmStack(
     sealed interface TvmStackValue {
         val continuationValue: TvmContinuationValue get() = error("Cannot extract continuation from stack value $this")
         val intValue: UExpr<UBvSort> get() = error("Cannot extract int from stack value $this")
-        val tupleValue: UHeapRef get() = error("Cannot extract tuple from stack value $this")
+        val tupleValue: TvmStackTupleValue get() = error("Cannot extract tuple from stack value $this")
         val cellValue: UHeapRef get() = error("Cannot extract cell from stack value $this")
         val sliceValue: UHeapRef get() = error("Cannot extract slice from stack value $this")
         val builderValue: UHeapRef get() = error("Cannot extract builder from stack value $this")
@@ -165,32 +170,80 @@ class TvmStack(
     }
     data class TvmStackContinuationValue(override val continuationValue: TvmContinuationValue) : TvmStackValue
     data class TvmStackIntValue(override val intValue: UExpr<UBvSort>): TvmStackValue
-    data class TvmStackTupleValue(override val tupleValue: UHeapRef): TvmStackValue
+
+    sealed interface TvmStackTupleValue : TvmStackValue {
+        override val tupleValue: TvmStackTupleValue get() = this
+        val size: UExpr<UBvSort>
+
+        operator fun get(idx: Int, stack: TvmStack): TvmStackEntry
+        operator fun set(idx: Int, value: TvmStackEntry): TvmStackTupleValue
+    }
+
+    data class TvmStackTupleValueConcreteNew(val ctx: TvmContext, val entries: PersistentList<TvmStackEntry>) : TvmStackTupleValue {
+        val concreteSize: Int = entries.size
+
+        override val size: UExpr<UBvSort> get() = with(ctx) { concreteSize.toBv257() }
+        override operator fun get(idx: Int, stack: TvmStack): TvmStackEntry = entries[idx]
+        override operator fun set(idx: Int, value: TvmStackEntry): TvmStackTupleValueConcreteNew = copy(entries = entries.set(idx, value))
+    }
+
+    sealed interface TvmStackTupleValueInputValue : TvmStackTupleValue
+
+    data class TvmStackTupleValueInputNew(
+        var entries: MutableMap<Int, TvmInputStackEntry> = mutableMapOf(),
+        override val size: UExpr<UBvSort> // id -> ctx.mkRegisterReading(id, ctx.int257sort)
+    ): TvmStackTupleValueInputValue {
+        override operator fun get(idx: Int, stack: TvmStack): TvmInputStackEntry = entries.getOrPut(idx) {
+            TvmInputStackEntry(id = stack.ctx.nextInputStackEntryId(), cell = null).also {
+                stack.inputElements = stack.inputElements.add(it)
+            }
+        }
+
+        override operator fun set(idx: Int, value: TvmStackEntry): TvmStackTupleValueModifiedInputNew {
+            // TODO should we increase size?
+            return TvmStackTupleValueModifiedInputNew(
+                entries.toPersistentMap<Int, TvmStackEntry>().put(idx, value),
+                this
+            )
+        }
+    }
+
+    data class TvmStackTupleValueModifiedInputNew(
+        var entries: PersistentMap<Int, TvmStackEntry>,
+        val original: TvmStackTupleValueInputNew
+    ) : TvmStackTupleValueInputValue {
+        override val size: UExpr<UBvSort> = original.size
+
+        override operator fun get(idx: Int, stack: TvmStack): TvmStackEntry {
+            entries[idx]?.let { return it }
+
+            val inputEntry = original[idx, stack]
+            stack.inputElements = stack.inputElements.add(inputEntry)
+            entries = entries.put(idx, inputEntry)
+
+            return inputEntry
+        }
+
+        override operator fun set(idx: Int, value: TvmStackEntry): TvmStackTupleValueModifiedInputNew {
+            // TODO should we increase size?
+            return copy(entries = entries.put(idx, value))
+        }
+    }
+
+
     data class TvmStackCellValue(override val cellValue: UHeapRef): TvmStackValue
     data object TvmStackNullValue : TvmStackValue {
         override val isNull: Boolean get() = true
     }
-
-    /*data class TvmStackSliceValue(
-        val cell: UHeapRef,
-        val dataPos: Uvalue<USizeSort>,
-        val refPos: UExpr<USizeSort>,
-        val dataLength: UExpr<USizeSort>,
-        val refsLength: UExpr<USizeSort>,
-    ): TvmStackValue
-    data class TvmStackBuilderValue(
-        val data: UExpr<UBvSort>,
-        val refs: UHeapRef,
-        val dataLength: UExpr<USizeSort>,
-        val refsLength: UExpr<USizeSort>,
-    ): TvmStackValue*/
     data class TvmStackSliceValue(override val sliceValue: UHeapRef): TvmStackValue
     data class TvmStackBuilderValue(override val builderValue: UHeapRef): TvmStackValue
 ///...
 
-    sealed interface TvmStackEntry
-    data class TvmConcreteStackEntry(val cell: TvmStackValue): TvmStackEntry
-    data class TvmInputStackEntry(val id: Int, var cell: TvmStackValue?): TvmStackEntry
+    sealed interface TvmStackEntry {
+        val cell: TvmStackValue?
+    }
+    data class TvmConcreteStackEntry(override val cell: TvmStackValue): TvmStackEntry
+    data class TvmInputStackEntry(val id: Int, override var cell: TvmStackValue?): TvmStackEntry
 
     private fun getStackValue(
         entry: TvmStackEntry,
@@ -219,10 +272,10 @@ class TvmStack(
         is TvmIntegerType -> TvmStackIntValue(this as UExpr<UBvSort>)
         TvmBuilderType -> TvmStackBuilderValue(this as UHeapRef)
         TvmCellType -> TvmStackCellValue(this as UHeapRef)
-        TvmContinuationType -> TODO()
+        TvmContinuationType -> TODO("Unexpected $this for constructing stack value of $TvmContinuationType")
         TvmNullType -> TvmStackNullValue
         TvmSliceType -> TvmStackSliceValue(this as UHeapRef)
-        TvmTupleType -> TvmStackTupleValue(this as UHeapRef)
+        TvmTupleType -> TODO("Unexpected $this for constructing stack value of $TvmTupleType")
     }
 
     private fun TvmStackValue.toStackEntry(): TvmConcreteStackEntry = TvmConcreteStackEntry(this)

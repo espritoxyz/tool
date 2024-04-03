@@ -70,7 +70,7 @@ class GasTest {
         var blocks = fiftCode.split(fiftProcDeclPattern).drop(1) // remove header
         val lastBlock = blocks.lastOrNull()
         if (lastBlock != null) {
-            blocks = blocks.dropLast(1) + lastBlock.removeSuffix("}END>c")
+            blocks = blocks.dropLast(1) + lastBlock.trim().removeSuffix("}END>c")
         }
 
         return blocks
