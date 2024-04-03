@@ -27,8 +27,11 @@ import org.usvm.machine.TvmContext
 import org.usvm.machine.interpreter.TvmLoopsInterpreter.ContinuationExtractor.CC
 import org.usvm.machine.interpreter.TvmLoopsInterpreter.ContinuationExtractor.STACK
 import org.usvm.machine.state.TvmIntegerOutOfRange
+import org.usvm.machine.state.TvmState
 import org.usvm.machine.state.newStmt
 import org.usvm.machine.state.nextStmt
+import org.usvm.machine.state.returnFromMethod
+import org.usvm.machine.state.setDefaultGasUsage
 import org.usvm.machine.state.setFailure
 import org.usvm.machine.state.signedIntegerFitsBits
 import org.usvm.machine.state.takeLastContinuation
@@ -36,6 +39,8 @@ import org.usvm.machine.state.takeLastInt
 
 class TvmLoopsInterpreter(private val ctx: TvmContext) {
     fun visitTvmContLoopsInst(scope: TvmStepScope, stmt: TvmContLoopsInst) {
+        scope.setDefaultGasUsage(stmt)
+
         when (stmt) {
             is TvmContLoopsRepeatInst -> visitRepeatInst(scope, stmt, continuationExtractor = STACK, executeUntilEnd = false)
             is TvmContLoopsRepeatendInst -> visitRepeatInst(scope, stmt, continuationExtractor = CC, executeUntilEnd = true)
@@ -149,7 +154,7 @@ class TvmLoopsInterpreter(private val ctx: TvmContext) {
             val isPositive = mkBvSignedLessExpr(zeroValue, loopRepeatTimes)
             scope.fork(
                 isPositive,
-                blockOnFalseState = { newStmt(stmt.nextStmtAfterLoopExit(stmt.executeUntilEnd)) }
+                blockOnFalseState = { lastIteration(stmt, stmt.executeUntilEnd) }
             ) ?: return
 
             val decreasedLoopRepeatTimes = mkBvSubExpr(loopRepeatTimes, oneValue)
@@ -170,9 +175,7 @@ class TvmLoopsInterpreter(private val ctx: TvmContext) {
 
         scope.fork(
             continueLoopCondition,
-            blockOnFalseState = {
-                newStmt(stmt.nextStmtAfterLoopExit(stmt.executeUntilEnd))
-            }
+            blockOnFalseState = { lastIteration(stmt, stmt.executeUntilEnd) }
         ) ?: return
 
         val continuation = stmt.continuationValue
@@ -210,9 +213,7 @@ class TvmLoopsInterpreter(private val ctx: TvmContext) {
 
         scope.fork(
             continueLoopCondition,
-            blockOnFalseState = {
-                newStmt(stmt.nextStmtAfterLoopExit(stmt.executeUntilEnd))
-            }
+            blockOnFalseState = { lastIteration(stmt, stmt.executeUntilEnd) }
         ) ?: return
 
         val continuationValue = stmt.continuationValue
@@ -236,11 +237,11 @@ class TvmLoopsInterpreter(private val ctx: TvmContext) {
         CC
     }
 
-    private fun TvmInst.nextStmtAfterLoopExit(executeUntilEnd: Boolean): TvmInst =
+    private fun TvmState.lastIteration(stmt: TvmInst, executeUntilEnd: Boolean) =
         if (executeUntilEnd) {
-            location.codeBlock.instList.last()
+            returnFromMethod()
         } else {
-            nextStmt()
+            newStmt(stmt.nextStmt())
         }
 
     context(TvmStepScope)

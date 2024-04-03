@@ -144,6 +144,7 @@ import org.usvm.machine.state.generateSymbolicCell
 import org.usvm.machine.state.generateSymbolicSlice
 import org.usvm.machine.state.newStmt
 import org.usvm.machine.state.nextStmt
+import org.usvm.machine.state.setDefaultGasUsage
 import org.usvm.machine.state.sliceCopy
 import org.usvm.machine.state.sliceLoadDataBits
 import org.usvm.machine.state.sliceLoadNextRef
@@ -165,6 +166,8 @@ import org.usvm.uctx
 
 class TvmDictOperationInterpreter(private val ctx: TvmContext) {
     fun visitTvmDictInst(scope: TvmStepScope, inst: TvmDictInst) {
+        scope.setDefaultGasUsage(inst)
+
         when (inst) {
             is TvmDictGetInst -> visitDictGet(scope, inst)
             is TvmDictSetInst -> visitDictSet(scope, inst)

@@ -26,7 +26,7 @@ data class TvmMethod(
         get() = instListRaw
 
     init {
-        instListRaw += TvmContBasicRetInst(TvmInstMethodLocation(id, instListRaw.size))
+        instListRaw += TvmArtificialImplicitRetInst(TvmInstMethodLocation(id, instListRaw.size))
         initLocationsCodeBlock()
     }
 }
@@ -42,7 +42,7 @@ data class TvmLambda(
         get() = instListRaw
 
     init {
-        instListRaw += TvmContBasicRetInst(TvmInstLambdaLocation(instListRaw.size))
+        instListRaw += TvmArtificialImplicitRetInst(TvmInstLambdaLocation(instListRaw.size))
         initLocationsCodeBlock()
     }
 }

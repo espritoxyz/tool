@@ -5,6 +5,7 @@ PROGRAM{
   0 DECLMETHOD f_repeat
   1 DECLMETHOD f_repeat_with_arg
   2 DECLMETHOD f_repeatend
+  3 DECLMETHOD f_repeatend_empty
   f_repeat PROC:<{
     1 PUSHINT
     5 PUSHINT
@@ -28,5 +29,12 @@ PROGRAM{
     REPEAT:
         2 PUSHINT
         MUL
+  }>
+  f_repeatend_empty PROC:<{
+      1 PUSHINT
+      0 PUSHINT
+      REPEAT:
+          2 PUSHINT
+          MUL
   }>
 }END>c

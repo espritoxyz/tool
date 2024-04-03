@@ -1,5 +1,6 @@
 package org.usvm.machine.state
 
+import kotlinx.collections.immutable.PersistentList
 import kotlinx.collections.immutable.PersistentSet
 import kotlinx.collections.immutable.persistentHashSetOf
 import kotlinx.collections.immutable.persistentListOf
@@ -10,9 +11,11 @@ import org.ton.bytecode.TvmReferenceType
 import org.ton.bytecode.TvmType
 import org.ton.targets.TvmTarget
 import org.usvm.PathNode
+import org.usvm.UBv32Sort
 import org.usvm.UCallStack
 import org.usvm.UConcreteHeapAddress
 import org.usvm.UConcreteHeapRef
+import org.usvm.UExpr
 import org.usvm.UHeapRef
 import org.usvm.UState
 import org.usvm.constraints.UPathConstraints
@@ -31,7 +34,8 @@ class TvmState(
     var registers: TvmRegisters,
     val emptyRefValue: TvmRefEmptyValue,
     private var symbolicRefs: PersistentSet<UConcreteHeapAddress> = persistentHashSetOf(),
-    // TODO codepage and gas
+    var gasUsage: PersistentList<UExpr<UBv32Sort>>,
+    // TODO codepage
     callStack: UCallStack<TvmCodeBlock, TvmInst> = UCallStack(),
     pathConstraints: UPathConstraints<TvmType>,
     memory: UMemory<TvmType, TvmCodeBlock>,
@@ -63,6 +67,7 @@ class TvmState(
             registers.copy(),
             emptyRefValue,
             symbolicRefs,
+            gasUsage,
             callStack.clone(),
             clonedConstraints,
             memory.clone(clonedConstraints.typeConstraints),

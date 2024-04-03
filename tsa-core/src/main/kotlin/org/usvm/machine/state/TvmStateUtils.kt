@@ -28,6 +28,7 @@ fun TvmInst.nextStmt(): TvmInst = location.codeBlock.instList.getOrNull(location
     ?: error("Unexpected end of the code block ${location.codeBlock}")
 
 fun setFailure(failure: TvmMethodResult.TvmFailure): (TvmState) -> Unit = { state ->
+    state.setGasUsage(IMPLICIT_EXCEPTION_THROW_GAS)
     state.methodResult = failure
 }
 

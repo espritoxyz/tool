@@ -1,12 +1,12 @@
 package org.ton.examples.loops
 
+import org.ton.examples.compareMethodStateResult
 import org.usvm.machine.TvmComponents
 import org.usvm.machine.TvmContext
 import org.usvm.machine.compileAndAnalyzeFift
-import org.usvm.machine.state.TvmIntegerOverflow
+import org.usvm.machine.runFiftMethod
 import kotlin.io.path.Path
 import kotlin.test.Test
-import kotlin.test.assertEquals
 
 class AgainLoopTest {
     private val ctx = TvmContext(TvmComponents())
@@ -19,9 +19,10 @@ class AgainLoopTest {
             ?: error("Cannot find resource fift $againLoopsFiftPath")
 
         val methodStates = compileAndAnalyzeFift(fiftResourcePath)
-        assertEquals(3, methodStates.size)
-        methodStates.all {
-            it.value.size == 1 && it.value.all { state -> state.methodResult is TvmIntegerOverflow }
+
+        val methodIds = (0..2).toSet()
+        compareMethodStateResult(methodIds, methodStates) { method ->
+            runFiftMethod(fiftResourcePath, method.id)
         }
     }
 }

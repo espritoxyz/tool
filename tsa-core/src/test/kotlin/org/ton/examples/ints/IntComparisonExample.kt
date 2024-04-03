@@ -1,10 +1,11 @@
 package org.ton.examples.ints
 
 import org.junit.jupiter.api.Test
-import org.ton.examples.compareActualAndExpectedStack
+import org.ton.examples.compareMethodStateStackNumbers
 import org.ton.examples.intValue
 import org.usvm.machine.compileAndAnalyzeAllMethods
 import org.usvm.machine.compileAndAnalyzeFift
+import org.usvm.machine.runFiftMethod
 import org.usvm.machine.state.takeLastInt
 import kotlin.io.path.Path
 import kotlin.test.assertEquals
@@ -34,23 +35,9 @@ class IntComparisonExample {
 
         val methodStates = compileAndAnalyzeFift(fiftResourcePath)
 
-        val expectedMethodStackValues = mapOf(
-            0 to listOf(-1),
-            1 to listOf(0),
-            2 to listOf(1),
-            3 to listOf(1),
-            4 to listOf(0),
-            5 to listOf(-1),
-            6 to listOf(0),
-            7 to listOf(0),
-            8 to listOf(-1),
-            9 to listOf(-1),
-            10 to listOf(0),
-            11 to listOf(-1),
-            12 to listOf(0),
-            13 to listOf(-1),
-        )
-
-        compareActualAndExpectedStack(expectedMethodStackValues, methodStates)
+        val methodIds = (0..13).toSet()
+        compareMethodStateStackNumbers(methodIds, methodStates) { method ->
+            runFiftMethod(fiftResourcePath, method.id)
+        }
     }
 }

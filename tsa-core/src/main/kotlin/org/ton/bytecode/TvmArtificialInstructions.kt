@@ -74,3 +74,10 @@ data class TvmArtificialAgainInst(
     override val mnemonic: String
         get() = "artificial_again_${originalInst.mnemonic}"
 }
+
+data class TvmArtificialImplicitRetInst(
+    override val location: TvmInstLocation
+) : TvmInst, TvmArtificialInst, TvmContBasicInst {
+    override val mnemonic: String get() = "implicit RET"
+    override val gasConsumption get() = TvmFixedGas(value = 5)
+}

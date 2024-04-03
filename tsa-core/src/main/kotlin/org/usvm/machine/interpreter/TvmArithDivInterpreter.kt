@@ -103,12 +103,15 @@ import org.usvm.machine.state.bvMaxValueSignedExtended
 import org.usvm.machine.state.bvMinValueSignedExtended
 import org.usvm.machine.state.newStmt
 import org.usvm.machine.state.nextStmt
+import org.usvm.machine.state.setDefaultGasUsage
 import org.usvm.machine.state.setFailure
 import org.usvm.machine.state.takeLastInt
 
 class TvmArithDivInterpreter(private val ctx: TvmContext) {
 
     fun visitArithmeticDivInst(scope: TvmStepScope, stmt: TvmArithmDivInst) {
+        scope.setDefaultGasUsage(stmt)
+
         with(ctx) {
             when (stmt) {
                 is TvmArithmDivDivInst -> {

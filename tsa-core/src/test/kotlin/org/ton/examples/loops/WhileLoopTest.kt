@@ -1,9 +1,10 @@
 package org.ton.examples.loops
 
-import org.ton.examples.compareActualAndExpectedStack
+import org.ton.examples.compareMethodStateStackNumbers
 import org.usvm.machine.TvmComponents
 import org.usvm.machine.TvmContext
 import org.usvm.machine.compileAndAnalyzeFift
+import org.usvm.machine.runFiftMethod
 import kotlin.io.path.Path
 import kotlin.test.Test
 
@@ -18,10 +19,10 @@ class WhileLoopTest {
             ?: error("Cannot find resource fift $whileLoopsFiftPath")
 
         val methodStates = compileAndAnalyzeFift(fiftResourcePath)
-        val expectedResult = listOf(5, 32)
 
-        val expectedMethodStackValues = (0..2).associateWith { expectedResult }
-
-        compareActualAndExpectedStack(expectedMethodStackValues, methodStates)
+        val methodIds = (0..2).toSet()
+        compareMethodStateStackNumbers(methodIds, methodStates) { method ->
+            runFiftMethod(fiftResourcePath, method.id)
+        }
     }
 }
