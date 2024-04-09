@@ -2,6 +2,7 @@ package org.usvm.machine
 
 import io.ksmt.expr.KBitVecValue
 import io.ksmt.utils.toBigInteger
+import io.ksmt.utils.uncheckedCast
 import org.ton.bytecode.TvmCellType
 import org.ton.bytecode.TvmField
 import org.ton.bytecode.TvmFieldImpl
@@ -14,6 +15,8 @@ import org.usvm.UComponents
 import org.usvm.UConcreteHeapRef
 import org.usvm.UContext
 import org.usvm.UExpr
+import org.usvm.mkSizeExpr
+import org.usvm.sizeSort
 
 // TODO: There is no size sort in TVM because of absence of arrays, but we need to represent cell data as boolean arrays
 //  with size no more than 1023
@@ -21,7 +24,7 @@ import org.usvm.UExpr
 // TODO make it Bv16
 typealias TvmSizeSort = UBv32Sort
 
-class TvmContext(components : UComponents<TvmType, TvmSizeSort>) : UContext<TvmSizeSort>(components) {
+class TvmContext(components: UComponents<TvmType, TvmSizeSort>) : UContext<TvmSizeSort>(components) {
     val int257sort: UBvSort = mkBvSort(INT_BITS)
     val cellDataSort: UBvSort = mkBvSort(MAX_DATA_LENGTH.toUInt())
 
@@ -33,6 +36,7 @@ class TvmContext(components : UComponents<TvmType, TvmSizeSort>) : UContext<TvmS
     val minusOneValue = trueValue
     val intBitsValue = INT_BITS.toInt().toBv257()
     val maxTupleSizeValue = MAX_TUPLE_SIZE.toBv257()
+    val zeroSizeExpr = mkSizeExpr(0)
 
     private var inputStackEntryCounter: Int = 0
     fun nextInputStackEntryId(): Int = inputStackEntryCounter++
@@ -41,7 +45,7 @@ class TvmContext(components : UComponents<TvmType, TvmSizeSort>) : UContext<TvmS
 
     fun Number.toBv257(): KBitVecValue<UBvSort> = mkBv(toBigInteger(), int257sort)
 
-    fun UExpr<UBvSort>.signedExtendToInteger(): UExpr<UBvSort> {
+    fun <Sort : UBvSort> UExpr<Sort>.signedExtendToInteger(): UExpr<UBvSort> {
         val extensionSize = int257sort.sizeBits - sort.sizeBits
         check(extensionSize <= int257sort.sizeBits) {
             "Cannot extend $this to bits more than ${int257sort.sizeBits}"
@@ -51,7 +55,7 @@ class TvmContext(components : UComponents<TvmType, TvmSizeSort>) : UContext<TvmS
         return extendedValue
     }
 
-    fun UExpr<UBvSort>.unsignedExtendToInteger(): UExpr<UBvSort> {
+    fun <Sort : UBvSort> UExpr<Sort>.unsignedExtendToInteger(): UExpr<UBvSort> {
         val extensionSize = int257sort.sizeBits - sort.sizeBits
         check(extensionSize <= int257sort.sizeBits) {
             "Cannot extend $this to bits more than ${int257sort.sizeBits}"
@@ -59,6 +63,18 @@ class TvmContext(components : UComponents<TvmType, TvmSizeSort>) : UContext<TvmS
 
         val extendedValue = mkBvZeroExtensionExpr(extensionSize.toInt(), this)
         return extendedValue
+    }
+
+    fun <Sort : UBvSort> UExpr<Sort>.zeroExtendToSort(sort: UBvSort): UExpr<UBvSort> {
+        require(this.sort.sizeBits <= sort.sizeBits)
+        val extensionSize = sort.sizeBits - this.sort.sizeBits
+        return mkBvZeroExtensionExpr(extensionSize.toInt(), this)
+    }
+
+    fun <Sort : UBvSort> UExpr<Sort>.extractToSizeSort(): UExpr<TvmSizeSort> {
+        require(sort.sizeBits >= sizeSort.sizeBits)
+
+        return mkBvExtractExpr(sizeSort.sizeBits.toInt() - 1, 0, this).uncheckedCast()
     }
 
     companion object {

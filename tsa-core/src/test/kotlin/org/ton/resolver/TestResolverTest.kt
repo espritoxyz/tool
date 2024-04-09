@@ -51,7 +51,7 @@ class TestResolverTest {
         assertTrue(params.size == 1)
 
         val arg = (params.first() as TvmTestCellValue).refs.first()
-        val extractedInt = arg.data.dropLast(3).takeLast(8)
+        val extractedInt = arg.data.drop(3).take(8)
 
         assertEquals("00000011", extractedInt)
     }
@@ -67,7 +67,7 @@ class TestResolverTest {
         assertTrue(params.size == 1)
 
         val arg = (params.first() as TvmTestSliceValue).cell.refs.first()
-        val extractedInt = arg.data.dropLast(3).takeLast(8)
+        val extractedInt = arg.data.drop(3).take(8)
 
         assertEquals("00000011", extractedInt)
     }
@@ -83,7 +83,7 @@ class TestResolverTest {
         assertTrue(params.size == 1)
 
         val arg = (params.first() as TvmTestBuilderValue).refs.first()
-        val extractedInt = arg.data.dropLast(3).takeLast(8)
+        val extractedInt = arg.data.drop(3).take(8)
 
         assertEquals("00000011", extractedInt)
     }

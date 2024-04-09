@@ -1,0 +1,166 @@
+"../fiftstdlib/Fift.fif" include
+"../fiftstdlib/Asm.fif" include
+
+PROGRAM{
+  0  DECLMETHOD load_int
+  1  DECLMETHOD load_int_le
+  2  DECLMETHOD load_intx
+  3  DECLMETHOD load_long_intx
+  4  DECLMETHOD load_slice
+  5  DECLMETHOD load_slicex
+  6  DECLMETHOD load_long_slicex
+  load_int PROC:<{
+    192 PUSHINT
+    65472 PUSHINT
+    NEWC
+    16 STU
+    8 STU
+    ENDC
+    CTOS
+    8 LDU
+    8 LDI
+    1 LDU
+    1 LDI
+    1 LDU
+    1 PLDI
+  }>
+  load_int_le PROC:<{
+    1537994938 PUSHINT
+    1537994810 PUSHINT
+    16761024 PUSHINT
+    16760896 PUSHINT
+    NEWC
+    32 STU
+    32 STU
+    32 STU
+    32 STU
+    ENDC
+    CTOS
+    LDULE4
+    LDULE4
+    LDILE4
+    PLDILE4
+  }>
+  load_intx PROC:<{
+    192 PUSHINT
+    20837 PUSHINT
+    65472 PUSHINT
+    NEWC
+    16 STU
+    16 STU
+    8 STU
+    ENDC
+    CTOS
+    8 PUSHINT
+    LDUX
+    8 PUSHINT
+    LDIX
+    8 PUSHINT
+    LDUX
+    8 PUSHINT
+    LDIX
+    0 PUSHINT
+    LDUX
+    0 PUSHINT
+    LDIX
+    1 PUSHINT
+    LDUX
+    1 PUSHINT
+    LDIX
+    1 PUSHINT
+    LDUX
+    1 PUSHINT
+    PLDIX
+  }>
+  load_long_intx PROC:<{
+    252 PUSHPOW2
+    255 PUSHPOW2
+    -1 PUSHINT
+    255 LSHIFT#
+    255 PUSHPOW2
+    NEWC
+    257 PUSHINT
+    STIX
+    257 PUSHINT
+    STIX
+    256 PUSHINT
+    STUX
+    253 PUSHINT
+    STUX
+    ENDC
+    CTOS
+    257 PUSHINT
+    LDIX
+    257 PUSHINT
+    LDIX
+    256 PUSHINT
+    LDUX
+    253 PUSHINT
+    PLDUX
+  }>
+  load_slice PROC:<{
+    186933 PUSHINT
+    NEWC
+    18 STU
+    ENDC
+    CTOS
+    1 LDSLICE
+    SWAP
+    1 PLDU
+    SWAP
+    3 LDSLICE
+    SWAP
+    3 PLDU
+    SWAP
+    6 LDSLICE
+    SWAP
+    6 PLDU
+    SWAP
+    8 PLDSLICE
+    8 PLDU
+  }>
+  load_slicex PROC:<{
+    186933 PUSHINT
+    NEWC
+    18 STU
+    ENDC
+    CTOS
+    1 PUSHINT
+    LDSLICEX
+    SWAP
+    1 PLDU
+    SWAP
+    0 PUSHINT
+    LDSLICEX
+    SWAP
+    0 PUSHINT
+    PLDUX
+    SWAP
+    3 PUSHINT
+    LDSLICEX
+    SWAP
+    3 PLDU
+    SWAP
+    6 PUSHINT
+    LDSLICEX
+    SWAP
+    6 PLDU
+    SWAP
+    8 PUSHINT
+    PLDSLICEX
+    8 PLDU
+  }>
+  load_long_slicex PROC:<{
+    252 PUSHPOW2
+    255 PUSHPOW2
+    NEWC
+    256 STU
+    253 STU
+    ENDC
+    CTOS
+    509 PUSHINT
+    PLDSLICEX
+    253 LDU
+    255 PLDU
+  }>
+}END>c

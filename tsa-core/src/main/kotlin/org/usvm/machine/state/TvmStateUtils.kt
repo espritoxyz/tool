@@ -130,6 +130,27 @@ fun TvmContext.unsignedIntegerFitsBits(value: UExpr<UBvSort>, bits: UInt): UBool
         )
     }
 
+/**
+ * 0 <= [sizeBits] <= 257
+ */
+fun TvmContext.signedIntegerFitsBits(value: UExpr<UBvSort>, bits: UExpr<UBvSort>): UBoolExpr =
+    mkAnd(
+        mkBvSignedLessOrEqualExpr(bvMinValueSignedExtended(bits), value),
+        mkBvSignedLessOrEqualExpr(value, bvMaxValueSignedExtended(bits)),
+    )
+
+
+/**
+ * 0 <= [sizeBits] <= 256
+ *
+ * @see unsignedIntegerFitsBits
+ */
+fun TvmContext.unsignedIntegerFitsBits(value: UExpr<UBvSort>, bits: UExpr<UBvSort>): UBoolExpr =
+    mkAnd(
+        mkBvSignedLessOrEqualExpr(zeroValue, value),
+        mkBvSignedLessOrEqualExpr(value, bvMaxValueUnsignedExtended(bits)),
+    )
+
 
 /**
  * 0 <= [sizeBits] <= 257

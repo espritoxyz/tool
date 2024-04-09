@@ -1,0 +1,58 @@
+"../fiftstdlib/Fift.fif" include
+"../fiftstdlib/Asm.fif" include
+
+PROGRAM{
+  0  DECLMETHOD load_int_underflow
+  1  DECLMETHOD load_int_le_underflow
+  2  DECLMETHOD load_intx_underflow
+  3  DECLMETHOD load_intx_outofrange
+  4  DECLMETHOD load_slice_underflow
+  5  DECLMETHOD load_slicex_underflow
+  6  DECLMETHOD load_slicex_outofrange
+  load_int_underflow PROC:<{
+    NEWC
+    ENDC
+    CTOS
+    255 LDU
+  }>
+  load_int_le_underflow PROC:<{
+    NEWC
+    ENDC
+    CTOS
+    LDULE4
+  }>
+  load_intx_underflow PROC:<{
+    NEWC
+    ENDC
+    CTOS
+    257 PUSHINT
+    LDIX
+  }>
+  load_intx_outofrange PROC:<{
+    NEWC
+    ENDC
+    CTOS
+    257 PUSHINT
+    LDUX
+  }>
+  load_slice_underflow PROC:<{
+    NEWC
+    ENDC
+    CTOS
+    1 LDSLICE
+  }>
+  load_slicex_underflow PROC:<{
+    NEWC
+    ENDC
+    CTOS
+    1 PUSHINT
+    LDSLICEX
+  }>
+  load_slicex_outofrange PROC:<{
+    NEWC
+    ENDC
+    CTOS
+    1024 PUSHINT
+    LDSLICEX
+  }>
+}END>c

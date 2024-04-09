@@ -59,7 +59,7 @@ sealed interface TvmCodepageInst: TvmInst
 sealed interface TvmCompareIntInst: TvmInst
 
 @Serializable
-sealed interface TvmCompareOtherInst: TvmInst
+sealed interface TvmCompareOtherInst: TvmInst // +
 
 @Serializable
 sealed interface TvmConstDataInst: TvmInst
@@ -68,13 +68,13 @@ sealed interface TvmConstDataInst: TvmInst
 sealed interface TvmConstIntInst: TvmInst
 
 @Serializable
-sealed interface TvmContBasicInst: TvmInst
+sealed interface TvmContBasicInst: TvmInst // +
 
 @Serializable
 sealed interface TvmContConditionalInst: TvmInst
 
 @Serializable
-sealed interface TvmContCreateInst: TvmInst
+sealed interface TvmContCreateInst: TvmInst // +
 
 @Serializable
 sealed interface TvmContDictInst: TvmInst
