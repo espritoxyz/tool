@@ -2275,6 +2275,22 @@ data class TvmArithmDivAddrshiftmodInst(
     
  */
 @Serializable
+@SerialName(TvmArithmDivAddrshiftmodVarInst.MNEMONIC)
+data class TvmArithmDivAddrshiftmodVarInst(
+    override val location: TvmInstLocation,
+): TvmInst, TvmArithmDivInst {
+    override val mnemonic: String get() = MNEMONIC
+    override val gasConsumption get() = TvmFixedGas(value = 26)
+         
+    companion object {
+        const val MNEMONIC = "ADDRSHIFTMOD_VAR"
+    }
+}
+
+/**
+    
+ */
+@Serializable
 @SerialName(TvmArithmDivAddrshiftmodcInst.MNEMONIC)
 data class TvmArithmDivAddrshiftmodcInst(
     override val location: TvmInstLocation,
@@ -16197,7 +16213,7 @@ fun SerializersModuleBuilder.registerTvmInstSerializer() {
         subclass(TvmArithmDivDivmodInst::class)
         subclass(TvmArithmDivDivmodrInst::class)
         subclass(TvmArithmDivDivmodcInst::class)
-        subclass(TvmArithmDivAddrshiftmodInst::class)
+        subclass(TvmArithmDivAddrshiftmodVarInst::class)
         subclass(TvmArithmDivAddrshiftmodrInst::class)
         subclass(TvmArithmDivAddrshiftmodcInst::class)
         subclass(TvmArithmDivRshiftrVarInst::class)
@@ -16208,6 +16224,7 @@ fun SerializersModuleBuilder.registerTvmInstSerializer() {
         subclass(TvmArithmDivRshiftmodVarInst::class)
         subclass(TvmArithmDivRshiftmodrVarInst::class)
         subclass(TvmArithmDivRshiftmodcVarInst::class)
+        subclass(TvmArithmDivAddrshiftmodInst::class)
         subclass(TvmArithmDivAddrshiftrmodInst::class)
         subclass(TvmArithmDivAddrshiftcmodInst::class)
         subclass(TvmArithmDivRshiftrInst::class)

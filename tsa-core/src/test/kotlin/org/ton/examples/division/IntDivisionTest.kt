@@ -17,7 +17,7 @@ class IntDivisionTest {
 
         val methodStates = compileAndAnalyzeFift(fiftResourcePath)
 
-        val methodIds = (0..143).toSet()
+        val methodIds = (0..197).toSet()
         compareMethodStateStack(methodIds, methodStates) { method ->
             runFiftMethod(fiftResourcePath, method.id)
         }
@@ -30,7 +30,7 @@ class IntDivisionTest {
 
         val methodStates = compileAndAnalyzeFift(fiftResourcePath)
 
-        val methodIds = (0..45).toSet()
+        val methodIds = (0..82).toSet()
         compareMethodStateStack(methodIds, methodStates) { method ->
             runFiftMethod(fiftResourcePath, method.id)
         }
