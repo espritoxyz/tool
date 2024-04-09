@@ -2558,7 +2558,7 @@ data class TvmArithmDivLshiftdivcInst(
     val t: Int, // uint
 ): TvmInst, TvmArithmDivInst {
     override val mnemonic: String get() = MNEMONIC
-    override val gasConsumption get() = TvmFixedGas(value = 26)
+    override val gasConsumption get() = TvmFixedGas(value = 34)
          
     companion object {
         const val MNEMONIC = "LSHIFTDIVC"

@@ -92,6 +92,64 @@ PROGRAM{
   87 DECLMETHOD rshiftcmod_var
   88 DECLMETHOD rshiftrmod_var_1
   89 DECLMETHOD rshiftrmod_var_2
+
+  90 DECLMETHOD lshiftdiv_1
+  91 DECLMETHOD lshiftdiv_2
+  92 DECLMETHOD lshiftdivc_1
+  93 DECLMETHOD lshiftdivc_2
+  94 DECLMETHOD lshiftdivc_3
+  95 DECLMETHOD lshiftdivr_1
+  96 DECLMETHOD lshiftdivr_2
+  97 DECLMETHOD lshiftdivr_3
+  98 DECLMETHOD lshiftdivr_4
+  99 DECLMETHOD lshiftdiv_var_1
+  100 DECLMETHOD lshiftdiv_var_2
+  101 DECLMETHOD lshiftdivc_var_1
+  102 DECLMETHOD lshiftdivc_var_2
+  103 DECLMETHOD lshiftdivc_var_3
+  104 DECLMETHOD lshiftdivr_var_1
+  105 DECLMETHOD lshiftdivr_var_2
+  106 DECLMETHOD lshiftdivr_var_3
+  107 DECLMETHOD lshiftdivr_var_4
+
+  108 DECLMETHOD lshiftdivmod_1
+  109 DECLMETHOD lshiftdivmod_2
+  110 DECLMETHOD lshiftdivmodc_1
+  111 DECLMETHOD lshiftdivmodc_2
+  112 DECLMETHOD lshiftdivmodc_3
+  113 DECLMETHOD lshiftdivmodr_1
+  114 DECLMETHOD lshiftdivmodr_2
+  115 DECLMETHOD lshiftdivmodr_3
+  116 DECLMETHOD lshiftdivmodr_4
+  117 DECLMETHOD lshiftdivmod_var_1
+  118 DECLMETHOD lshiftdivmod_var_2
+  119 DECLMETHOD lshiftdivmodc_var_1
+  120 DECLMETHOD lshiftdivmodc_var_2
+  121 DECLMETHOD lshiftdivmodc_var_3
+  122 DECLMETHOD lshiftdivmodr_var_1
+  123 DECLMETHOD lshiftdivmodr_var_2
+  124 DECLMETHOD lshiftdivmodr_var_3
+  125 DECLMETHOD lshiftdivmodr_var_4
+
+  126 DECLMETHOD lshiftmod_1
+  127 DECLMETHOD lshiftmod_2
+  128 DECLMETHOD lshiftmodc_1
+  129 DECLMETHOD lshiftmodc_2
+  130 DECLMETHOD lshiftmodc_3
+  131 DECLMETHOD lshiftmodr_1
+  132 DECLMETHOD lshiftmodr_2
+  133 DECLMETHOD lshiftmodr_3
+  134 DECLMETHOD lshiftmodr_4
+  135 DECLMETHOD lshiftmod_var_1
+  136 DECLMETHOD lshiftmod_var_2
+  137 DECLMETHOD lshiftmodc_var_1
+  138 DECLMETHOD lshiftmodc_var_2
+  139 DECLMETHOD lshiftmodc_var_3
+  140 DECLMETHOD lshiftmodr_var_1
+  141 DECLMETHOD lshiftmodr_var_2
+  142 DECLMETHOD lshiftmodr_var_3
+  143 DECLMETHOD lshiftmodr_var_4
+
   div_neg_pos_1 PROC:<{
       -3 PUSHINT
       2 PUSHINT
@@ -584,5 +642,332 @@ PROGRAM{
       5 PUSHINT
       2 PUSHINT
       RSHIFTMODR  // 1 1
+  }>
+  lshiftdiv_1 PROC:<{
+      -1 PUSHINT
+      3 PUSHINT
+      1 LSHIFT#DIV  // -1
+  }>
+  lshiftdiv_2 PROC:<{
+      1 PUSHINT
+      3 PUSHINT
+      256 LSHIFT#DIV
+  }>
+  lshiftdivc_1 PROC:<{
+      -1 PUSHINT
+      3 PUSHINT
+      1 LSHIFT#DIVC
+  }>
+  lshiftdivc_2 PROC:<{
+      1 PUSHINT
+      3 PUSHINT
+      256 LSHIFT#DIVC
+  }>
+  lshiftdivc_3 PROC:<{
+      255 PUSHPOW2
+      -1 PUSHINT
+      MUL
+      255 PUSHPOW2
+      256 LSHIFT#DIVC
+  }>
+  lshiftdivr_1 PROC:<{
+      -1 PUSHINT
+      3 PUSHINT
+      1 LSHIFT#DIVR
+  }>
+  lshiftdivr_2 PROC:<{
+      1 PUSHINT
+      3 PUSHINT
+      256 LSHIFT#DIVR
+  }>
+  lshiftdivr_3 PROC:<{
+      255 PUSHPOW2
+      -1 PUSHINT
+      MUL
+      255 PUSHPOW2
+      256 LSHIFT#DIVR
+  }>
+  lshiftdivr_4 PROC:<{
+      4 PUSHINT
+      3 PUSHINT
+      1 LSHIFT#DIVR
+  }>
+  lshiftdiv_var_1 PROC:<{
+      -1 PUSHINT
+      3 PUSHINT
+      1 PUSHINT
+      LSHIFTDIV
+  }>
+  lshiftdiv_var_2 PROC:<{
+      1 PUSHINT
+      3 PUSHINT
+      256 PUSHINT
+      256 PUSHINT
+      LSHIFTDIV
+  }>
+  lshiftdivc_var_1 PROC:<{
+      -1 PUSHINT
+      3 PUSHINT
+      1 PUSHINT
+      LSHIFTDIVC
+  }>
+  lshiftdivc_var_2 PROC:<{
+      1 PUSHINT
+      3 PUSHINT
+      256 PUSHINT
+      LSHIFTDIVC
+  }>
+  lshiftdivc_var_3 PROC:<{
+      255 PUSHPOW2
+      -1 PUSHINT
+      MUL
+      255 PUSHPOW2
+      256 PUSHINT
+      LSHIFTDIVC
+  }>
+  lshiftdivr_var_1 PROC:<{
+      -1 PUSHINT
+      3 PUSHINT
+      1 PUSHINT
+      LSHIFTDIVR
+  }>
+  lshiftdivr_var_2 PROC:<{
+      1 PUSHINT
+      3 PUSHINT
+      256 PUSHINT
+      LSHIFTDIVR
+  }>
+  lshiftdivr_var_3 PROC:<{
+      255 PUSHPOW2
+      -1 PUSHINT
+      MUL
+      255 PUSHPOW2
+      256 PUSHINT
+      LSHIFTDIVR
+  }>
+  lshiftdivr_var_4 PROC:<{
+      4 PUSHINT
+      3 PUSHINT
+      1 PUSHINT
+      LSHIFTDIVR
+  }>
+
+  lshiftdivmod_1 PROC:<{
+      -1 PUSHINT
+      3 PUSHINT
+      1 LSHIFT#DIVMOD
+  }>
+  lshiftdivmod_2 PROC:<{
+      1 PUSHINT
+      3 PUSHINT
+      256 LSHIFT#DIVMOD
+  }>
+  lshiftdivmodc_1 PROC:<{
+      -1 PUSHINT
+      3 PUSHINT
+      1 LSHIFT#DIVMODC
+  }>
+  lshiftdivmodc_2 PROC:<{
+      1 PUSHINT
+      3 PUSHINT
+      256 LSHIFT#DIVMODC
+  }>
+  lshiftdivmodc_3 PROC:<{
+      255 PUSHPOW2
+      -1 PUSHINT
+      MUL
+      255 PUSHPOW2
+      256 LSHIFT#DIVMODC
+  }>
+  lshiftdivmodr_1 PROC:<{
+      -1 PUSHINT
+      3 PUSHINT
+      1 LSHIFT#DIVMODR
+  }>
+  lshiftdivmodr_2 PROC:<{
+      1 PUSHINT
+      3 PUSHINT
+      256 LSHIFT#DIVMODR
+  }>
+  lshiftdivmodr_3 PROC:<{
+      255 PUSHPOW2
+      -1 PUSHINT
+      MUL
+      255 PUSHPOW2
+      256 LSHIFT#DIVMODR
+  }>
+  lshiftdivmodr_4 PROC:<{
+      4 PUSHINT
+      3 PUSHINT
+      1 LSHIFT#DIVMODR
+  }>
+  lshiftdivmod_var_1 PROC:<{
+      -1 PUSHINT
+      3 PUSHINT
+      1 PUSHINT
+      LSHIFTDIVMOD
+  }>
+  lshiftdivmod_var_2 PROC:<{
+      1 PUSHINT
+      3 PUSHINT
+      256 PUSHINT
+      256 PUSHINT
+      LSHIFTDIVMOD
+  }>
+  lshiftdivmodc_var_1 PROC:<{
+      -1 PUSHINT
+      3 PUSHINT
+      1 PUSHINT
+      LSHIFTDIVMODC
+  }>
+  lshiftdivmodc_var_2 PROC:<{
+      1 PUSHINT
+      3 PUSHINT
+      256 PUSHINT
+      LSHIFTDIVMODC
+  }>
+  lshiftdivmodc_var_3 PROC:<{
+      255 PUSHPOW2
+      -1 PUSHINT
+      MUL
+      255 PUSHPOW2
+      256 PUSHINT
+      LSHIFTDIVMODC
+  }>
+  lshiftdivmodr_var_1 PROC:<{
+      -1 PUSHINT
+      3 PUSHINT
+      1 PUSHINT
+      LSHIFTDIVMODR
+  }>
+  lshiftdivmodr_var_2 PROC:<{
+      1 PUSHINT
+      3 PUSHINT
+      256 PUSHINT
+      LSHIFTDIVMODR
+  }>
+  lshiftdivmodr_var_3 PROC:<{
+      255 PUSHPOW2
+      -1 PUSHINT
+      MUL
+      255 PUSHPOW2
+      256 PUSHINT
+      LSHIFTDIVMODR
+  }>
+  lshiftdivmodr_var_4 PROC:<{
+      4 PUSHINT
+      3 PUSHINT
+      1 PUSHINT
+      LSHIFTDIVMODR
+  }>
+
+
+  lshiftmod_1 PROC:<{
+      -1 PUSHINT
+      3 PUSHINT
+      1 LSHIFT#MOD
+  }>
+  lshiftmod_2 PROC:<{
+      1 PUSHINT
+      3 PUSHINT
+      256 LSHIFT#MOD
+  }>
+  lshiftmodc_1 PROC:<{
+      -1 PUSHINT
+      3 PUSHINT
+      1 LSHIFT#MODC
+  }>
+  lshiftmodc_2 PROC:<{
+      1 PUSHINT
+      3 PUSHINT
+      256 LSHIFT#MODC
+  }>
+  lshiftmodc_3 PROC:<{
+      255 PUSHPOW2
+      -1 PUSHINT
+      MUL
+      255 PUSHPOW2
+      256 LSHIFT#MODC
+  }>
+  lshiftmodr_1 PROC:<{
+      -1 PUSHINT
+      3 PUSHINT
+      1 LSHIFT#MODR
+  }>
+  lshiftmodr_2 PROC:<{
+      1 PUSHINT
+      3 PUSHINT
+      256 LSHIFT#MODR
+  }>
+  lshiftmodr_3 PROC:<{
+      255 PUSHPOW2
+      -1 PUSHINT
+      MUL
+      255 PUSHPOW2
+      256 LSHIFT#MODR
+  }>
+  lshiftmodr_4 PROC:<{
+      4 PUSHINT
+      3 PUSHINT
+      1 LSHIFT#MODR
+  }>
+  lshiftmod_var_1 PROC:<{
+      -1 PUSHINT
+      3 PUSHINT
+      1 PUSHINT
+      LSHIFTMOD
+  }>
+  lshiftmod_var_2 PROC:<{
+      1 PUSHINT
+      3 PUSHINT
+      256 PUSHINT
+      256 PUSHINT
+      LSHIFTMOD
+  }>
+  lshiftmodc_var_1 PROC:<{
+      -1 PUSHINT
+      3 PUSHINT
+      1 PUSHINT
+      LSHIFTMODC
+  }>
+  lshiftmodc_var_2 PROC:<{
+      1 PUSHINT
+      3 PUSHINT
+      256 PUSHINT
+      LSHIFTMODC
+  }>
+  lshiftmodc_var_3 PROC:<{
+      255 PUSHPOW2
+      -1 PUSHINT
+      MUL
+      255 PUSHPOW2
+      256 PUSHINT
+      LSHIFTMODC
+  }>
+  lshiftmodr_var_1 PROC:<{
+      -1 PUSHINT
+      3 PUSHINT
+      1 PUSHINT
+      LSHIFTMODR
+  }>
+  lshiftmodr_var_2 PROC:<{
+      1 PUSHINT
+      3 PUSHINT
+      256 PUSHINT
+      LSHIFTMODR
+  }>
+  lshiftmodr_var_3 PROC:<{
+      255 PUSHPOW2
+      -1 PUSHINT
+      MUL
+      255 PUSHPOW2
+      256 PUSHINT
+      LSHIFTMODR
+  }>
+  lshiftmodr_var_4 PROC:<{
+      4 PUSHINT
+      3 PUSHINT
+      1 PUSHINT
+      LSHIFTMODR
   }>
 }END>c

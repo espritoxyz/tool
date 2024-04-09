@@ -30,6 +30,24 @@ PROGRAM{
   25 DECLMETHOD rshiftmod_var_neg
   26 DECLMETHOD rshiftmodc_var_neg
   27 DECLMETHOD rshiftmodr_var_neg
+  28 DECLMETHOD lsiftdiv_overflow
+  29 DECLMETHOD lsiftdiv_zero
+  30 DECLMETHOD lsiftdivc_overflow
+  31 DECLMETHOD lsiftdivc_zero
+  32 DECLMETHOD lsiftdivr_overflow
+  33 DECLMETHOD lsiftdivr_zero
+  34 DECLMETHOD lsiftdiv_var_overflow
+  35 DECLMETHOD lsiftdiv_var_zero
+  36 DECLMETHOD lsiftdivc_var_overflow
+  37 DECLMETHOD lsiftdivc_var_zero
+  38 DECLMETHOD lsiftdivr_var_overflow
+  39 DECLMETHOD lsiftdivr_var_zero
+  40 DECLMETHOD lsiftdiv_var_neg
+  41 DECLMETHOD lsiftdiv_var_big
+  42 DECLMETHOD lsiftdivc_var_neg
+  43 DECLMETHOD lsiftdivc_var_big
+  44 DECLMETHOD lsiftdivr_var_neg
+  45 DECLMETHOD lsiftdivr_var_big
   addivmod_pos PROC:<{
       255 PUSHPOW2
       255 PUSHPOW2
@@ -208,5 +226,107 @@ PROGRAM{
       -7 PUSHINT
       -1 PUSHINT
       RSHIFTMODR
+  }>
+  lsiftdiv_overflow PROC:<{
+      10 PUSHINT
+      10 PUSHINT
+      256 LSHIFT#DIV
+  }>
+  lsiftdiv_zero PROC:<{
+      10 PUSHINT
+      0 PUSHINT
+      1 LSHIFT#DIV
+  }>
+  lsiftdivc_overflow PROC:<{
+      10 PUSHINT
+      10 PUSHINT
+      256 LSHIFT#DIVC
+  }>
+  lsiftdivc_zero PROC:<{
+      10 PUSHINT
+      0 PUSHINT
+      1 LSHIFT#DIVC
+  }>
+  lsiftdivr_overflow PROC:<{
+      10 PUSHINT
+      10 PUSHINT
+      256 LSHIFT#DIVR
+  }>
+  lsiftdivr_zero PROC:<{
+      10 PUSHINT
+      0 PUSHINT
+      1 LSHIFT#DIVR
+  }>
+  lsiftdiv_var_overflow PROC:<{
+      10 PUSHINT
+      10 PUSHINT
+      256 PUSHINT
+      LSHIFTDIV
+  }>
+  lsiftdiv_var_zero PROC:<{
+      10 PUSHINT
+      0 PUSHINT
+      1 PUSHINT
+      LSHIFTDIV
+  }>
+  lsiftdivc_var_overflow PROC:<{
+      10 PUSHINT
+      10 PUSHINT
+      256 PUSHINT
+      LSHIFTDIVC
+  }>
+  lsiftdivc_var_zero PROC:<{
+      10 PUSHINT
+      0 PUSHINT
+      1 PUSHINT
+      LSHIFTDIVC
+  }>
+  lsiftdivr_var_overflow PROC:<{
+      10 PUSHINT
+      10 PUSHINT
+      256 PUSHINT
+      LSHIFTDIVR
+  }>
+  lsiftdivr_var_zero PROC:<{
+      10 PUSHINT
+      0 PUSHINT
+      1 PUSHINT
+      LSHIFTDIVR
+  }>
+  lsiftdiv_var_neg PROC:<{
+      10 PUSHINT
+      10 PUSHINT
+      -1 PUSHINT
+      LSHIFTDIV
+  }>
+  lsiftdiv_var_big PROC:<{
+      10 PUSHINT
+      10 PUSHINT
+      257 PUSHINT
+      LSHIFTDIV
+  }>
+  lsiftdivc_var_neg PROC:<{
+      10 PUSHINT
+      10 PUSHINT
+      -1 PUSHINT
+      LSHIFTDIVC
+  }>
+  lsiftdivc_var_big PROC:<{
+      10 PUSHINT
+      10 PUSHINT
+      257 PUSHINT
+      LSHIFTDIVC
+  }>
+  lsiftdivr_var_neg PROC:<{
+      10 PUSHINT
+      10 PUSHINT
+      -1 PUSHINT
+      LSHIFTDIVR
+  }>
+  lsiftdivr_var_big PROC:<{
+      10 PUSHINT
+      10 PUSHINT
+      257 PUSHINT
+      LSHIFTDIVR
   }>
 }END>c
