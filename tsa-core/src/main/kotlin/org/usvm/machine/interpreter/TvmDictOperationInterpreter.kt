@@ -124,7 +124,6 @@ import org.usvm.UHeapRef
 import org.usvm.USort
 import org.usvm.UTransformer
 import org.usvm.api.makeSymbolicPrimitive
-import org.usvm.api.writeField
 import org.usvm.apply
 import org.usvm.collection.set.primitive.USetEntryLValue
 import org.usvm.collection.set.primitive.setEntries
@@ -142,12 +141,13 @@ import org.usvm.machine.state.ensureSymbolicCellInitialized
 import org.usvm.machine.state.ensureSymbolicSliceInitialized
 import org.usvm.machine.state.generateSymbolicCell
 import org.usvm.machine.state.generateSymbolicSlice
+import org.usvm.machine.state.makeSliceFromData
 import org.usvm.machine.state.newStmt
 import org.usvm.machine.state.nextStmt
 import org.usvm.machine.state.consumeDefaultGas
 import org.usvm.machine.state.sliceCopy
-import org.usvm.machine.state.sliceLoadDataBits
-import org.usvm.machine.state.sliceLoadNextRef
+import org.usvm.machine.state.slicePreloadDataBits
+import org.usvm.machine.state.slicePreloadNextRef
 import org.usvm.machine.state.sliceMoveDataPtr
 import org.usvm.machine.state.sliceMoveRefPtr
 import org.usvm.machine.state.takeLastBuilder
@@ -159,9 +159,7 @@ import org.usvm.memory.UMemoryRegion
 import org.usvm.memory.UMemoryRegionId
 import org.usvm.memory.UReadOnlyMemory
 import org.usvm.memory.USymbolicCollectionKeyInfo
-import org.usvm.mkSizeExpr
 import org.usvm.regions.SetRegion
-import org.usvm.sizeSort
 import org.usvm.uctx
 
 class TvmDictOperationInterpreter(private val ctx: TvmContext) {
@@ -310,7 +308,7 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
 
     private fun doLoadDict(inst: TvmDictSerialInst, scope: TvmStepScope, returnUpdatedSlice: Boolean) {
         val slice = scope.calcOnStateCtx { stack.takeLastSlice() }
-        val dictConstructorTypeBit = scope.sliceLoadDataBits(slice, bits = 1) ?: return
+        val dictConstructorTypeBit = scope.slicePreloadDataBits(slice, bits = 1) ?: return
         val dictIsNotEmpty = scope.calcOnStateCtx { mkEq(dictConstructorTypeBit, mkBv(value = 1, sizeBits = 1u)) }
 
         scope.fork(
@@ -330,7 +328,7 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
         ) ?: return
 
         scope.doWithStateCtx {
-            val dictCellRef = scope.sliceLoadNextRef(slice) ?: return@doWithStateCtx
+            val dictCellRef = scope.slicePreloadNextRef(slice) ?: return@doWithStateCtx
             stack.add(dictCellRef, TvmCellType)
 
             if (returnUpdatedSlice) {
@@ -801,7 +799,7 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
             DictKeyType.UNSIGNED_INT -> stack.takeLastInt().let { mkBvExtractExpr(high = keyLength - 1, low = 0, it) }
             DictKeyType.SLICE -> {
                 val slice = stack.takeLastSlice()
-                scope.sliceLoadDataBits(slice, keyLength) ?: return@calcOnStateCtx null
+                scope.slicePreloadDataBits(slice, keyLength) ?: return@calcOnStateCtx null
             }
         }
     }
@@ -819,18 +817,7 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
             }
 
             DictKeyType.SLICE -> {
-                val sliceCell = memory.allocConcrete(TvmBuilderType)
-                memory.writeField(sliceCell, TvmContext.cellDataField, cellDataSort, mkBv(0, cellDataSort), trueExpr)
-                memory.writeField(sliceCell, TvmContext.cellDataLengthField, sizeSort, mkSizeExpr(0), trueExpr)
-                memory.writeField(sliceCell, TvmContext.cellRefsLengthField, sizeSort, mkSizeExpr(0), trueExpr)
-
-                builderStoreDataBits(sliceCell, key)
-
-                val resultSlice = memory.allocConcrete(TvmSliceType)
-                memory.writeField(resultSlice, TvmContext.sliceCellField, addressSort, sliceCell, trueExpr)
-                memory.writeField(resultSlice, TvmContext.sliceDataPosField, sizeSort, mkSizeExpr(0), trueExpr)
-                memory.writeField(resultSlice, TvmContext.sliceRefPosField, sizeSort, mkSizeExpr(0), trueExpr)
-
+                val resultSlice = makeSliceFromData(key)
                 stack.add(resultSlice, TvmSliceType)
             }
         }

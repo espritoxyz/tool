@@ -10,6 +10,9 @@ sealed interface TvmArtificialInst : TvmInst {
 
 sealed interface TvmLoopArtificialInst : TvmArtificialInst, TvmContLoopsInst {
     val originalInst: TvmContLoopsInst
+
+    override val location: TvmInstLocation
+        get() = originalInst.location
 }
 
 data class TvmArtificialRepeatInst(
@@ -18,9 +21,6 @@ data class TvmArtificialRepeatInst(
     val loopRepeats: UExpr<UBvSort>,
     val executeUntilEnd: Boolean,
 ) : TvmLoopArtificialInst {
-    override val location: TvmInstLocation
-        get() = originalInst.location
-
     override val mnemonic: String
         get() = "artificial_repeat_${originalInst.mnemonic}"
 }
@@ -30,9 +30,6 @@ data class TvmArtificialUntilInst(
     val continuationValue: TvmContinuationValue,
     val executeUntilEnd: Boolean,
 ) : TvmLoopArtificialInst {
-    override val location: TvmInstLocation
-        get() = originalInst.location
-
     override val mnemonic: String
         get() = "artificial_until_${originalInst.mnemonic}"
 }
@@ -43,9 +40,6 @@ data class TvmArtificialWhileStartInst(
     val conditionContinuation: TvmContinuationValue,
     val executeUntilEnd: Boolean,
 ) : TvmLoopArtificialInst {
-    override val location: TvmInstLocation
-        get() = originalInst.location
-
     override val mnemonic: String
         get() = "artificial_while_start_${originalInst.mnemonic}"
 }
@@ -56,9 +50,6 @@ data class TvmArtificialWhileEndInst(
     val conditionContinuation: TvmContinuationValue,
     val executeUntilEnd: Boolean,
 ) : TvmLoopArtificialInst {
-    override val location: TvmInstLocation
-        get() = originalInst.location
-
     override val mnemonic: String
         get() = "artificial_while_end_${originalInst.mnemonic}"
 }
@@ -68,11 +59,35 @@ data class TvmArtificialAgainInst(
     val continuationValue: TvmContinuationValue,
     val executeUntilEnd: Boolean,
 ) : TvmLoopArtificialInst {
-    override val location: TvmInstLocation
-        get() = originalInst.location
-
     override val mnemonic: String
         get() = "artificial_again_${originalInst.mnemonic}"
+}
+
+sealed interface TvmArtificialLoadAddrInst : TvmArtificialInst, TvmAppAddrInst {
+    val originalInst: TvmAppAddrLdmsgaddrInst
+
+    override val location: TvmInstLocation
+        get() = originalInst.location
+}
+
+data class TvmArtificialLoadAddrNoneInst(override val originalInst: TvmAppAddrLdmsgaddrInst) : TvmArtificialLoadAddrInst {
+    override val mnemonic: String
+        get() = "artificial_addr_none_${originalInst.mnemonic}"
+}
+
+data class TvmArtificialLoadAddrExternInst(override val originalInst: TvmAppAddrLdmsgaddrInst) : TvmArtificialLoadAddrInst {
+    override val mnemonic: String
+        get() = "artificial_addr_extern_${originalInst.mnemonic}"
+}
+
+data class TvmArtificialLoadAddrStdInst(override val originalInst: TvmAppAddrLdmsgaddrInst) : TvmArtificialLoadAddrInst {
+    override val mnemonic: String
+        get() = "artificial_addr_std_${originalInst.mnemonic}"
+}
+
+data class TvmArtificialLoadAddrVarInst(override val originalInst: TvmAppAddrLdmsgaddrInst) : TvmArtificialLoadAddrInst {
+    override val mnemonic: String
+        get() = "artificial_addr_var_${originalInst.mnemonic}"
 }
 
 data class TvmArtificialImplicitRetInst(

@@ -1,7 +1,6 @@
 package org.usvm.machine
 
 import org.ton.bytecode.TvmContractCode
-import org.ton.bytecode.TvmDictSpecialDictpushconstInst
 import org.ton.bytecode.TvmMethod
 import org.ton.cell.Cell
 import org.usvm.machine.FuncAnalyzer.Companion.FIFT_EXECUTABLE
@@ -17,7 +16,11 @@ import kotlin.io.path.readBytes
 import kotlin.io.path.readText
 
 sealed interface TvmAnalyzer {
-    fun analyzeAllMethods(sourcesPath: Path, contractDataHex: String? = null): Map<TvmMethod, List<TvmState>>
+    fun analyzeAllMethods(
+        sourcesPath: Path,
+        contractDataHex: String? = null,
+        methodsBlackList: Set<Int> = hashSetOf(Int.MAX_VALUE)
+    ): Map<TvmMethod, List<TvmState>>
 }
 
 class FuncAnalyzer(
@@ -27,11 +30,15 @@ class FuncAnalyzer(
     private val funcExecutablePath: Path = Paths.get(FUNC_EXECUTABLE)
     private val fiftExecutablePath: Path = Paths.get(FIFT_EXECUTABLE)
 
-    override fun analyzeAllMethods(sourcesPath: Path, contractDataHex: String?): Map<TvmMethod, List<TvmState>> {
+    override fun analyzeAllMethods(
+        sourcesPath: Path,
+        contractDataHex: String?,
+        methodsBlackList: Set<Int>
+    ): Map<TvmMethod, List<TvmState>> {
         val tmpBocFile = createTempFile(suffix = ".boc")
         try {
             compileFuncSourceToBoc(sourcesPath, tmpBocFile)
-            return BocAnalyzer.analyzeAllMethods(tmpBocFile, contractDataHex)
+            return BocAnalyzer.analyzeAllMethods(tmpBocFile, contractDataHex, methodsBlackList)
         } finally {
             tmpBocFile.deleteIfExists()
         }
@@ -61,11 +68,15 @@ class FiftAnalyzer(
 ) : TvmAnalyzer {
     private val fiftExecutablePath: Path = Paths.get(FIFT_EXECUTABLE)
 
-    override fun analyzeAllMethods(sourcesPath: Path, contractDataHex: String?): Map<TvmMethod, List<TvmState>> {
+    override fun analyzeAllMethods(
+        sourcesPath: Path,
+        contractDataHex: String?,
+        methodsBlackList: Set<Int>
+    ): Map<TvmMethod, List<TvmState>> {
         val tmpBocFile = createTempFile(suffix = ".boc")
         try {
             compileFiftToBoc(sourcesPath, tmpBocFile)
-            return BocAnalyzer.analyzeAllMethods(tmpBocFile, contractDataHex)
+            return BocAnalyzer.analyzeAllMethods(tmpBocFile, contractDataHex, methodsBlackList)
         } finally {
             tmpBocFile.deleteIfExists()
         }
@@ -202,9 +213,13 @@ class FiftAnalyzer(
 }
 
 data object BocAnalyzer : TvmAnalyzer {
-    override fun analyzeAllMethods(sourcesPath: Path, contractDataHex: String?): Map<TvmMethod, List<TvmState>> {
+    override fun analyzeAllMethods(
+        sourcesPath: Path,
+        contractDataHex: String?,
+        methodsBlackList: Set<Int>
+    ): Map<TvmMethod, List<TvmState>> {
         val contract = loadContractFromBoc(sourcesPath)
-        return analyzeAllMethods(contract, contractDataHex)
+        return analyzeAllMethods(contract, methodsBlackList, contractDataHex)
     }
 
     fun loadContractFromBoc(bocFilePath: Path): TvmContractCode {
@@ -224,13 +239,24 @@ data object BocAnalyzer : TvmAnalyzer {
     private const val DISASSEMBLER_TIMEOUT = 5.toLong() // seconds
 }
 
-fun analyzeAllMethods(contract: TvmContractCode, contractDataHex: String? = null): Map<TvmMethod, List<TvmState>> {
+fun analyzeAllMethods(contract: TvmContractCode, methodsBlackList: Set<Int> = hashSetOf(Int.MAX_VALUE), contractDataHex: String? = null): Map<TvmMethod, List<TvmState>> {
     val contractData = Cell.Companion.of(contractDataHex ?: DEFAULT_CONTRACT_DATA_HEX)
     val machine = TvmMachine()
-    val methodsExceptDictPushConst = contract.methods.filterValues {
-        it.instList.none { inst -> inst is TvmDictSpecialDictpushconstInst }
+    val methodsExceptDictPushConst = contract.methods.filterKeys { it !in methodsBlackList }
+    val methodStates = methodsExceptDictPushConst.values.associateWith { method ->
+        runCatching {
+            machine.analyze(
+                contract,
+                contractData,
+                method.id
+            )
+        }.getOrElse {
+            logger.error(it) {
+                "Failed analyzing $method"
+            }
+            emptyList()
+        }
     }
-    val methodStates = methodsExceptDictPushConst.values.associateWith { machine.analyze(contract, contractData, it.id) }
     methodStates.forEach {
         println("Method ${it.key}")
         val exceptionalStates = it.value.filter { state -> state.isExceptional }

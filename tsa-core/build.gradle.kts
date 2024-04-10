@@ -1,5 +1,5 @@
 val usvmRepo = "com.github.UnitTestBot.usvm"
-val usvmVersion = "00c90d2e2a"
+val usvmVersion = "875f4e236c"
 
 plugins {
     id("tsa.kotlin-conventions")

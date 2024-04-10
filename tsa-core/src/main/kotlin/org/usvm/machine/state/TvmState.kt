@@ -41,6 +41,7 @@ class TvmState(
     memory: UMemory<TvmType, TvmCodeBlock>,
     models: List<UModelBase<TvmType>> = listOf(),
     pathNode: PathNode<TvmInst> = PathNode.root(),
+    forkPoints: PathNode<PathNode<TvmInst>> = PathNode.root(),
     var methodResult: TvmMethodResult = TvmMethodResult.NoCall,
     targets: UTargetsSet<TvmTarget, TvmInst> = UTargetsSet.empty(),
 ) : UState<TvmType, TvmCodeBlock, TvmInst, TvmContext, TvmTarget, TvmState>(
@@ -50,7 +51,8 @@ class TvmState(
     memory,
     models,
     pathNode,
-    targets
+    forkPoints,
+    targets,
 ) {
     override val isExceptional: Boolean
         get() = methodResult is TvmMethodResult.TvmFailure
@@ -59,22 +61,23 @@ class TvmState(
         val clonedConstraints = newConstraints ?: pathConstraints.clone()
 
         return TvmState(
-            ctx,
-            entrypoint,
+            ctx = ctx,
+            entrypoint = entrypoint,
 //            registers, // TODO clone?
-            currentContinuation, // TODO clone?
-            stack.clone(), // TODO clone?
-            registers.copy(),
-            emptyRefValue,
-            symbolicRefs,
-            gasUsage,
-            callStack.clone(),
-            clonedConstraints,
-            memory.clone(clonedConstraints.typeConstraints),
-            models,
-            pathNode,
-            methodResult,
-            targets.clone()
+            currentContinuation = currentContinuation, // TODO clone?
+            stack = stack.clone(), // TODO clone?
+            registers = registers.copy(),
+            emptyRefValue = emptyRefValue,
+            symbolicRefs = symbolicRefs,
+            gasUsage = gasUsage,
+            callStack = callStack.clone(),
+            pathConstraints = clonedConstraints,
+            memory = memory.clone(clonedConstraints.typeConstraints),
+            models = models,
+            pathNode = pathNode,
+            forkPoints = forkPoints,
+            methodResult = methodResult,
+            targets = targets.clone(),
         )
     }
 

@@ -84,3 +84,44 @@ private fun takeLastRef(
     val lastRefValue = stack.takeLast(referenceType, generateSymbolicRef)
     return lastRefValue.extractValue()
 }
+
+fun doXchg(scope: TvmStepScope, first: Int, second: Int) {
+    scope.doWithState {
+        stack.swap(first, second)
+    }
+}
+
+fun doPop(scope: TvmStepScope, i: Int) {
+    scope.doWithState {
+        stack.pop(i)
+    }
+}
+
+fun doPush(scope: TvmStepScope, i: Int) {
+    scope.doWithState {
+        stack.push(i)
+    }
+}
+
+fun TvmStack.doBlkSwap(i: Int, j: Int) {
+    reverse(i + 1, j + 1)
+    reverse(j + 1, 0)
+    reverse(i + j + 2, 0)
+}
+
+fun TvmStack.doPuxc(i: Int, j: Int) {
+    push(i)
+    swap(0, 1)
+    swap(0, j + 1)
+}
+
+fun TvmStack.doXchg2(i: Int, j: Int) {
+    swap(1, i)
+    swap(0, j)
+}
+
+fun TvmStack.doXchg3(i: Int, j: Int, k: Int) {
+    swap(2, i)
+    swap(1, j)
+    swap(0, k)
+}

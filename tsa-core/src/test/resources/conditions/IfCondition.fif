@@ -1,0 +1,65 @@
+"../fiftstdlib/Fift.fif" include
+"../fiftstdlib/Asm.fif" include
+
+PROGRAM{
+  0 DECLMETHOD f_ifelse_1
+  1 DECLMETHOD f_ifelse_2
+  2 DECLMETHOD f_if_1
+  3 DECLMETHOD f_if_2
+  4 DECLMETHOD f_ifjmp_1
+  5 DECLMETHOD f_ifjmp_2
+  f_ifelse_1 PROC:<{
+    0 PUSHINT
+    CONT:<{
+      1 PUSHINT
+    }>
+    CONT:<{
+      -1 PUSHINT
+    }>
+    IFELSE
+    42 PUSHINT
+  }>
+  f_ifelse_2 PROC:<{
+    1 PUSHINT
+    CONT:<{
+      1 PUSHINT
+    }>
+    CONT:<{
+      -1 PUSHINT
+    }>
+    IFELSE
+    42 PUSHINT
+  }>
+  f_if_1 PROC:<{
+    0 PUSHINT
+    CONT:<{
+      1 PUSHINT
+    }>
+    IF
+    42 PUSHINT
+  }>
+  f_if_2 PROC:<{
+    1 PUSHINT
+    CONT:<{
+      1 PUSHINT
+    }>
+    IF
+    42 PUSHINT
+  }>
+  f_ifjmp_1 PROC:<{
+    0 PUSHINT
+    CONT:<{
+      -1 PUSHINT
+    }>
+    IFJMP
+    42 PUSHINT
+  }>
+  f_ifjmp_2 PROC:<{
+    1 PUSHINT
+    CONT:<{
+      -1 PUSHINT
+    }>
+    IFJMP
+    42 PUSHINT
+  }>
+}END>c

@@ -15,7 +15,9 @@ import org.usvm.UExpr
 import org.usvm.UHeapRef
 import org.usvm.api.writeField
 import org.usvm.machine.TvmContext
+import org.usvm.machine.TvmSizeSort
 import org.usvm.machine.interpreter.TvmStepScope
+import org.usvm.mkSizeAddExpr
 import org.usvm.mkSizeExpr
 import org.usvm.sizeSort
 import java.math.BigInteger
@@ -93,11 +95,6 @@ fun TvmState.initializeSymbolicBuilder(ref: UConcreteHeapRef) = with(ctx) {
 //    memory.writeField(ref, TvmContext.cellDataLengthField, sizeSort, mkSizeExpr(0), guard = trueExpr)
 //    memory.writeField(ref, TvmContext.cellRefsLengthField, sizeSort, mkSizeExpr(0), guard = trueExpr)
 }
-
-fun TvmState.generateSymbolicTuple(): UHeapRef = generateSymbolicRef(TvmTupleType)
-
-fun TvmState.ensureSymbolicTupleInitialized(ref: UHeapRef) =
-    ensureSymbolicRefInitialized(ref, TvmTupleType)
 
 fun TvmStepScope.assertIfSat(
     constraint: UBoolExpr
@@ -180,3 +177,6 @@ fun TvmContext.bvMaxValueSignedExtended(sizeBits: UExpr<UBvSort>): UExpr<UBvSort
  */
 fun TvmContext.bvMaxValueUnsignedExtended(sizeBits: UExpr<UBvSort>): UExpr<UBvSort> =
     mkBvSubExpr(mkBvShiftLeftExpr(oneValue, sizeBits), oneValue)
+
+fun TvmState.calcConsumedGas(): UExpr<TvmSizeSort> =
+    gasUsage.fold(ctx.zeroSizeExpr) { acc, value -> ctx.mkSizeAddExpr(acc, value) }

@@ -14,6 +14,7 @@ import org.usvm.machine.FuncAnalyzer
 import org.usvm.machine.state.TvmMethodResult
 import org.usvm.machine.state.TvmStack
 import org.usvm.machine.state.TvmState
+import org.usvm.machine.state.calcConsumedGas
 import org.usvm.test.TvmTestIntegerValue
 import org.usvm.test.TvmTestNullValue
 import org.usvm.test.TvmTestStateResolver
@@ -22,6 +23,7 @@ import org.usvm.test.TvmTestValue
 import java.nio.file.Path
 import kotlin.io.path.Path
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 private const val FUNC_STDLIB_PATH = "/imports"
 private val FUNC_STDLIB_RESOURCE: Path = object {}.javaClass.getResource(FUNC_STDLIB_PATH)?.path?.let { Path(it) }
@@ -33,13 +35,23 @@ private val FIFT_STDLIB_RESOURCE: Path = object {}.javaClass.getResource(FIFT_ST
 
 fun compileAndAnalyzeAllMethods(
     funcSourcesPath: Path,
-    contractDataHex: String? = null
-): Map<TvmMethod, List<TvmState>> = FuncAnalyzer(funcStdlibPath = FUNC_STDLIB_RESOURCE, fiftStdlibPath = FIFT_STDLIB_RESOURCE).analyzeAllMethods(funcSourcesPath, contractDataHex)
+    contractDataHex: String? = null,
+    methodsBlackList: Set<Int> = hashSetOf(Int.MAX_VALUE),
+): Map<TvmMethod, List<TvmState>> = FuncAnalyzer(funcStdlibPath = FUNC_STDLIB_RESOURCE, fiftStdlibPath = FIFT_STDLIB_RESOURCE).analyzeAllMethods(
+    funcSourcesPath,
+    contractDataHex,
+    methodsBlackList
+)
 
 fun compileAndAnalyzeFift(
     fiftPath: Path,
-    contractDataHex: String? = null
-): Map<TvmMethod, List<TvmState>> = FiftAnalyzer(fiftStdlibPath = FIFT_STDLIB_RESOURCE).analyzeAllMethods(fiftPath, contractDataHex)
+    contractDataHex: String? = null,
+    methodsBlackList: Set<Int> = hashSetOf(Int.MAX_VALUE),
+): Map<TvmMethod, List<TvmState>> = FiftAnalyzer(fiftStdlibPath = FIFT_STDLIB_RESOURCE).analyzeAllMethods(
+    fiftPath,
+    contractDataHex,
+    methodsBlackList,
+)
 
 /**
  * [codeBlocks] -- blocks of FIFT instructions, surrounded with <{ ... }>
@@ -49,8 +61,11 @@ fun compileFiftCodeBlocksContract(
     codeBlocks: List<String>,
 ): TvmContractCode = FiftAnalyzer(fiftStdlibPath = FIFT_STDLIB_RESOURCE).compileFiftCodeBlocksContract(fiftWorkDir, codeBlocks)
 
-fun analyzeAllMethods(bytecodePath: String, contractDataHex: String? = null): Map<TvmMethod, List<TvmState>> =
-    BocAnalyzer.analyzeAllMethods(Path(bytecodePath), contractDataHex)
+fun analyzeAllMethods(
+    bytecodePath: String,
+    contractDataHex: String? = null,
+    methodsBlackList: Set<Int> = hashSetOf(Int.MAX_VALUE),
+): Map<TvmMethod, List<TvmState>> = BocAnalyzer.analyzeAllMethods(Path(bytecodePath), contractDataHex, methodsBlackList)
 
 /**
  * Run method with [methodId].
@@ -78,7 +93,7 @@ internal fun TvmState.executionCode(): Int = when (val res = methodResult) {
 
 internal fun TvmState.gasUsageValue(): Int {
     val model = models.first()
-    return gasUsage.sumOf { model.eval(it).intValue() }
+    return model.eval(calcConsumedGas()).intValue()
 }
 
 internal fun UExpr<out UBvSort>.intValue() = (this as KBitVecValue<*>).toBigIntegerSigned().toInt()
@@ -159,4 +174,9 @@ internal fun compareMethodStates(
         val concreteState = expectedState(method)
         comparison(method, state, concreteState)
     }
+}
+
+internal fun checkAtLeastOneStateForAllMethods(methodsNumber: Int, methodStates: Map<TvmMethod, List<TvmState>>) {
+    assertEquals(methodsNumber, methodStates.size)
+    assertTrue(methodStates.all { it.value.isNotEmpty() })
 }

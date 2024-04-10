@@ -1,6 +1,7 @@
 package org.usvm.machine
 
 import io.ksmt.expr.KBitVecValue
+import io.ksmt.utils.asExpr
 import io.ksmt.utils.toBigInteger
 import io.ksmt.utils.uncheckedCast
 import org.ton.bytecode.TvmCellType
@@ -36,7 +37,11 @@ class TvmContext(components: UComponents<TvmType, TvmSizeSort>) : UContext<TvmSi
     val minusOneValue = trueValue
     val intBitsValue = INT_BITS.toInt().toBv257()
     val maxTupleSizeValue = MAX_TUPLE_SIZE.toBv257()
+    val unitTimeMinValue = UNIX_TIME_MIN.toBv257()
+
     val zeroSizeExpr = mkSizeExpr(0)
+    val maxDataLengthSizeExpr = mkSizeExpr(MAX_DATA_LENGTH)
+    val maxRefsLengthSizeExpr = mkSizeExpr(MAX_REFS_NUMBER)
 
     private var inputStackEntryCounter: Int = 0
     fun nextInputStackEntryId(): Int = inputStackEntryCounter++
@@ -65,10 +70,10 @@ class TvmContext(components: UComponents<TvmType, TvmSizeSort>) : UContext<TvmSi
         return extendedValue
     }
 
-    fun <Sort : UBvSort> UExpr<Sort>.zeroExtendToSort(sort: UBvSort): UExpr<UBvSort> {
+    fun <InSort : UBvSort, OutSort: UBvSort> UExpr<InSort>.zeroExtendToSort(sort: OutSort): UExpr<OutSort> {
         require(this.sort.sizeBits <= sort.sizeBits)
         val extensionSize = sort.sizeBits - this.sort.sizeBits
-        return mkBvZeroExtensionExpr(extensionSize.toInt(), this)
+        return mkBvZeroExtensionExpr(extensionSize.toInt(), this).asExpr(sort)
     }
 
     fun <Sort : UBvSort> UExpr<Sort>.extractToSizeSort(): UExpr<TvmSizeSort> {
@@ -84,6 +89,8 @@ class TvmContext(components: UComponents<TvmType, TvmSizeSort>) : UContext<TvmSi
         const val MAX_TUPLE_SIZE: Int = 255
 
         const val INT_BITS: UInt = 257u
+
+        const val UNIX_TIME_MIN: Int = 1712318909
 
         val cellDataField: TvmField = TvmFieldImpl(TvmCellType, "data")
         val cellDataLengthField: TvmField = TvmFieldImpl(TvmCellType, "dataLength")
