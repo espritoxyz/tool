@@ -1,10 +1,10 @@
 package org.ton.examples.loops
 
 import org.ton.examples.compareMethodStateStack
+import org.ton.examples.compileAndAnalyzeFift
+import org.ton.examples.runFiftMethod
 import org.usvm.machine.TvmComponents
 import org.usvm.machine.TvmContext
-import org.usvm.machine.compileAndAnalyzeFift
-import org.usvm.machine.runFiftMethod
 import kotlin.io.path.Path
 import kotlin.test.Test
 

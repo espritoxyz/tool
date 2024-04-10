@@ -1,6 +1,6 @@
 package org.ton.examples.dict
 
-import org.usvm.machine.compileAndAnalyzeAllMethods
+import org.ton.examples.compileAndAnalyzeAllMethods
 import kotlin.io.path.Path
 import kotlin.test.Test
 import kotlin.test.assertTrue

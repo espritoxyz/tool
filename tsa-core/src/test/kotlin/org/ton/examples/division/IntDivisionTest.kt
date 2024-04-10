@@ -2,8 +2,8 @@ package org.ton.examples.division
 
 import org.junit.jupiter.api.Test
 import org.ton.examples.compareMethodStateStack
-import org.usvm.machine.compileAndAnalyzeFift
-import org.usvm.machine.runFiftMethod
+import org.ton.examples.compileAndAnalyzeFift
+import org.ton.examples.runFiftMethod
 import kotlin.io.path.Path
 
 class IntDivisionTest {

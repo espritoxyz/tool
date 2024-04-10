@@ -1,5 +1,5 @@
-"../fiftstdlib/Fift.fif" include
-"../fiftstdlib/Asm.fif" include
+"Fift.fif" include
+"Asm.fif" include
 
 // Run this script using "fift -n CompileExample.fif"
 

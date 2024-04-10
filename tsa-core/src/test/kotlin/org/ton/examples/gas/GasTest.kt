@@ -1,10 +1,10 @@
 package org.ton.examples.gas
 
+import org.ton.examples.compileFiftCodeBlocksContract
 import org.ton.examples.executionCode
 import org.ton.examples.gasUsageValue
+import org.ton.examples.runFiftCodeBlock
 import org.usvm.machine.analyzeAllMethods
-import org.usvm.machine.compileFiftCodeBlocksContract
-import org.usvm.machine.runFiftCodeBlock
 import java.nio.file.FileVisitResult
 import java.nio.file.Path
 import kotlin.io.path.ExperimentalPathApi

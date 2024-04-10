@@ -2,11 +2,11 @@ package org.ton.examples.stack
 
 import org.ton.bytecode.TvmIntegerType
 import org.ton.examples.compareMethodStateStack
+import org.ton.examples.compileAndAnalyzeFift
 import org.ton.examples.loadIntegers
+import org.ton.examples.runFiftMethod
 import org.usvm.machine.TvmComponents
 import org.usvm.machine.TvmContext
-import org.usvm.machine.compileAndAnalyzeFift
-import org.usvm.machine.runFiftMethod
 import org.usvm.machine.state.TvmStack
 import kotlin.io.path.Path
 import kotlin.test.Test

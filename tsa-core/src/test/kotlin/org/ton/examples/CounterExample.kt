@@ -1,7 +1,5 @@
 package org.ton.examples
 
-import org.usvm.machine.analyzeAllMethods
-import org.usvm.machine.state.TvmIntegerOverflow
 import kotlin.test.Test
 import kotlin.test.assertTrue
 

@@ -2,10 +2,10 @@ package org.ton.examples.ints
 
 import org.junit.jupiter.api.Test
 import org.ton.examples.compareMethodStateStack
+import org.ton.examples.compileAndAnalyzeAllMethods
+import org.ton.examples.compileAndAnalyzeFift
 import org.ton.examples.intValue
-import org.usvm.machine.compileAndAnalyzeAllMethods
-import org.usvm.machine.compileAndAnalyzeFift
-import org.usvm.machine.runFiftMethod
+import org.ton.examples.runFiftMethod
 import org.usvm.machine.state.takeLastInt
 import kotlin.io.path.Path
 import kotlin.test.assertEquals

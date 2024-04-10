@@ -1,5 +1,5 @@
-"../fiftstdlib/Fift.fif" include
-"../fiftstdlib/Asm.fif" include
+"Fift.fif" include
+"Asm.fif" include
 
 PROGRAM{
   0 DECLMETHOD f_until

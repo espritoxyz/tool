@@ -1,18 +1,18 @@
 package org.ton.resolver
 
-import java.math.BigInteger
-import org.usvm.test.TvmTestResolver
 import org.ton.bigint.plus
 import org.ton.bytecode.TvmArithmDivInst
 import org.ton.bytecode.TvmMethod
-import org.usvm.machine.compileAndAnalyzeAllMethods
+import org.ton.examples.compileAndAnalyzeAllMethods
 import org.usvm.machine.state.TvmIntegerOverflow
 import org.usvm.machine.state.TvmState
 import org.usvm.machine.state.lastStmt
 import org.usvm.test.TvmTestBuilderValue
 import org.usvm.test.TvmTestCellValue
 import org.usvm.test.TvmTestIntegerValue
+import org.usvm.test.TvmTestResolver
 import org.usvm.test.TvmTestSliceValue
+import java.math.BigInteger
 import kotlin.io.path.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals
