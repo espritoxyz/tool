@@ -8,6 +8,7 @@ import org.usvm.machine.state.TvmState
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.util.concurrent.TimeUnit
+import kotlin.io.path.Path
 import kotlin.io.path.absolutePathString
 import kotlin.io.path.createTempFile
 import kotlin.io.path.deleteIfExists
@@ -50,7 +51,10 @@ class FuncAnalyzer(
         val command = "$funcCommand | $fiftCommand"
         val compilerProcess = ProcessBuilder(listOf("/bin/sh", "-c", command))
             .start()
-        compilerProcess.waitFor(COMPILER_TIMEOUT, TimeUnit.SECONDS)
+        val exited = compilerProcess.waitFor(COMPILER_TIMEOUT, TimeUnit.SECONDS)
+        check(exited) {
+            "Compiler process has not finished in $COMPILER_TIMEOUT seconds"
+        }
 
         check(bocFilePath.exists() && bocFilePath.readBytes().isNotEmpty()) {
             "Compilation failed, error: ${compilerProcess.errorStream.bufferedReader().readText()}"
@@ -167,23 +171,39 @@ class FiftAnalyzer(
         val compilerProcess = ProcessBuilder(listOf("/bin/sh", "-c", fiftCommand))
             .directory(fiftStdlibPath.toFile())
             .start()
-        compilerProcess.waitFor(COMPILER_TIMEOUT, TimeUnit.SECONDS)
+        val exited = compilerProcess.waitFor(COMPILER_TIMEOUT, TimeUnit.SECONDS)
+        check(exited) {
+            "Compiler process has not finished in $COMPILER_TIMEOUT seconds"
+        }
 
         check(compilerProcess.exitValue() == 0 && bocFilePath.exists() && bocFilePath.readBytes().isNotEmpty()) {
             "Compilation failed, error: ${compilerProcess.errorStream.bufferedReader().readText()}"
         }
     }
 
-    private fun runFiftInterpreter(fiftWorkDir: Path, fiftInterpreterCommand: String): FiftInterpreterResult{
+    private fun ProcessBuilder.addFiftStdlib(): ProcessBuilder {
+        val env = environment()
+        env["FIFTPATH"] = fiftStdlibPath.toString()
+        return this
+    }
+
+    private fun runFiftInterpreter(
+        fiftWorkDir: Path,
+        fiftInterpreterCommand: String
+    ): FiftInterpreterResult{
         val fiftCommand = "echo '$fiftInterpreterCommand' | $fiftExecutablePath -n"
         val interpreterProcess = ProcessBuilder(listOf("/bin/sh", "-c", fiftCommand))
             .directory(fiftWorkDir.toFile())
+            .addFiftStdlib()
             .start()
-
-        interpreterProcess.waitFor(COMPILER_TIMEOUT, TimeUnit.SECONDS)
 
         val stdout = interpreterProcess.inputStream.bufferedReader().readText()
         val stderr = interpreterProcess.errorStream.bufferedReader().readText()
+
+        val exited = interpreterProcess.waitFor(COMPILER_TIMEOUT, TimeUnit.SECONDS)
+        check(exited) {
+            "`fift` process has not finished in $COMPILER_TIMEOUT seconds"
+        }
 
         val finalStackState = stdout.lines()
             .lastOrNull { it.trim().endsWith(FINAL_STACK_STATE_MARKER) }
@@ -228,9 +248,13 @@ data object BocAnalyzer : TvmAnalyzer {
             .directory(Paths.get(DISASSEMBLER_PATH).toFile())
             .start()
 
-        disasmProcess.waitFor(DISASSEMBLER_TIMEOUT, TimeUnit.SECONDS)
-
         val bytecodeJson = disasmProcess.inputStream.bufferedReader().readText()
+
+        val exited = disasmProcess.waitFor(DISASSEMBLER_TIMEOUT, TimeUnit.SECONDS)
+        check(exited) {
+            "Disassembler process has not finished in $DISASSEMBLER_TIMEOUT seconds"
+        }
+
         return TvmContractCode.fromJson(bytecodeJson)
     }
 
