@@ -192,6 +192,7 @@ import org.usvm.machine.TvmContext.Companion.cellRefsLengthField
 import org.usvm.machine.TvmContext.Companion.sliceCellField
 import org.usvm.machine.TvmContext.Companion.sliceDataPosField
 import org.usvm.machine.TvmContext.Companion.sliceRefPosField
+import org.usvm.machine.TvmContext.TvmInt257Sort
 import org.usvm.machine.state.C3Register
 import org.usvm.machine.state.C4Register
 import org.usvm.machine.state.TvmIntegerOutOfRange
@@ -590,7 +591,7 @@ class TvmInterpreter(
         }
     }
 
-    private fun TvmConstIntInst.bv257value(ctx: TvmContext): UExpr<UBvSort> = with(ctx) {
+    private fun TvmConstIntInst.bv257value(ctx: TvmContext): UExpr<TvmInt257Sort> = with(ctx) {
         when (this@bv257value) {
             is TvmConstIntPushint4Inst -> {
                 check(i in 0..15) { "Unexpected $i" }
@@ -795,7 +796,7 @@ class TvmInterpreter(
     )
 
     private fun visitArithmeticLogicalInst(scope: TvmStepScope, stmt: TvmArithmLogicalInst): Unit = with(ctx) {
-        val result: UExpr<UBvSort> = when (stmt) {
+        val result: UExpr<TvmInt257Sort> = when (stmt) {
             is TvmArithmLogicalOrInst -> {
                 scope.consumeDefaultGas(stmt)
 
@@ -1017,8 +1018,8 @@ class TvmInterpreter(
                 val disjArgs = mutableListOf(
                     mkAnd(signedIntegerFitsBits(value, 0u), symbolicSizeBits eq zeroValue)
                 )
-                var prevMinValue: UExpr<UBvSort> = bvMinValueSignedExtended(zeroValue)
-                var prevMaxValue: UExpr<UBvSort> = bvMaxValueSignedExtended(zeroValue)
+                var prevMinValue: UExpr<TvmInt257Sort> = bvMinValueSignedExtended(zeroValue)
+                var prevMaxValue: UExpr<TvmInt257Sort> = bvMaxValueSignedExtended(zeroValue)
                 for (sizeBits in 1..TvmContext.INT_BITS.toInt()) {
                     val minValue = bvMinValueSignedExtended(sizeBits.toBv257())
                     val maxValue = bvMaxValueSignedExtended(sizeBits.toBv257())
@@ -1053,7 +1054,7 @@ class TvmInterpreter(
                 val disjArgs = mutableListOf(
                     mkAnd(unsignedIntegerFitsBits(value, 0u), symbolicSizeBits eq zeroValue)
                 )
-                var prevMaxValue: UExpr<UBvSort> = bvMaxValueUnsignedExtended(zeroValue)
+                var prevMaxValue: UExpr<TvmInt257Sort> = bvMaxValueUnsignedExtended(zeroValue)
                 for (sizeBits in 1 until TvmContext.INT_BITS.toInt()) {
                     val maxValue = bvMaxValueUnsignedExtended(sizeBits.toBv257())
                     val smallestCond = mkBvSignedGreaterExpr(value, prevMaxValue)
@@ -1161,7 +1162,7 @@ class TvmInterpreter(
         }
     }
 
-    private fun TvmState.doCmp(stmt: TvmInst, x: UExpr<UBvSort>, y: UExpr<UBvSort>) {
+    private fun TvmState.doCmp(stmt: TvmInst, x: UExpr<TvmInt257Sort>, y: UExpr<TvmInt257Sort>) {
         val value = with(ctx) {
             mkIte(x eq y, zeroValue, mkIte(mkBvSignedLessExpr(x, y), minusOneValue, oneValue))
         }
@@ -1534,7 +1535,7 @@ class TvmInterpreter(
         return mkBv(bits.joinToString(""), bits.size.toUInt())
     }
 
-    private fun UExpr<KBvSort>.extractConcrete(inst: TvmInst): Int {
+    private fun UExpr<TvmInt257Sort>.extractConcrete(inst: TvmInst): Int {
         if (this !is KInterpretedValue)
             TODO("symbolic value in $inst")
         return (this as KBitVecValue<*>).toBigIntegerSigned().toInt()

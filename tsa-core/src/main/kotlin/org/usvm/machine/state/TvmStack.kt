@@ -2,9 +2,7 @@ package org.usvm.machine.state
 
 import kotlinx.collections.immutable.PersistentList
 import kotlinx.collections.immutable.PersistentMap
-import kotlinx.collections.immutable.PersistentSet
 import kotlinx.collections.immutable.mutate
-import kotlinx.collections.immutable.persistentHashSetOf
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toPersistentMap
 import org.ton.bytecode.TvmBuilderType
@@ -16,11 +14,11 @@ import org.ton.bytecode.TvmNullType
 import org.ton.bytecode.TvmSliceType
 import org.ton.bytecode.TvmTupleType
 import org.ton.bytecode.TvmType
-import org.usvm.UBvSort
 import org.usvm.UExpr
 import org.usvm.UHeapRef
 import org.usvm.USort
 import org.usvm.machine.TvmContext
+import org.usvm.machine.TvmContext.TvmInt257Sort
 import kotlin.math.max
 
 class TvmStack(
@@ -161,7 +159,7 @@ class TvmStack(
     // TODO continuations
     sealed interface TvmStackValue {
         val continuationValue: TvmContinuationValue get() = error("Cannot extract continuation from stack value $this")
-        val intValue: UExpr<UBvSort> get() = error("Cannot extract int from stack value $this")
+        val intValue: UExpr<TvmInt257Sort> get() = error("Cannot extract int from stack value $this")
         val tupleValue: TvmStackTupleValue get() = error("Cannot extract tuple from stack value $this")
         val cellValue: UHeapRef get() = error("Cannot extract cell from stack value $this")
         val sliceValue: UHeapRef get() = error("Cannot extract slice from stack value $this")
@@ -169,11 +167,11 @@ class TvmStack(
         val isNull: Boolean get() = false
     }
     data class TvmStackContinuationValue(override val continuationValue: TvmContinuationValue) : TvmStackValue
-    data class TvmStackIntValue(override val intValue: UExpr<UBvSort>): TvmStackValue
+    data class TvmStackIntValue(override val intValue: UExpr<TvmInt257Sort>): TvmStackValue
 
     sealed interface TvmStackTupleValue : TvmStackValue {
         override val tupleValue: TvmStackTupleValue get() = this
-        val size: UExpr<UBvSort>
+        val size: UExpr<TvmInt257Sort>
 
         operator fun get(idx: Int, stack: TvmStack): TvmStackEntry
         operator fun set(idx: Int, value: TvmStackEntry): TvmStackTupleValue
@@ -182,7 +180,7 @@ class TvmStack(
     data class TvmStackTupleValueConcreteNew(val ctx: TvmContext, val entries: PersistentList<TvmStackEntry>) : TvmStackTupleValue {
         val concreteSize: Int = entries.size
 
-        override val size: UExpr<UBvSort> get() = with(ctx) { concreteSize.toBv257() }
+        override val size: UExpr<TvmInt257Sort> get() = with(ctx) { concreteSize.toBv257() }
         override operator fun get(idx: Int, stack: TvmStack): TvmStackEntry = entries[idx]
         override operator fun set(idx: Int, value: TvmStackEntry): TvmStackTupleValueConcreteNew = copy(entries = entries.set(idx, value))
     }
@@ -191,7 +189,7 @@ class TvmStack(
 
     data class TvmStackTupleValueInputNew(
         var entries: MutableMap<Int, TvmInputStackEntry> = mutableMapOf(),
-        override val size: UExpr<UBvSort> // id -> ctx.mkRegisterReading(id, ctx.int257sort)
+        override val size: UExpr<TvmInt257Sort> // id -> ctx.mkRegisterReading(id, ctx.int257sort)
     ): TvmStackTupleValueInputValue {
         override operator fun get(idx: Int, stack: TvmStack): TvmInputStackEntry = entries.getOrPut(idx) {
             TvmInputStackEntry(id = stack.ctx.nextInputStackEntryId(), cell = null).also {
@@ -212,7 +210,7 @@ class TvmStack(
         var entries: PersistentMap<Int, TvmStackEntry>,
         val original: TvmStackTupleValueInputNew
     ) : TvmStackTupleValueInputValue {
-        override val size: UExpr<UBvSort> = original.size
+        override val size: UExpr<TvmInt257Sort> = original.size
 
         override operator fun get(idx: Int, stack: TvmStack): TvmStackEntry {
             entries[idx]?.let { return it }
@@ -269,7 +267,7 @@ class TvmStack(
 
     @Suppress("UNCHECKED_CAST")
     private fun UExpr<*>.toStackValue(expectedType: TvmType): TvmStackValue = when (expectedType) {
-        is TvmIntegerType -> TvmStackIntValue(this as UExpr<UBvSort>)
+        is TvmIntegerType -> TvmStackIntValue(this as UExpr<TvmInt257Sort>)
         TvmBuilderType -> TvmStackBuilderValue(this as UHeapRef)
         TvmCellType -> TvmStackCellValue(this as UHeapRef)
         TvmContinuationType -> TODO("Unexpected $this for constructing stack value of $TvmContinuationType")

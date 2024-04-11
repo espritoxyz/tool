@@ -7,15 +7,15 @@ import org.ton.bytecode.TvmContinuationValue
 import org.ton.bytecode.TvmIntegerType
 import org.ton.bytecode.TvmReferenceType
 import org.ton.bytecode.TvmSliceType
-import org.usvm.UBvSort
 import org.usvm.UExpr
 import org.usvm.UHeapRef
+import org.usvm.machine.TvmContext.TvmInt257Sort
 import org.usvm.machine.interpreter.TvmStepScope
 import org.usvm.machine.state.TvmStack.TvmConcreteStackEntry
 import org.usvm.machine.state.TvmStack.TvmInputStackEntry
 import org.usvm.machine.state.TvmStack.TvmStackTupleValue
 
-fun TvmStack.takeLastInt(): UExpr<UBvSort> {
+fun TvmStack.takeLastInt(): UExpr<TvmInt257Sort> {
     val intStackValue = takeLast(TvmIntegerType) { id ->
         ctx.mkRegisterReading(id, ctx.int257sort)
     }

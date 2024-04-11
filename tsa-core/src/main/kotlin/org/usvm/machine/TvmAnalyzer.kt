@@ -1,5 +1,6 @@
 package org.usvm.machine
 
+import mu.KLogging
 import org.ton.bytecode.TvmContractCode
 import org.ton.bytecode.TvmMethod
 import org.ton.cell.Cell
@@ -301,3 +302,5 @@ data class FiftInterpreterResult(
 
 private const val DEFAULT_CONTRACT_DATA_HEX = "b5ee9c7241010101000a00001000000185d258f59ccfc59500"
 private const val COMPILER_TIMEOUT = 5.toLong() // seconds
+
+private val logger = object : KLogging() {}.logger

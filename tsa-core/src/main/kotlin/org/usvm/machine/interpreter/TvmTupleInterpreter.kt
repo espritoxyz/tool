@@ -1,6 +1,5 @@
 package org.usvm.machine.interpreter
 
-import io.ksmt.utils.asExpr
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toPersistentList
 import org.ton.bytecode.TvmAliasInst
@@ -50,12 +49,12 @@ import org.usvm.machine.state.TvmStack
 import org.usvm.machine.state.TvmStack.TvmStackTupleValueConcreteNew
 import org.usvm.machine.state.TvmTypeCheckError
 import org.usvm.machine.state.calcOnStateCtx
+import org.usvm.machine.state.consumeDefaultGas
+import org.usvm.machine.state.consumeGas
 import org.usvm.machine.state.doWithStateCtx
 import org.usvm.machine.state.newStmt
 import org.usvm.machine.state.nextStmt
-import org.usvm.machine.state.consumeDefaultGas
 import org.usvm.machine.state.setFailure
-import org.usvm.machine.state.consumeGas
 import org.usvm.machine.state.takeLastInt
 import org.usvm.machine.state.takeLastTuple
 
@@ -299,7 +298,7 @@ class TvmTupleInterpreter(private val ctx: TvmContext) {
 
         scope.doWithStateCtx {
             stack.addTuple(updatedTuple)
-            consumeGas(mkBvExtractExpr(high = 31, low = 0, size).asExpr(bv32Sort))
+            consumeGas(size.extractToSizeSort())
             newStmt(stmt.nextStmt())
         }
     }

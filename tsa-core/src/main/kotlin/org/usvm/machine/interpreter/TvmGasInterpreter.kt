@@ -15,7 +15,6 @@ import org.usvm.machine.state.newStmt
 import org.usvm.machine.state.nextStmt
 import org.usvm.machine.state.setFailure
 import org.usvm.machine.state.takeLastInt
-import org.usvm.mkSizeAddExpr
 
 class TvmGasInterpreter(private val ctx: TvmContext) {
     fun visitGasInst(scope: TvmStepScope, stmt: TvmAppGasInst) {

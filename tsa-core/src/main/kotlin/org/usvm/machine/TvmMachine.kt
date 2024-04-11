@@ -1,5 +1,6 @@
 package org.usvm.machine
 
+import mu.KLogging
 import org.ton.bytecode.TvmCodeBlock
 import org.ton.bytecode.TvmContractCode
 import org.ton.bytecode.TvmInst
@@ -8,7 +9,6 @@ import org.usvm.PathSelectionStrategy
 import org.usvm.StateCollectionStrategy
 import org.usvm.UMachine
 import org.usvm.UMachineOptions
-import org.usvm.api.targets.JcTarget
 import org.usvm.machine.interpreter.TvmInterpreter
 import org.usvm.machine.state.TvmMethodResult
 import org.usvm.machine.state.TvmState
@@ -28,7 +28,7 @@ class TvmMachine(private val options: UMachineOptions = defaultOptions) : UMachi
     private val components = TvmComponents()
     private val ctx = TvmContext(components)
 
-    fun analyze(contractCode: TvmContractCode, contractData: Cell, methodId: Int, targets: List<JcTarget> = emptyList()): List<TvmState> {
+    fun analyze(contractCode: TvmContractCode, contractData: Cell, methodId: Int): List<TvmState> {
         val interpreter = TvmInterpreter(ctx, contractCode)
         logger.debug("{}.analyze({})", this, contractCode)
         val initialState = interpreter.getInitialState(contractCode, contractData, methodId)
@@ -102,6 +102,8 @@ class TvmMachine(private val options: UMachineOptions = defaultOptions) : UMachi
     }
 
     companion object {
+        private val logger = object : KLogging() {}.logger
+
         private const val LOOP_ITERATIONS_LIMIT: Int = 20 // TODO find the best value
 
         private val defaultOptions: UMachineOptions = UMachineOptions(

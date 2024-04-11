@@ -1,7 +1,7 @@
 package org.ton.bytecode
 
-import org.usvm.UBvSort
 import org.usvm.UExpr
+import org.usvm.machine.TvmContext.TvmInt257Sort
 
 sealed interface TvmArtificialInst : TvmInst {
     override val gasConsumption: TvmGas
@@ -18,7 +18,7 @@ sealed interface TvmLoopArtificialInst : TvmArtificialInst, TvmContLoopsInst {
 data class TvmArtificialRepeatInst(
     override val originalInst: TvmContLoopsInst,
     val continuationValue: TvmContinuationValue,
-    val loopRepeats: UExpr<UBvSort>,
+    val loopRepeats: UExpr<TvmInt257Sort>,
     val executeUntilEnd: Boolean,
 ) : TvmLoopArtificialInst {
     override val mnemonic: String

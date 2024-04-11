@@ -21,6 +21,10 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-collections-immutable-jvm:${Versions.collections}")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-cbor:${Versions.kotlinx_serialization}")
 
-    implementation(group = usvmRepo, name = "usvm-core", version = usvmVersion)
-    implementation(group = usvmRepo, name = "usvm-jvm", version = usvmVersion)
+    // todo: remove ksmt-core exclude after upgrading ksmt version in USVM
+    implementation("io.ksmt:ksmt-core:${Versions.ksmt}")
+
+    implementation(group = usvmRepo, name = "usvm-core", version = usvmVersion) {
+        exclude(group = "io.ksmt", module = "ksmt-core")
+    }
 }

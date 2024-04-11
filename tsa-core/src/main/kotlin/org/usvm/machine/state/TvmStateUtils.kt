@@ -7,14 +7,13 @@ import org.ton.bytecode.TvmContinuationValue
 import org.ton.bytecode.TvmInst
 import org.ton.bytecode.TvmIntegerType
 import org.ton.bytecode.TvmSliceType
-import org.ton.bytecode.TvmTupleType
 import org.usvm.UBoolExpr
-import org.usvm.UBvSort
 import org.usvm.UConcreteHeapRef
 import org.usvm.UExpr
 import org.usvm.UHeapRef
 import org.usvm.api.writeField
 import org.usvm.machine.TvmContext
+import org.usvm.machine.TvmContext.TvmInt257Sort
 import org.usvm.machine.TvmSizeSort
 import org.usvm.machine.interpreter.TvmStepScope
 import org.usvm.mkSizeAddExpr
@@ -104,7 +103,7 @@ fun TvmStepScope.assertIfSat(
     return stateWithConstraint != null
 }
 
-fun TvmContext.signedIntegerFitsBits(value: UExpr<UBvSort>, bits: UInt): UBoolExpr =
+fun TvmContext.signedIntegerFitsBits(value: UExpr<TvmInt257Sort>, bits: UInt): UBoolExpr =
     when {
         bits == 0u -> value eq zeroValue
         bits >= TvmContext.INT_BITS -> trueExpr
@@ -117,7 +116,7 @@ fun TvmContext.signedIntegerFitsBits(value: UExpr<UBvSort>, bits: UInt): UBoolEx
 /**
  * Since TVM integers have a signed representation only, every non-negative integer fits in 256 bits
  */
-fun TvmContext.unsignedIntegerFitsBits(value: UExpr<UBvSort>, bits: UInt): UBoolExpr =
+fun TvmContext.unsignedIntegerFitsBits(value: UExpr<TvmInt257Sort>, bits: UInt): UBoolExpr =
     when {
         bits == 0u -> value eq zeroValue
         bits >= TvmContext.INT_BITS - 1u -> mkBvSignedGreaterOrEqualExpr(value, zeroValue)
@@ -130,7 +129,7 @@ fun TvmContext.unsignedIntegerFitsBits(value: UExpr<UBvSort>, bits: UInt): UBool
 /**
  * 0 <= [sizeBits] <= 257
  */
-fun TvmContext.signedIntegerFitsBits(value: UExpr<UBvSort>, bits: UExpr<UBvSort>): UBoolExpr =
+fun TvmContext.signedIntegerFitsBits(value: UExpr<TvmInt257Sort>, bits: UExpr<TvmInt257Sort>): UBoolExpr =
     mkAnd(
         mkBvSignedLessOrEqualExpr(bvMinValueSignedExtended(bits), value),
         mkBvSignedLessOrEqualExpr(value, bvMaxValueSignedExtended(bits)),
@@ -142,7 +141,7 @@ fun TvmContext.signedIntegerFitsBits(value: UExpr<UBvSort>, bits: UExpr<UBvSort>
  *
  * @see unsignedIntegerFitsBits
  */
-fun TvmContext.unsignedIntegerFitsBits(value: UExpr<UBvSort>, bits: UExpr<UBvSort>): UBoolExpr =
+fun TvmContext.unsignedIntegerFitsBits(value: UExpr<TvmInt257Sort>, bits: UExpr<TvmInt257Sort>): UBoolExpr =
     mkAnd(
         mkBvSignedLessOrEqualExpr(zeroValue, value),
         mkBvSignedLessOrEqualExpr(value, bvMaxValueUnsignedExtended(bits)),
@@ -152,7 +151,7 @@ fun TvmContext.unsignedIntegerFitsBits(value: UExpr<UBvSort>, bits: UExpr<UBvSor
 /**
  * 0 <= [sizeBits] <= 257
  */
-fun TvmContext.bvMinValueSignedExtended(sizeBits: UExpr<UBvSort>): UExpr<UBvSort> =
+fun TvmContext.bvMinValueSignedExtended(sizeBits: UExpr<TvmInt257Sort>): UExpr<TvmInt257Sort> =
     mkIte(
         condition = sizeBits eq zeroValue,
         trueBranch = zeroValue,
@@ -163,7 +162,7 @@ fun TvmContext.bvMinValueSignedExtended(sizeBits: UExpr<UBvSort>): UExpr<UBvSort
 /**
  * 0 <= [sizeBits] <= 257
  */
-fun TvmContext.bvMaxValueSignedExtended(sizeBits: UExpr<UBvSort>): UExpr<UBvSort> =
+fun TvmContext.bvMaxValueSignedExtended(sizeBits: UExpr<TvmInt257Sort>): UExpr<TvmInt257Sort> =
     mkIte(
         condition = sizeBits eq zeroValue,
         trueBranch = zeroValue,
@@ -175,7 +174,7 @@ fun TvmContext.bvMaxValueSignedExtended(sizeBits: UExpr<UBvSort>): UExpr<UBvSort
  *
  * @see unsignedIntegerFitsBits
  */
-fun TvmContext.bvMaxValueUnsignedExtended(sizeBits: UExpr<UBvSort>): UExpr<UBvSort> =
+fun TvmContext.bvMaxValueUnsignedExtended(sizeBits: UExpr<TvmInt257Sort>): UExpr<TvmInt257Sort> =
     mkBvSubExpr(mkBvShiftLeftExpr(oneValue, sizeBits), oneValue)
 
 fun TvmState.calcConsumedGas(): UExpr<TvmSizeSort> =

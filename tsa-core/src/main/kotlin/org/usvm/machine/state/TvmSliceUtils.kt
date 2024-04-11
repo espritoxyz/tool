@@ -20,6 +20,8 @@ import org.usvm.machine.TvmContext.Companion.cellRefsLengthField
 import org.usvm.machine.TvmContext.Companion.sliceCellField
 import org.usvm.machine.TvmContext.Companion.sliceDataPosField
 import org.usvm.machine.TvmContext.Companion.sliceRefPosField
+import org.usvm.machine.TvmContext.TvmCellDataSort
+import org.usvm.machine.TvmContext.TvmInt257Sort
 import org.usvm.machine.TvmSizeSort
 import org.usvm.machine.interpreter.TvmStepScope
 import org.usvm.memory.UWritableMemory
@@ -77,7 +79,7 @@ fun TvmStepScope.slicePreloadDataBits(
     slice: UHeapRef,
     sizeBits: UExpr<TvmSizeSort>,
     quietBlock: (TvmState.() -> Unit)? = null
-): UExpr<UBvSort>? = calcOnStateCtx {
+): UExpr<TvmCellDataSort>? = calcOnStateCtx {
     val cell = memory.readField(slice, sliceCellField, addressSort)
     val cellDataLength = memory.readField(cell, cellDataLengthField, sizeSort)
 
@@ -113,15 +115,15 @@ fun TvmStepScope.slicePreloadDataBits(
  */
 fun TvmStepScope.slicePreloadInt(
     slice: UHeapRef,
-    sizeBits: UExpr<UBvSort>,
+    sizeBits: UExpr<TvmInt257Sort>,
     isSigned: Boolean,
     quietBlock: (TvmState.() -> Unit)? = null
-): UExpr<UBvSort>? {
+): UExpr<TvmInt257Sort>? {
     val shiftedData = calcOnStateCtx { slicePreloadDataBits(slice, sizeBits.extractToSizeSort(), quietBlock) }
         ?: return null
 
     return calcOnStateCtx {
-        val extractedBits = mkBvExtractExpr(high = TvmContext.INT_BITS.toInt() - 1, low = 0, shiftedData)
+        val extractedBits = shiftedData.extractToInt257Sort()
         val trashBits = mkBvSubExpr(intBitsValue, sizeBits)
         val shiftedBits = mkBvShiftLeftExpr(extractedBits, trashBits)
 
@@ -185,7 +187,7 @@ fun TvmState.builderStoreDataBits(builder: UHeapRef, bits: UExpr<UBvSort>) = wit
     val builderData = memory.readField(builder, cellDataField, cellDataSort)
     val builderDataLength = memory.readField(builder, cellDataLengthField, sizeSort)
 
-    val updatedData = if (builderDataLength is KBitVecValue<*>) {
+    val updatedData: UExpr<TvmCellDataSort> = if (builderDataLength is KBitVecValue<*>) {
         val size = builderDataLength.toBigIntegerSigned().toInt()
         val updatedData = if (size > 0) {
             val oldData = mkBvExtractExpr(high = size - 1, low = 0, builderData)
@@ -212,9 +214,9 @@ fun TvmState.builderStoreDataBits(builder: UHeapRef, bits: UExpr<UBvSort>) = wit
 
 
 context(TvmContext)
-fun TvmStepScope.builderStoreDataBits(
+fun <S : UBvSort> TvmStepScope.builderStoreDataBits(
     builder: UHeapRef,
-    bits: UExpr<UBvSort>,
+    bits: UExpr<S>,
     sizeBits: UExpr<TvmSizeSort>,
     quietBlock: (TvmState.() -> Unit)? = null
 ): Unit? {
@@ -242,13 +244,11 @@ fun TvmStepScope.builderStoreDataBits(
 context(TvmContext)
 fun TvmStepScope.builderStoreInt(
     builder: UHeapRef,
-    value: UExpr<UBvSort>,
-    sizeBits: UExpr<UBvSort>,
+    value: UExpr<TvmInt257Sort>,
+    sizeBits: UExpr<TvmInt257Sort>,
     isSigned: Boolean,
     quietBlock: (TvmState.() -> Unit)? = null
 ): Unit? {
-    require(value.sort == int257sort) { "Expected int value, but got: $value" }
-
     val builderData = calcOnState { memory.readField(builder, cellDataField, cellDataSort) }
     val builderDataLength = calcOnState { memory.readField(builder, cellDataLengthField, sizeSort) }
     val updatedLength = mkSizeAddExpr(builderDataLength, sizeBits.extractToSizeSort())

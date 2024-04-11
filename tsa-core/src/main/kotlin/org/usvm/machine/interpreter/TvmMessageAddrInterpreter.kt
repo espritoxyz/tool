@@ -1,6 +1,5 @@
 package org.usvm.machine.interpreter
 
-import io.ksmt.utils.asExpr
 import org.ton.bytecode.TvmAppAddrInst
 import org.ton.bytecode.TvmAppAddrLdmsgaddrInst
 import org.ton.bytecode.TvmAppAddrRewritestdaddrInst
@@ -218,7 +217,7 @@ class TvmMessageAddrInterpreter(private val ctx: TvmContext) {
         val addrLen = slicePreloadDataBits(slice, bits = 9)
             ?: return null
 
-        return ctx.mkBvZeroExtensionExpr((ctx.sizeSort.sizeBits - addrLen.sort.sizeBits).toInt(), addrLen).asExpr(ctx.sizeSort)
+        return with(ctx) { addrLen.zeroExtendToSort(sizeSort) }
     }
 
     private fun TvmStepScope.loadMessageAddr(updatedSlice: UHeapRef, inst: TvmAppAddrLdmsgaddrInst) = calcOnStateCtx {
