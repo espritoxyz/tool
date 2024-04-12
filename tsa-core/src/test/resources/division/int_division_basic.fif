@@ -1,0 +1,196 @@
+"Fift.fif" include
+"Asm.fif" include
+
+PROGRAM{
+  0 DECLMETHOD div_neg_pos_1
+  1 DECLMETHOD div_neg_pos_2
+  2 DECLMETHOD div_pos_neg_1
+  3 DECLMETHOD div_pos_neg_2
+  4 DECLMETHOD div_neg_neg
+  5 DECLMETHOD div_zero_neg
+  6 DECLMETHOD div_pos_pos_1
+  7 DECLMETHOD div_pos_pos_2
+  8 DECLMETHOD mod_1
+  9 DECLMETHOD mod_2
+  10 DECLMETHOD mod_3
+  11 DECLMETHOD div_overflow
+  12 DECLMETHOD divc_neg_pos_1
+  13 DECLMETHOD divc_neg_pos_2
+  14 DECLMETHOD divc_pos_neg_1
+  15 DECLMETHOD divc_pos_neg_2
+  16 DECLMETHOD divc_neg_neg
+  17 DECLMETHOD divc_zero_neg
+  18 DECLMETHOD divc_pos_pos_1
+  19 DECLMETHOD divc_pos_pos_2
+  20 DECLMETHOD divr_neg_pos_1
+  21 DECLMETHOD divr_neg_pos_2
+  22 DECLMETHOD divr_pos_neg_1
+  23 DECLMETHOD divr_pos_neg_2
+  24 DECLMETHOD divr_pos_neg_3
+  25 DECLMETHOD divr_neg_neg_1
+  26 DECLMETHOD divr_neg_neg_2
+  27 DECLMETHOD divr_zero_neg
+  28 DECLMETHOD divr_pos_pos_1
+  29 DECLMETHOD divr_pos_pos_2
+  30 DECLMETHOD divr_pos_pos_3
+
+  div_neg_pos_1 PROC:<{
+      -3 PUSHINT
+      2 PUSHINT
+      DIV
+  }>
+  div_neg_pos_2 PROC:<{
+      -2 PUSHINT
+      2 PUSHINT
+      DIV
+  }>
+  div_pos_neg_1 PROC:<{
+      2 PUSHINT
+      -3 PUSHINT
+      DIV
+  }>
+  div_pos_neg_2 PROC:<{
+      2 PUSHINT
+      -1 PUSHINT
+      DIV
+  }>
+  div_neg_neg PROC:<{
+      -2 PUSHINT
+      -3 PUSHINT
+      DIV
+  }>
+  div_zero_neg PROC:<{
+      0 PUSHINT
+      -3 PUSHINT
+      DIV
+  }>
+  div_pos_pos_1 PROC:<{
+      3 PUSHINT
+      5 PUSHINT
+      DIV
+  }>
+  div_pos_pos_2 PROC:<{
+      5 PUSHINT
+      5 PUSHINT
+      DIV
+  }>
+  mod_1 PROC:<{
+      -1 PUSHINT
+      3 PUSHINT
+      MOD
+  }>
+  mod_2 PROC:<{
+      1 PUSHINT
+      -3 PUSHINT
+      MOD
+  }>
+  mod_3 PROC:<{
+      -1 PUSHINT
+      -3 PUSHINT
+      MOD
+  }>
+  div_overflow PROC:<{
+     255 PUSHPOW2
+     -1 PUSHINT
+     ADD
+     255 PUSHPOW2
+     -2 PUSHINT
+     MUL
+     DIV
+  }>
+  divc_neg_pos_1 PROC:<{
+      -3 PUSHINT
+      2 PUSHINT
+      DIVC
+  }>
+  divc_neg_pos_2 PROC:<{
+      -2 PUSHINT
+      2 PUSHINT
+      DIVC
+  }>
+  divc_pos_neg_1 PROC:<{
+      2 PUSHINT
+      -3 PUSHINT
+      DIVC
+  }>
+  divc_pos_neg_2 PROC:<{
+      2 PUSHINT
+      -1 PUSHINT
+      DIVC
+  }>
+  divc_neg_neg PROC:<{
+      -2 PUSHINT
+      -3 PUSHINT
+      DIVC
+  }>
+  divc_zero_neg PROC:<{
+      0 PUSHINT
+      -3 PUSHINT
+      DIVC
+  }>
+  divc_pos_pos_1 PROC:<{
+      3 PUSHINT
+      5 PUSHINT
+      DIVC
+  }>
+  divc_pos_pos_2 PROC:<{
+      5 PUSHINT
+      5 PUSHINT
+      DIVC
+  }>
+  divr_neg_pos_1 PROC:<{
+      -3 PUSHINT
+      2 PUSHINT
+      DIVR
+  }>
+  divr_neg_pos_2 PROC:<{
+      -2 PUSHINT
+      2 PUSHINT
+      DIVR
+  }>
+  divr_pos_neg_1 PROC:<{
+      2 PUSHINT
+      -3 PUSHINT
+      DIVR
+  }>
+  divr_pos_neg_2 PROC:<{
+      1 PUSHINT
+      -3 PUSHINT
+      DIVR
+  }>
+  divr_pos_neg_3 PROC:<{
+      2 PUSHINT
+      -1 PUSHINT
+      DIVR
+  }>
+  divr_neg_neg_1 PROC:<{
+      -2 PUSHINT
+      -3 PUSHINT
+      DIVR
+  }>
+  divr_neg_neg_2 PROC:<{
+      -1 PUSHINT
+      -3 PUSHINT
+      DIVR
+  }>
+  divr_zero_neg PROC:<{
+      0 PUSHINT
+      -3 PUSHINT
+      DIVR
+  }>
+  divr_pos_pos_1 PROC:<{
+      3 PUSHINT
+      5 PUSHINT
+      DIVR
+  }>
+  divr_pos_pos_2 PROC:<{
+      2 PUSHINT
+      5 PUSHINT
+      DIVR
+  }>
+  divr_pos_pos_3 PROC:<{
+      5 PUSHINT
+      5 PUSHINT
+      DIVR
+  }>
+}END>c

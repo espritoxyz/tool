@@ -118,29 +118,35 @@ class TvmArithDivInterpreter(private val ctx: TvmContext) {
         with(ctx) {
             when (stmt) {
                 is TvmArithmDivDivInst -> {
-                    val (x, y) = takeOperandsAndCheckForZero(scope) ?: return
+                    val (x, y) = takeOperandsAndCheckForZero(scope)
+                        ?: return
                     val (div, noOverflow) = makeDiv(x, y)
-                    checkOverflow(noOverflow, scope) ?: return
+                    checkOverflow(noOverflow, scope)
+                        ?: return
                     scope.calcOnState {
                         stack.add(div, TvmIntegerType)
                     }
                 }
                 is TvmArithmDivModInst -> {
-                    val (x, y) = takeOperandsAndCheckForZero(scope) ?: return
+                    val (x, y) = takeOperandsAndCheckForZero(scope)
+                        ?: return
                     scope.calcOnState {
                         stack.add(makeMod(x, y), TvmIntegerType)
                     }
                 }
                 is TvmArithmDivDivcInst -> {
-                    val (x, y) = takeOperandsAndCheckForZero(scope) ?: return
+                    val (x, y) = takeOperandsAndCheckForZero(scope)
+                        ?: return
                     val (divc, noOverflow) = makeDivc(x, y)
-                    checkOverflow(noOverflow, scope) ?: return
+                    checkOverflow(noOverflow, scope)
+                        ?: return
                     scope.calcOnState {
                         stack.add(divc, TvmIntegerType)
                     }
                 }
                 is TvmArithmDivDivrInst -> {
-                    val (x, y) = takeOperandsAndCheckForZero(scope) ?: return
+                    val (x, y) = takeOperandsAndCheckForZero(scope)
+                        ?: return
                     val (divr, noOverflow) = makeDivr(x, y)
                     checkOverflow(noOverflow, scope) ?: return
                     scope.calcOnState {
@@ -148,7 +154,8 @@ class TvmArithDivInterpreter(private val ctx: TvmContext) {
                     }
                 }
                 is TvmArithmDivDivmodInst -> {
-                    val (x, y) = takeOperandsAndCheckForZero(scope) ?: return
+                    val (x, y) = takeOperandsAndCheckForZero(scope)
+                        ?: return
                     val (div, mod) = makeDivMod(x, y)
                     checkOverflow(div.noOverflow, scope) ?: return
                     scope.calcOnState {
@@ -157,43 +164,52 @@ class TvmArithDivInterpreter(private val ctx: TvmContext) {
                     }
                 }
                 is TvmArithmDivDivmodcInst -> {
-                    val (x, y) = takeOperandsAndCheckForZero(scope) ?: return
+                    val (x, y) = takeOperandsAndCheckForZero(scope)
+                        ?: return
                     val (divc, modc) = makeDivModc(x, y)
-                    checkOverflow(divc.noOverflow, scope) ?: return
+                    checkOverflow(divc.noOverflow, scope)
+                        ?: return
                     scope.calcOnState {
                         stack.add(divc.value, TvmIntegerType)
                         stack.add(modc, TvmIntegerType)
                     }
                 }
                 is TvmArithmDivDivmodrInst -> {
-                    val (x, y) = takeOperandsAndCheckForZero(scope) ?: return
+                    val (x, y) = takeOperandsAndCheckForZero(scope)
+                        ?: return
                     val (divr, modr) = makeDivModr(x, y)
-                    checkOverflow(divr.noOverflow, scope) ?: return
+                    checkOverflow(divr.noOverflow, scope)
+                        ?: return
                     scope.calcOnState {
                         stack.add(divr.value, TvmIntegerType)
                         stack.add(modr, TvmIntegerType)
                     }
                 }
                 is TvmArithmDivModcInst -> {
-                    val (x, y) = takeOperandsAndCheckForZero(scope) ?: return
+                    val (x, y) = takeOperandsAndCheckForZero(scope)
+                        ?: return
                     scope.calcOnState {
                         stack.add(makeModc(x, y), TvmIntegerType)
                     }
                 }
                 is TvmArithmDivModrInst -> {
-                    val (x, y) = takeOperandsAndCheckForZero(scope) ?: return
+                    val (x, y) = takeOperandsAndCheckForZero(scope)
+                        ?: return
                     scope.calcOnState {
                         stack.add(makeModr(x, y), TvmIntegerType)
                     }
                 }
                 is TvmArithmDivAdddivmodInst -> {
-                    doAdddivmodX(scope) { x, y -> makeDivMod(x, y) } ?: return
+                    doAdddivmodX(scope) { x, y -> makeDivMod(x, y) }
+                        ?: return
                 }
                 is TvmArithmDivAdddivmodcInst -> {
-                    doAdddivmodX(scope) { x, y -> makeDivModc(x, y) } ?: return
+                    doAdddivmodX(scope) { x, y -> makeDivModc(x, y) }
+                        ?: return
                 }
                 is TvmArithmDivAdddivmodrInst -> {
-                    doAdddivmodX(scope) { x, y -> makeDivModr(x, y) } ?: return
+                    doAdddivmodX(scope) { x, y -> makeDivModr(x, y) }
+                        ?: return
                 }
                 is TvmArithmDivModpow2Inst -> scope.doWithState {
                     doModpow2XNoVar(scope, stmt.t) { x, y -> makeMod(x, y) }
@@ -205,13 +221,16 @@ class TvmArithDivInterpreter(private val ctx: TvmContext) {
                     doModpow2XNoVar(scope, stmt.t) { x, y -> makeModr(x, y) }
                 }
                 is TvmArithmDivModpow2VarInst -> {
-                    doModpow2XVar(scope) { x, y -> makeMod(x, y) } ?: return
+                    doModpow2XVar(scope) { x, y -> makeMod(x, y) }
+                        ?: return
                 }
                 is TvmArithmDivModpow2cVarInst -> {
-                    doModpow2XVar(scope) { x, y -> makeModc(x, y) } ?: return
+                    doModpow2XVar(scope) { x, y -> makeModc(x, y) }
+                        ?: return
                 }
                 is TvmArithmDivModpow2rVarInst -> {
-                    doModpow2XVar(scope) { x, y -> makeModr(x, y) } ?: return
+                    doModpow2XVar(scope) { x, y -> makeModr(x, y) }
+                        ?: return
                 }
                 is TvmArithmDivRshiftcInst -> {
                     doRshiftXNoVar(stmt.t, scope) { x, y -> listOf(makeDivc(x, y).value) }
@@ -220,10 +239,12 @@ class TvmArithDivInterpreter(private val ctx: TvmContext) {
                     doRshiftXNoVar(stmt.t, scope) { x, y -> listOf(makeDivr(x, y).value) }
                 }
                 is TvmArithmDivRshiftcVarInst -> {
-                    doRshiftXVar(scope) { x, y -> listOf(makeDivc(x, y).value) } ?: return
+                    doRshiftXVar(scope) { x, y -> listOf(makeDivc(x, y).value) }
+                        ?: return
                 }
                 is TvmArithmDivRshiftrVarInst -> {
-                    doRshiftXVar(scope) { x, y -> listOf(makeDivr(x, y).value) } ?: return
+                    doRshiftXVar(scope) { x, y -> listOf(makeDivr(x, y).value) }
+                        ?: return
                 }
                 is TvmArithmDivRshiftmodInst -> {
                     doRshiftXNoVar(stmt.t, scope) { x, y ->
@@ -564,16 +585,114 @@ class TvmArithDivInterpreter(private val ctx: TvmContext) {
                         listOf(mod)
                     } ?: return
                 }
-
-                // * >>
-                is TvmArithmDivMulrshiftInst -> TODO()
-                is TvmArithmDivMulrshiftcInst -> TODO()
-                is TvmArithmDivMulrshiftrInst -> TODO()
-
-                // * >>
-                is TvmArithmDivMulrshiftVarInst -> TODO()
-                is TvmArithmDivMulrshiftcVarInst -> TODO()
-                is TvmArithmDivMulrshiftrVarInst -> TODO()
+                is TvmArithmDivMulrshiftInst -> {
+                    doMulrshiftXNoVar(scope, stmt.t) { x, y ->
+                        val div = makeDiv(x, y)
+                        // no need for checkOverflow (y > 0)
+                        checkInBounds(div.value, scope)
+                            ?: return@doMulrshiftXNoVar null
+                        listOf(div.value)
+                    } ?: return
+                }
+                is TvmArithmDivMulrshiftcInst -> {
+                    doMulrshiftXNoVar(scope, stmt.t) { x, y ->
+                        val div = makeDivc(x, y)
+                        // no need for checkOverflow (y > 0)
+                        checkInBounds(div.value, scope)
+                            ?: return@doMulrshiftXNoVar null
+                        listOf(div.value)
+                    } ?: return
+                }
+                is TvmArithmDivMulrshiftrInst -> {
+                    doMulrshiftXNoVar(scope, stmt.t) { x, y ->
+                        val div = makeDivr(x, y)
+                        // no need for checkOverflow (y > 0)
+                        checkInBounds(div.value, scope)
+                            ?: return@doMulrshiftXNoVar null
+                        listOf(div.value)
+                    } ?: return
+                }
+                is TvmArithmDivMulrshiftVarInst -> {
+                    doMulrshiftXVar(scope) { x, y ->
+                        val div = makeDiv(x, y)
+                        // no need for checkOverflow (y > 0)
+                        checkInBounds(div.value, scope)
+                            ?: return@doMulrshiftXVar null
+                        listOf(div.value)
+                    } ?: return
+                }
+                is TvmArithmDivMulrshiftcVarInst -> {
+                    doMulrshiftXVar(scope) { x, y ->
+                        val div = makeDivc(x, y)
+                        // no need for checkOverflow (y > 0)
+                        checkInBounds(div.value, scope)
+                            ?: return@doMulrshiftXVar null
+                        listOf(div.value)
+                    } ?: return
+                }
+                is TvmArithmDivMulrshiftrVarInst -> {
+                    doMulrshiftXVar(scope) { x, y ->
+                        val div = makeDivr(x, y)
+                        // no need for checkOverflow (y > 0)
+                        checkInBounds(div.value, scope)
+                            ?: return@doMulrshiftXVar null
+                        listOf(div.value)
+                    } ?: return
+                }
+                is TvmArithmDivMulrshiftmodInst -> {
+                    doMulrshiftXNoVar(scope, stmt.t) { x, y ->
+                        val (div, mod) = makeDivMod(x, y)
+                        // no need for checkOverflow (y > 0)
+                        checkInBounds(div.value, scope)
+                            ?: return@doMulrshiftXNoVar null
+                        listOf(div.value, mod)
+                    } ?: return
+                }
+                is TvmArithmDivMulrshiftcmodInst -> {
+                    doMulrshiftXNoVar(scope, stmt.t) { x, y ->
+                        val (div, mod) = makeDivModc(x, y)
+                        // no need for checkOverflow (y > 0)
+                        checkInBounds(div.value, scope)
+                            ?: return@doMulrshiftXNoVar null
+                        listOf(div.value, mod)
+                    } ?: return
+                }
+                is TvmArithmDivMulrshiftrmodInst -> {
+                    doMulrshiftXNoVar(scope, stmt.t) { x, y ->
+                        val (div, mod) = makeDivModr(x, y)
+                        // no need for checkOverflow (y > 0)
+                        checkInBounds(div.value, scope)
+                            ?: return@doMulrshiftXNoVar null
+                        listOf(div.value, mod)
+                    } ?: return
+                }
+                is TvmArithmDivMulrshiftmodVarInst -> {
+                    doMulrshiftXVar(scope) { x, y ->
+                        val (div, mod) = makeDivMod(x, y)
+                        // no need for checkOverflow (y > 0)
+                        checkInBounds(div.value, scope)
+                            ?: return@doMulrshiftXVar null
+                        listOf(div.value, mod)
+                    } ?: return
+                }
+                is TvmArithmDivMulrshiftcmodVarInst -> {
+                    doMulrshiftXVar(scope) { x, y ->
+                        val (div, mod) = makeDivModc(x, y)
+                        // no need for checkOverflow (y > 0)
+                        checkInBounds(div.value, scope)
+                            ?: return@doMulrshiftXVar null
+                        listOf(div.value, mod)
+                    } ?: return
+                }
+                is TvmArithmDivMulrshiftrmodVarInst -> {
+                    doMulrshiftXVar(scope) { x, y ->
+                        val (div, mod) = makeDivModr(x, y)
+                        // no need for checkOverflow (y > 0)
+                        checkInBounds(div.value, scope)
+                            ?: return@doMulrshiftXVar null
+                        listOf(div.value, mod)
+                    } ?: return
+                }
 
                 // * + /%
                 is TvmArithmDivMuladddivmodInst -> TODO()
@@ -594,16 +713,6 @@ class TvmArithDivInterpreter(private val ctx: TvmContext) {
                 is TvmArithmDivMulmodpow2VarInst -> TODO()
                 is TvmArithmDivMulmodpow2cVarInst -> TODO()
                 is TvmArithmDivMulmodpow2rVarInst -> TODO()
-
-                // * >> %
-                is TvmArithmDivMulrshiftmodInst -> TODO()
-                is TvmArithmDivMulrshiftcmodInst -> TODO()
-                is TvmArithmDivMulrshiftrmodInst -> TODO()
-
-                // * >> %
-                is TvmArithmDivMulrshiftmodVarInst -> TODO()
-                is TvmArithmDivMulrshiftcmodVarInst -> TODO()
-                is TvmArithmDivMulrshiftrmodVarInst -> TODO()
             }
 
             scope.doWithState {
@@ -742,7 +851,8 @@ class TvmArithDivInterpreter(private val ctx: TvmContext) {
         val (secondOperand, firstOperand) = scope.calcOnState {
             stack.takeLastInt() to stack.takeLastInt()
         }
-        checkDivisionByZero(secondOperand, scope) ?: return null
+        checkDivisionByZero(secondOperand, scope)
+            ?: return null
         return firstOperand to secondOperand
     }
 
@@ -753,7 +863,8 @@ class TvmArithDivInterpreter(private val ctx: TvmContext) {
         val z = scope.calcOnState { stack.takeLastInt() }
         val w = scope.calcOnState { stack.takeLastInt() }
         val x = scope.calcOnState { stack.takeLastInt() }
-        checkDivisionByZero(z, scope) ?: return null
+        checkDivisionByZero(z, scope)
+            ?: return null
 
         val xExtended = x.signedExtendByOne()
         val wExtended = w.signedExtendByOne()
@@ -761,8 +872,10 @@ class TvmArithDivInterpreter(private val ctx: TvmContext) {
         val addExtended = mkBvAddExpr(xExtended, wExtended)
         val (divExtended, modExtended) = makeDivmodX(addExtended, zExtended)
 
-        checkOverflow(divExtended.noOverflow, scope) ?: return null
-        checkInBounds(divExtended.value, scope) ?: return null
+        checkOverflow(divExtended.noOverflow, scope)
+            ?: return null
+        checkInBounds(divExtended.value, scope)
+            ?: return null
 
         val div = divExtended.value.extractToInt257Sort()
         val mod = modExtended.extractToInt257Sort()
@@ -787,7 +900,9 @@ class TvmArithDivInterpreter(private val ctx: TvmContext) {
         makeModOrDivX: (UExpr<TvmInt257Ext1Sort>, UExpr<TvmInt257Ext1Sort>) -> List<UExpr<TvmInt257Ext1Sort>>
     ): Unit? = with(ctx) {
         val t = scope.calcOnState { stack.takeLastInt() }
-        checkInRange(t, scope, min = 0, max = 256) ?: return null
+
+        checkInRange(t, scope, min = 0, max = 256)
+            ?: return null
 
         val x = scope.calcOnState { stack.takeLastInt() }
         doRshiftX(x, t, scope, makeModOrDivX)
@@ -827,8 +942,8 @@ class TvmArithDivInterpreter(private val ctx: TvmContext) {
         makeModX: (UExpr<TvmInt257Ext1Sort>, UExpr<TvmInt257Ext1Sort>) -> UExpr<TvmInt257Ext1Sort>
     ): Unit? = with(ctx) {
         val t = scope.calcOnState { stack.takeLastInt() }
-        checkInRange(t, scope, min = 0, max = 256) ?: return null
-
+        checkInRange(t, scope, min = 0, max = 256)
+            ?: return null
         val x = scope.calcOnState { stack.takeLastInt() }
         doModpow2X(scope, x, t, makeModX)
     }
@@ -864,8 +979,8 @@ class TvmArithDivInterpreter(private val ctx: TvmContext) {
         makeDivOrMod: (UExpr<TvmInt257Ext256Sort>, UExpr<TvmInt257Ext256Sort>) -> List<UExpr<TvmInt257Ext256Sort>>?
     ) = with(ctx) {
         val t = scope.calcOnState { stack.takeLastInt() }
-        checkInRange(t, scope, min = 0, max = 256) ?: return null
-
+        checkInRange(t, scope, min = 0, max = 256)
+            ?: return null
         val y = scope.calcOnState { stack.takeLastInt() }
         val x = scope.calcOnState { stack.takeLastInt() }
         doLshiftX(scope, x, y, t, makeDivOrMod)
@@ -904,8 +1019,8 @@ class TvmArithDivInterpreter(private val ctx: TvmContext) {
         makeDivModX: (UExpr<TvmInt257Ext1Sort>, UExpr<TvmInt257Ext1Sort>) -> Pair<DivResult<TvmInt257Ext1Sort>, UExpr<TvmInt257Ext1Sort>>
     ) = with(ctx) {
         val t = scope.calcOnState { stack.takeLastInt() }
-        checkInRange(t, scope, min = 0, max = 256) ?: return null
-
+        checkInRange(t, scope, min = 0, max = 256)
+            ?: return null
         val w = scope.calcOnState { stack.takeLastInt() }
         val x = scope.calcOnState { stack.takeLastInt() }
         doAddrshiftmodX(scope, x, w, t, makeDivModX)
@@ -925,7 +1040,8 @@ class TvmArithDivInterpreter(private val ctx: TvmContext) {
         val (divExtended, modExtended) = makeDivModX(sumExtended, yExtended)
 
         // no need for checkOverflow (y > 0)
-        checkInBounds(divExtended.value, scope) ?: return null
+        checkInBounds(divExtended.value, scope)
+            ?: return null
 
         val div = divExtended.value.extractToInt257Sort()
         val mod = modExtended.extractToInt257Sort()
@@ -951,8 +1067,8 @@ class TvmArithDivInterpreter(private val ctx: TvmContext) {
         makeDivModX: (UExpr<TvmInt257Ext256Sort>, UExpr<TvmInt257Ext256Sort>) -> Pair<DivResult<TvmInt257Ext256Sort>, UExpr<TvmInt257Ext256Sort>>
     ) = with(ctx) {
         val t = scope.calcOnState { stack.takeLastInt() }
-        checkInRange(t, scope, min = 0, max = 256) ?: return null
-
+        checkInRange(t, scope, min = 0, max = 256)
+            ?: return null
         val z = scope.calcOnState { stack.takeLastInt() }
         val w = scope.calcOnState { stack.takeLastInt() }
         val x = scope.calcOnState { stack.takeLastInt() }
@@ -967,7 +1083,8 @@ class TvmArithDivInterpreter(private val ctx: TvmContext) {
         t: UExpr<TvmInt257Sort>,
         makeDivModX: (UExpr<TvmInt257Ext256Sort>, UExpr<TvmInt257Ext256Sort>) -> Pair<DivResult<TvmInt257Ext256Sort>, UExpr<TvmInt257Ext256Sort>>
     ): Unit? = with(ctx) {
-        checkDivisionByZero(z, scope) ?: return null
+        checkDivisionByZero(z, scope)
+            ?: return null
 
         val xExtended = x.signedExtendBy256()
         val xShifted = mkBvShiftLeftExpr(xExtended, t.signedExtendBy256())
@@ -976,8 +1093,10 @@ class TvmArithDivInterpreter(private val ctx: TvmContext) {
         val zExtended = z.signedExtendBy256()
         val (divExtended, modExtended) = makeDivModX(sumExtended, zExtended)
 
-        checkOverflow(divExtended.noOverflow, scope) ?: return null
-        checkInBounds(divExtended.value, scope) ?: return null
+        checkOverflow(divExtended.noOverflow, scope)
+            ?: return null
+        checkInBounds(divExtended.value, scope)
+            ?: return null
 
         val div = divExtended.value.extractToInt257Sort()
         val mod = modExtended.extractToInt257Sort()
@@ -994,17 +1113,64 @@ class TvmArithDivInterpreter(private val ctx: TvmContext) {
         val z = scope.calcOnState { stack.takeLastInt() }
         val y = scope.calcOnState { stack.takeLastInt() }
         val x = scope.calcOnState { stack.takeLastInt() }
-        checkDivisionByZero(z, scope) ?: return null
+        checkDivisionByZero(z, scope)
+            ?: return null
 
         val xExtended = x.signedExtendBy256()
         val yExtended = y.signedExtendBy256()
         val zExtended = z.signedExtendBy256()
         val mulExtended = mkBvMulExpr(xExtended, yExtended)
-        val resultsExtended = makeDivOrMod(mulExtended, zExtended) ?: return null
+        val resultsExtended = makeDivOrMod(mulExtended, zExtended)
+            ?: return null
 
         val results = resultsExtended.map { it.extractToInt257Sort() }
         scope.doWithState {
             results.forEach { stack.add(it, TvmIntegerType) }
+        }
+    }
+
+    private fun doMulrshiftXNoVar(
+        scope: TvmStepScope,
+        stmtT: Int,
+        makeDivX: (UExpr<TvmInt257Ext256Sort>, UExpr<TvmInt257Ext256Sort>) -> List<UExpr<TvmInt257Ext256Sort>>?
+    ) = with(ctx) {
+        val y = scope.calcOnState { stack.takeLastInt() }
+        val x = scope.calcOnState { stack.takeLastInt() }
+        val t = mkBvShiftLeftExpr(oneValue, (stmtT + 1).toBv257())
+        doMulrshiftX(scope, x, y, t, makeDivX)
+    }
+
+    private fun doMulrshiftXVar(
+        scope: TvmStepScope,
+        makeDivX: (UExpr<TvmInt257Ext256Sort>, UExpr<TvmInt257Ext256Sort>) -> List<UExpr<TvmInt257Ext256Sort>>?
+    ) = with(ctx) {
+        val z = scope.calcOnState { stack.takeLastInt() }
+        checkInRange(z, scope, min = 0, max = 256)
+            ?: return null
+        val y = scope.calcOnState { stack.takeLastInt() }
+        val x = scope.calcOnState { stack.takeLastInt() }
+        val t = mkBvShiftLeftExpr(oneValue, z)
+        doMulrshiftX(scope, x, y, t, makeDivX)
+    }
+
+    private fun doMulrshiftX(
+        scope: TvmStepScope,
+        x: UExpr<TvmInt257Sort>,
+        y: UExpr<TvmInt257Sort>,
+        t: UExpr<TvmInt257Sort>,
+        makeDivX: (UExpr<TvmInt257Ext256Sort>, UExpr<TvmInt257Ext256Sort>) -> List<UExpr<TvmInt257Ext256Sort>>?
+    ): Unit? = with(ctx) {
+        val xExtended = x.signedExtendBy256()
+        val yExtended = y.signedExtendBy256()
+        val tExtended = t.signedExtendBy256()
+        val mulExtended = mkBvMulExpr(xExtended, yExtended)
+        val resultsExtended = makeDivX(mulExtended, tExtended)
+            ?: return null
+        val results = resultsExtended.map { it.extractToInt257Sort() }
+        scope.doWithState {
+            results.forEach {
+                stack.add(it, TvmIntegerType)
+            }
         }
     }
 

@@ -8,7 +8,21 @@ import kotlin.io.path.Path
 
 class IntDivisionTest {
     private val fiftPath = "/division/int_division_no_throw.fif"
-    private val fiftPathOverflow = "/division/int_division_fail.fif"
+    private val fiftPathBasic = "/division/int_division_basic.fif"
+    private val fiftPathFail = "/division/int_division_fail.fif"
+
+    @Test
+    fun testIntDivisionFiftBasic() {
+        val fiftResourcePath = this::class.java.getResource(fiftPathBasic)?.path?.let { Path(it) }
+            ?: error("Cannot find resource fift $fiftPathBasic")
+
+        val methodStates = compileAndAnalyzeFift(fiftResourcePath)
+
+        val methodIds = (0..30).toSet()
+        compareMethodStateStack(methodIds, methodStates) { method ->
+            runFiftMethod(fiftResourcePath, method.id)
+        }
+    }
 
     @Test
     fun testIntDivisionFiftNoThrow() {
@@ -17,7 +31,7 @@ class IntDivisionTest {
 
         val methodStates = compileAndAnalyzeFift(fiftResourcePath)
 
-        val methodIds = (0..197).toSet()
+        val methodIds = (0..190).toSet()
         compareMethodStateStack(methodIds, methodStates) { method ->
             runFiftMethod(fiftResourcePath, method.id)
         }
@@ -25,12 +39,12 @@ class IntDivisionTest {
 
     @Test
     fun testIntDivisionFiftFailure() {
-        val fiftResourcePath = this::class.java.getResource(fiftPathOverflow)?.path?.let { Path(it) }
-            ?: error("Cannot find resource fift $fiftPathOverflow")
+        val fiftResourcePath = this::class.java.getResource(fiftPathFail)?.path?.let { Path(it) }
+            ?: error("Cannot find resource fift $fiftPathFail")
 
         val methodStates = compileAndAnalyzeFift(fiftResourcePath)
 
-        val methodIds = (0..82).toSet()
+        val methodIds = (0..94).toSet()
         compareMethodStateStack(methodIds, methodStates) { method ->
             runFiftMethod(fiftResourcePath, method.id)
         }

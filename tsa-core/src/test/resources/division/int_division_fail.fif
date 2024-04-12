@@ -85,6 +85,18 @@ PROGRAM{
   80 DECLMETHOD mulmod_zero
   81 DECLMETHOD mulmodc_zero
   82 DECLMETHOD mulmodr_zero
+  83 DECLMETHOD mulrshift_overflow
+  84 DECLMETHOD mulrshiftc_overflow
+  85 DECLMETHOD mulrshiftr_overflow
+  86 DECLMETHOD mulrshift_var_overflow
+  87 DECLMETHOD mulrshiftc_var_overflow
+  88 DECLMETHOD mulrshiftr_var_overflow
+  89 DECLMETHOD mulrshift_mod_overflow
+  90 DECLMETHOD mulrshiftc_mod_overflow
+  91 DECLMETHOD mulrshiftr_mod_overflow
+  92 DECLMETHOD mulrshift_mod_var_overflow
+  93 DECLMETHOD mulrshiftc_mod_var_overflow
+  94 DECLMETHOD mulrshiftr_mod_var_overflow
   addivmod_pos PROC:<{
       255 PUSHPOW2
       255 PUSHPOW2
@@ -596,5 +608,71 @@ PROGRAM{
       1 PUSHINT
       0 PUSHINT
       MULMODR
+  }>
+  mulrshift_overflow PROC:<{
+      254 PUSHPOW2
+      254 PUSHPOW2
+      1 MULRSHIFT#
+  }>
+  mulrshiftc_overflow PROC:<{
+      254 PUSHPOW2
+      254 PUSHPOW2
+      1 MULRSHIFTC#
+  }>
+  mulrshiftr_overflow PROC:<{
+      254 PUSHPOW2
+      254 PUSHPOW2
+      1 MULRSHIFTR#
+  }>
+  mulrshift_var_overflow PROC:<{
+      254 PUSHPOW2
+      254 PUSHPOW2
+      1 PUSHINT
+      MULRSHIFT
+  }>
+  mulrshiftc_var_overflow PROC:<{
+      254 PUSHPOW2
+      254 PUSHPOW2
+      1 PUSHINT
+      MULRSHIFTC
+  }>
+  mulrshiftr_var_overflow PROC:<{
+      254 PUSHPOW2
+      254 PUSHPOW2
+      1 PUSHINT
+      MULRSHIFTR
+  }>
+  mulrshift_mod_overflow PROC:<{
+      254 PUSHPOW2
+      254 PUSHPOW2
+      1 MULRSHIFT#MOD
+  }>
+  mulrshiftc_mod_overflow PROC:<{
+      254 PUSHPOW2
+      254 PUSHPOW2
+      1 MULRSHIFTC#MOD
+  }>
+  mulrshiftr_mod_overflow PROC:<{
+      254 PUSHPOW2
+      254 PUSHPOW2
+      1 MULRSHIFTR#MOD
+  }>
+  mulrshift_mod_var_overflow PROC:<{
+      254 PUSHPOW2
+      254 PUSHPOW2
+      1 PUSHINT
+      MULRSHIFTMOD
+  }>
+  mulrshiftc_mod_var_overflow PROC:<{
+      254 PUSHPOW2
+      254 PUSHPOW2
+      1 PUSHINT
+      MULRSHIFTCMOD
+  }>
+  mulrshiftr_mod_var_overflow PROC:<{
+      254 PUSHPOW2
+      254 PUSHPOW2
+      1 PUSHINT
+      MULRSHIFTRMOD
   }>
 }END>c

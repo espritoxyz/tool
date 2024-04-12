@@ -9,7 +9,6 @@ import org.usvm.machine.state.TvmState
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.util.concurrent.TimeUnit
-import kotlin.io.path.Path
 import kotlin.io.path.absolutePathString
 import kotlin.io.path.createTempFile
 import kotlin.io.path.deleteIfExists
@@ -54,6 +53,7 @@ class FuncAnalyzer(
             .start()
         val exited = compilerProcess.waitFor(COMPILER_TIMEOUT, TimeUnit.SECONDS)
         check(exited) {
+            compilerProcess.destroyForcibly()
             "Compiler process has not finished in $COMPILER_TIMEOUT seconds"
         }
 
@@ -174,6 +174,7 @@ class FiftAnalyzer(
             .start()
         val exited = compilerProcess.waitFor(COMPILER_TIMEOUT, TimeUnit.SECONDS)
         check(exited) {
+            compilerProcess.destroyForcibly()
             "Compiler process has not finished in $COMPILER_TIMEOUT seconds"
         }
 
@@ -203,6 +204,7 @@ class FiftAnalyzer(
 
         val exited = interpreterProcess.waitFor(COMPILER_TIMEOUT, TimeUnit.SECONDS)
         check(exited) {
+            interpreterProcess.destroyForcibly()
             "`fift` process has not finished in $COMPILER_TIMEOUT seconds"
         }
 
@@ -250,10 +252,15 @@ data object BocAnalyzer : TvmAnalyzer {
             .start()
 
         val bytecodeJson = disasmProcess.inputStream.bufferedReader().readText()
+        val stderr = disasmProcess.errorStream.bufferedReader().readText()
 
         val exited = disasmProcess.waitFor(DISASSEMBLER_TIMEOUT, TimeUnit.SECONDS)
         check(exited) {
+            disasmProcess.destroyForcibly()
             "Disassembler process has not finished in $DISASSEMBLER_TIMEOUT seconds"
+        }
+        check(disasmProcess.exitValue() == 0) {
+            "Disassembler process finished with an error:\n$stderr"
         }
 
         return TvmContractCode.fromJson(bytecodeJson)

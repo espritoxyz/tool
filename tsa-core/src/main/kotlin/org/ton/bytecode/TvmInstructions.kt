@@ -59,7 +59,7 @@ sealed interface TvmCodepageInst: TvmInst
 sealed interface TvmCompareIntInst: TvmInst
 
 @Serializable
-sealed interface TvmCompareOtherInst: TvmInst // +
+sealed interface TvmCompareOtherInst: TvmInst
 
 @Serializable
 sealed interface TvmConstDataInst: TvmInst
@@ -68,13 +68,13 @@ sealed interface TvmConstDataInst: TvmInst
 sealed interface TvmConstIntInst: TvmInst
 
 @Serializable
-sealed interface TvmContBasicInst: TvmInst // +
+sealed interface TvmContBasicInst: TvmInst
 
 @Serializable
 sealed interface TvmContConditionalInst: TvmInst
 
 @Serializable
-sealed interface TvmContCreateInst: TvmInst // +
+sealed interface TvmContCreateInst: TvmInst
 
 @Serializable
 sealed interface TvmContDictInst: TvmInst
@@ -3390,6 +3390,7 @@ data class TvmArithmDivMulrshiftcVarInst(
 @SerialName(TvmArithmDivMulrshiftcmodInst.MNEMONIC)
 data class TvmArithmDivMulrshiftcmodInst(
     override val location: TvmInstLocation,
+    val t: Int, // uint
 ): TvmInst, TvmArithmDivInst {
     override val mnemonic: String get() = MNEMONIC
     override val gasConsumption get() = TvmFixedGas(value = 34)
@@ -3422,6 +3423,7 @@ data class TvmArithmDivMulrshiftcmodVarInst(
 @SerialName(TvmArithmDivMulrshiftmodInst.MNEMONIC)
 data class TvmArithmDivMulrshiftmodInst(
     override val location: TvmInstLocation,
+    val t: Int, // uint
 ): TvmInst, TvmArithmDivInst {
     override val mnemonic: String get() = MNEMONIC
     override val gasConsumption get() = TvmFixedGas(value = 34)
@@ -3487,6 +3489,7 @@ data class TvmArithmDivMulrshiftrVarInst(
 @SerialName(TvmArithmDivMulrshiftrmodInst.MNEMONIC)
 data class TvmArithmDivMulrshiftrmodInst(
     override val location: TvmInstLocation,
+    val t: Int, // uint
 ): TvmInst, TvmArithmDivInst {
     override val mnemonic: String get() = MNEMONIC
     override val gasConsumption get() = TvmFixedGas(value = 34)
