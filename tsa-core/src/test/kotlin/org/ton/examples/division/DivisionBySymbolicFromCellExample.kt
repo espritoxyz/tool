@@ -1,7 +1,7 @@
 package org.ton.examples.division
 
 import org.ton.examples.analyzeAllMethods
-import org.usvm.machine.state.TvmIntegerOverflow
+import org.usvm.machine.state.TvmIntegerOverflowError
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
@@ -16,7 +16,7 @@ class DivisionBySymbolicFromCellExample {
         val methodStates = analyzeAllMethods(bytecodeResourcePath)
         val allStates = methodStates.values.flatten()
         val results = allStates.map { it.methodResult }
-        val exceptions = results.filterIsInstance<TvmIntegerOverflow>()
+        val exceptions = results.filterIsInstance<TvmIntegerOverflowError>()
         assertTrue(exceptions.isNotEmpty(), "Division by zero was not found!")
     }
 }

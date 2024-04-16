@@ -136,6 +136,7 @@ import org.usvm.machine.state.builderCopy
 import org.usvm.machine.state.builderStoreDataBits
 import org.usvm.machine.state.builderStoreNextRef
 import org.usvm.machine.state.calcOnStateCtx
+import org.usvm.machine.state.consumeDefaultGas
 import org.usvm.machine.state.doWithStateCtx
 import org.usvm.machine.state.ensureSymbolicCellInitialized
 import org.usvm.machine.state.ensureSymbolicSliceInitialized
@@ -144,16 +145,16 @@ import org.usvm.machine.state.generateSymbolicSlice
 import org.usvm.machine.state.makeSliceFromData
 import org.usvm.machine.state.newStmt
 import org.usvm.machine.state.nextStmt
-import org.usvm.machine.state.consumeDefaultGas
 import org.usvm.machine.state.sliceCopy
-import org.usvm.machine.state.slicePreloadDataBits
-import org.usvm.machine.state.slicePreloadNextRef
 import org.usvm.machine.state.sliceMoveDataPtr
 import org.usvm.machine.state.sliceMoveRefPtr
+import org.usvm.machine.state.slicePreloadDataBits
+import org.usvm.machine.state.slicePreloadNextRef
 import org.usvm.machine.state.takeLastBuilder
 import org.usvm.machine.state.takeLastCell
 import org.usvm.machine.state.takeLastInt
 import org.usvm.machine.state.takeLastSlice
+import org.usvm.machine.state.throwTypeCheckError
 import org.usvm.memory.ULValue
 import org.usvm.memory.UMemoryRegion
 import org.usvm.memory.UMemoryRegionId
@@ -308,6 +309,11 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
 
     private fun doLoadDict(inst: TvmDictSerialInst, scope: TvmStepScope, returnUpdatedSlice: Boolean) {
         val slice = scope.calcOnStateCtx { stack.takeLastSlice() }
+        if (slice == null) {
+            scope.doWithState(throwTypeCheckError)
+            return
+        }
+
         val dictConstructorTypeBit = scope.slicePreloadDataBits(slice, bits = 1) ?: return
         val dictIsNotEmpty = scope.calcOnStateCtx { mkEq(dictConstructorTypeBit, mkBv(value = 1, sizeBits = 1u)) }
 
@@ -345,6 +351,11 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
 
     private fun doStoreDictToBuilder(inst: TvmDictSerialInst, scope: TvmStepScope) {
         val builder = scope.calcOnStateCtx { stack.takeLastBuilder() }
+        if (builder == null) {
+            scope.doWithState(throwTypeCheckError)
+            return
+        }
+
         val dictCellRef = loadDict(scope)
 
         val resultBuilder = scope.calcOnStateCtx { memory.allocConcrete(TvmBuilderType) }
@@ -377,6 +388,10 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
         val dictCellRef = loadDict(scope)
         val key = loadKey(scope, keyType, keyLength) ?: return
         val value = loadValue(scope, valueType)
+        if (value == null) {
+            scope.doWithState(throwTypeCheckError)
+            return
+        }
 
         val dictId = DictId(keyLength)
         val resultDict = scope.calcOnState { memory.allocConcrete(TvmCellType) }
@@ -799,6 +814,11 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
             DictKeyType.UNSIGNED_INT -> stack.takeLastInt().let { mkBvExtractExpr(high = keyLength - 1, low = 0, it) }
             DictKeyType.SLICE -> {
                 val slice = stack.takeLastSlice()
+                if (slice == null) {
+                    throwTypeCheckError(this)
+                    return@calcOnStateCtx null
+                }
+
                 scope.slicePreloadDataBits(slice, keyLength) ?: return@calcOnStateCtx null
             }
         }

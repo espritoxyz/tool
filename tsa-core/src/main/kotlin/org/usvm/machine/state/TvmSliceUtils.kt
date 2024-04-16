@@ -40,7 +40,7 @@ fun checkCellUnderflow(
     noUnderflowExpr,
     blockOnFalseState = {
         quietBlock?.invoke(this)
-            ?: setFailure(TvmCellUnderflow)(this)
+            ?: throwCellUnderflowError(this)
     }
 )
 
@@ -52,7 +52,7 @@ fun checkCellOverflow(
     noOverflowExpr,
     blockOnFalseState = {
         quietBlock?.invoke(this)
-            ?: setFailure(TvmCellOverflow)(this)
+            ?: throwCellOverflowError(this)
     }
 )
 

@@ -161,9 +161,9 @@ class TvmStack(
         val continuationValue: TvmContinuationValue get() = error("Cannot extract continuation from stack value $this")
         val intValue: UExpr<TvmInt257Sort> get() = error("Cannot extract int from stack value $this")
         val tupleValue: TvmStackTupleValue get() = error("Cannot extract tuple from stack value $this")
-        val cellValue: UHeapRef get() = error("Cannot extract cell from stack value $this")
-        val sliceValue: UHeapRef get() = error("Cannot extract slice from stack value $this")
-        val builderValue: UHeapRef get() = error("Cannot extract builder from stack value $this")
+        val cellValue: UHeapRef? get() = error("Cannot extract cell from stack value $this")
+        val sliceValue: UHeapRef? get() = error("Cannot extract slice from stack value $this")
+        val builderValue: UHeapRef? get() = error("Cannot extract builder from stack value $this")
         val isNull: Boolean get() = false
     }
     data class TvmStackContinuationValue(override val continuationValue: TvmContinuationValue) : TvmStackValue
@@ -232,6 +232,12 @@ class TvmStack(
     data class TvmStackCellValue(override val cellValue: UHeapRef): TvmStackValue
     data object TvmStackNullValue : TvmStackValue {
         override val isNull: Boolean get() = true
+
+        // TODO should tupleValue return an empty tuple?
+
+        override val cellValue: UHeapRef? = null
+        override val sliceValue: UHeapRef? get() = null
+        override val builderValue: UHeapRef? get() = null
     }
     data class TvmStackSliceValue(override val sliceValue: UHeapRef): TvmStackValue
     data class TvmStackBuilderValue(override val builderValue: UHeapRef): TvmStackValue

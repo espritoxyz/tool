@@ -195,8 +195,6 @@ import org.usvm.machine.TvmContext.Companion.sliceRefPosField
 import org.usvm.machine.TvmContext.TvmInt257Sort
 import org.usvm.machine.state.C3Register
 import org.usvm.machine.state.C4Register
-import org.usvm.machine.state.TvmIntegerOutOfRange
-import org.usvm.machine.state.TvmIntegerOverflow
 import org.usvm.machine.state.TvmRefEmptyValue
 import org.usvm.machine.state.TvmRegisters
 import org.usvm.machine.state.TvmStack
@@ -219,12 +217,14 @@ import org.usvm.machine.state.lastStmt
 import org.usvm.machine.state.newStmt
 import org.usvm.machine.state.nextStmt
 import org.usvm.machine.state.returnFromMethod
-import org.usvm.machine.state.setFailure
 import org.usvm.machine.state.signedIntegerFitsBits
 import org.usvm.machine.state.takeLastCell
 import org.usvm.machine.state.takeLastContinuation
 import org.usvm.machine.state.takeLastInt
 import org.usvm.machine.state.takeLastSlice
+import org.usvm.machine.state.throwIntegerOutOfRangeError
+import org.usvm.machine.state.throwIntegerOverflowError
+import org.usvm.machine.state.throwTypeCheckError
 import org.usvm.machine.state.unsignedIntegerFitsBits
 import org.usvm.memory.UMemory
 import org.usvm.memory.UWritableMemory
@@ -782,17 +782,17 @@ class TvmInterpreter(
 
     private fun checkOverflow(noOverflowExpr: UBoolExpr, scope: TvmStepScope): Unit? = scope.fork(
         noOverflowExpr,
-        blockOnFalseState = setFailure(TvmIntegerOverflow)
+        blockOnFalseState = throwIntegerOverflowError
     )
 
     private fun checkUnderflow(noUnderflowExpr: UBoolExpr, scope: TvmStepScope): Unit? = scope.fork(
         noUnderflowExpr,
-        blockOnFalseState = setFailure(TvmIntegerOverflow)
+        blockOnFalseState = throwIntegerOverflowError
     )
 
     private fun checkOutOfRange(notOutOfRangeExpr: UBoolExpr, scope: TvmStepScope): Unit? = scope.fork(
         condition = notOutOfRangeExpr,
-        blockOnFalseState = setFailure(TvmIntegerOutOfRange)
+        blockOnFalseState = throwIntegerOutOfRangeError
     )
 
     private fun visitArithmeticLogicalInst(scope: TvmStepScope, stmt: TvmArithmLogicalInst): Unit = with(ctx) {
@@ -1183,6 +1183,10 @@ class TvmInterpreter(
 
                 with(ctx) {
                     val slice = scope.calcOnState { stack.takeLastSlice() }
+                    if (slice == null) {
+                        scope.doWithState(throwTypeCheckError)
+                        return
+                    }
 
                     val cell = scope.calcOnState { memory.readField(slice, sliceCellField, addressSort) }
                     val dataPos = scope.calcOnState { memory.readField(slice, sliceDataPosField, sizeSort) }

@@ -35,6 +35,12 @@ fun setFailure(failure: TvmMethodResult.TvmFailure): (TvmState) -> Unit = { stat
     state.stack.add(state.ctx.zeroValue, TvmIntegerType) // Push default zero parameter to the stack
 }
 
+val throwTypeCheckError: (TvmState) -> Unit = setFailure(TvmTypeCheckError)
+val throwIntegerOverflowError: (TvmState) -> Unit = setFailure(TvmIntegerOverflowError)
+val throwIntegerOutOfRangeError: (TvmState) -> Unit = setFailure(TvmIntegerOutOfRangeError)
+val throwCellOverflowError: (TvmState) -> Unit = setFailure(TvmCellOverflowError)
+val throwCellUnderflowError: (TvmState) -> Unit = setFailure(TvmCellUnderflowError)
+
 // TODO support RETALT
 fun TvmState.returnFromMethod() {
     val returnFromMethod = callStack.lastMethod()

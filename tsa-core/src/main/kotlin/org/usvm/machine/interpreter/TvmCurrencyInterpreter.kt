@@ -20,6 +20,7 @@ import org.usvm.machine.state.slicePreloadInt
 import org.usvm.machine.state.takeLastBuilder
 import org.usvm.machine.state.takeLastInt
 import org.usvm.machine.state.takeLastSlice
+import org.usvm.machine.state.throwTypeCheckError
 import org.usvm.mkSizeExpr
 import org.usvm.sizeSort
 
@@ -37,6 +38,11 @@ class TvmCurrencyInterpreter(private val ctx: TvmContext) {
     private fun visitLoadGramsInst(scope: TvmStepScope, stmt: TvmAppCurrencyLdgramsInst) {
         scope.doWithStateCtx {
             val slice = stack.takeLastSlice()
+            if (slice == null) {
+                throwTypeCheckError(this)
+                return@doWithStateCtx
+            }
+
             val updatedSlice = memory.allocConcrete(TvmSliceType).also { sliceCopy(slice, it) }
 
             val length = scope.slicePreloadDataBits(updatedSlice, bits = 4)?.zeroExtendToSort(sizeSort)
@@ -64,6 +70,11 @@ class TvmCurrencyInterpreter(private val ctx: TvmContext) {
     private fun visitStoreGrams(scope: TvmStepScope, stmt: TvmAppCurrencyStgramsInst) {
         scope.doWithStateCtx {
             val (grams, builder) = stack.takeLastInt() to stack.takeLastBuilder()
+            if (builder == null) {
+                throwTypeCheckError(this)
+                return@doWithStateCtx
+            }
+
             val updatedBuilder = memory.allocConcrete(TvmBuilderType).also { builderCopy(builder, it) }
 
             // TODO make a real implementation

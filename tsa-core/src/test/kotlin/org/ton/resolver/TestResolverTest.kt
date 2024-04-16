@@ -4,7 +4,7 @@ import org.ton.bigint.plus
 import org.ton.bytecode.TvmArithmDivInst
 import org.ton.bytecode.TvmMethod
 import org.ton.examples.compileAndAnalyzeAllMethods
-import org.usvm.machine.state.TvmIntegerOverflow
+import org.usvm.machine.state.TvmIntegerOverflowError
 import org.usvm.machine.state.TvmState
 import org.usvm.machine.state.lastStmt
 import org.usvm.test.TvmTestBuilderValue
@@ -28,7 +28,7 @@ class TestResolverTest {
     fun testDivisionByIntZero() {
         val methodStates = compileAndAnalyzeAllMethods(divisionByIntZeroSource)
         val (method, state) = findMethodState(methodStates) { state ->
-            state.methodResult is TvmIntegerOverflow && state.lastStmt is TvmArithmDivInst
+            state.methodResult is TvmIntegerOverflowError && state.lastStmt is TvmArithmDivInst
         }
 
         val params = TvmTestResolver.resolve(method, state)
@@ -44,7 +44,7 @@ class TestResolverTest {
     fun testDivisionByCellRefZero() {
         val methodStates = compileAndAnalyzeAllMethods(divisionByCellRefZeroSource)
         val (method, state) = findMethodState(methodStates) { state ->
-            state.methodResult is TvmIntegerOverflow && state.lastStmt is TvmArithmDivInst
+            state.methodResult is TvmIntegerOverflowError && state.lastStmt is TvmArithmDivInst
         }
 
         val params = TvmTestResolver.resolve(method, state)
@@ -60,7 +60,7 @@ class TestResolverTest {
     fun testDivisionBySliceRefZero() {
         val methodStates = compileAndAnalyzeAllMethods(divisionBySliceRefZeroSource)
         val (method, state) = findMethodState(methodStates) { state ->
-            state.methodResult is TvmIntegerOverflow && state.lastStmt is TvmArithmDivInst
+            state.methodResult is TvmIntegerOverflowError && state.lastStmt is TvmArithmDivInst
         }
 
         val params = TvmTestResolver.resolve(method, state)
@@ -76,7 +76,7 @@ class TestResolverTest {
     fun testDivisionByBuilderRefZero() {
         val methodStates = compileAndAnalyzeAllMethods(divisionByBuilderRefZeroSource)
         val (method, state) = findMethodState(methodStates) { state ->
-            state.methodResult is TvmIntegerOverflow && state.lastStmt is TvmArithmDivInst
+            state.methodResult is TvmIntegerOverflowError && state.lastStmt is TvmArithmDivInst
         }
 
         val params = TvmTestResolver.resolve(method, state)

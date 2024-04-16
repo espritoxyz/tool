@@ -44,19 +44,18 @@ import org.ton.bytecode.TvmTupleUntupleInst
 import org.ton.bytecode.TvmTupleUntuplevarInst
 import org.usvm.machine.TvmContext
 import org.usvm.machine.state.SIMPLE_GAS_USAGE
-import org.usvm.machine.state.TvmIntegerOutOfRange
 import org.usvm.machine.state.TvmStack
 import org.usvm.machine.state.TvmStack.TvmStackTupleValueConcreteNew
-import org.usvm.machine.state.TvmTypeCheckError
 import org.usvm.machine.state.calcOnStateCtx
 import org.usvm.machine.state.consumeDefaultGas
 import org.usvm.machine.state.consumeGas
 import org.usvm.machine.state.doWithStateCtx
 import org.usvm.machine.state.newStmt
 import org.usvm.machine.state.nextStmt
-import org.usvm.machine.state.setFailure
 import org.usvm.machine.state.takeLastInt
 import org.usvm.machine.state.takeLastTuple
+import org.usvm.machine.state.throwIntegerOutOfRangeError
+import org.usvm.machine.state.throwTypeCheckError
 
 class TvmTupleInterpreter(private val ctx: TvmContext) {
     fun visitTvmTupleInst(scope: TvmStepScope, stmt: TvmTupleInst) {
@@ -146,14 +145,14 @@ class TvmTupleInterpreter(private val ctx: TvmContext) {
 
         val tuple = scope.takeLastTuple()
         if (tuple == null) {
-            scope.doWithState(setFailure(TvmTypeCheckError))
+            scope.doWithState(throwTypeCheckError)
             return
         }
 
         when (tuple) {
             is TvmStackTupleValueConcreteNew -> {
                 if (size != tuple.concreteSize) {
-                    scope.doWithState { setFailure(TvmTypeCheckError)(this) }
+                    scope.doWithState(throwTypeCheckError)
                     return
                 }
 
@@ -187,7 +186,7 @@ class TvmTupleInterpreter(private val ctx: TvmContext) {
         val tuple = scope.takeLastTuple()
         if (tuple == null) {
             if (!quiet) {
-                scope.doWithState(setFailure(TvmTypeCheckError))
+                scope.doWithState(throwTypeCheckError)
             } else {
                 scope.doWithStateCtx {
                     stack.add(minusOneValue, TvmIntegerType)
@@ -212,7 +211,7 @@ class TvmTupleInterpreter(private val ctx: TvmContext) {
         val lastIsNull = scope.calcOnState { stack.lastIsNull() }
         if (lastIsNull) {
             if (!quiet) {
-                scope.doWithState(setFailure(TvmTypeCheckError))
+                scope.doWithState(throwTypeCheckError)
                 return null
             }
 
@@ -221,7 +220,7 @@ class TvmTupleInterpreter(private val ctx: TvmContext) {
 
         val tuple = scope.takeLastTuple()
         if (tuple == null) {
-            scope.doWithState(setFailure(TvmTypeCheckError))
+            scope.doWithState(throwTypeCheckError)
             return null
         }
 
@@ -234,7 +233,7 @@ class TvmTupleInterpreter(private val ctx: TvmContext) {
                     stack.add(ctx.nullValue, TvmNullType)
                     newStmt(stmt.nextStmt())
                 } else {
-                    setFailure(TvmIntegerOutOfRange)(this)
+                    throwIntegerOutOfRangeError(this)
                 }
             }
         ) ?: return null
@@ -264,7 +263,7 @@ class TvmTupleInterpreter(private val ctx: TvmContext) {
                     stack.pop(0)
                     TvmStackTupleValueConcreteNew(ctx, persistentListOf())
                 } else {
-                    setFailure(TvmTypeCheckError)(this)
+                    throwTypeCheckError(this)
                 }
             }
 
@@ -273,7 +272,7 @@ class TvmTupleInterpreter(private val ctx: TvmContext) {
 
         val tuple = scope.takeLastTuple()
         if (tuple == null) {
-            scope.doWithState(setFailure(TvmTypeCheckError))
+            scope.doWithState(throwTypeCheckError)
             return
         }
 
@@ -285,7 +284,7 @@ class TvmTupleInterpreter(private val ctx: TvmContext) {
                 if (quiet) {
                     TODO("How to extend tuple with symbolic number of null values?")
                 } else {
-                    setFailure(TvmIntegerOutOfRange)(this)
+                    throwIntegerOutOfRangeError(this)
                 }
             }
         ) ?: return

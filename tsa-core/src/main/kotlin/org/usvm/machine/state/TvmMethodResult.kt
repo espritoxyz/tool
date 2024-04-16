@@ -32,31 +32,32 @@ sealed interface TvmMethodResult {
 
 // TODO standard exit code should be placed in codepage 0?
 // TODO add integer underflow?
-object TvmIntegerOverflow : TvmFailure {
+object TvmIntegerOverflowError : TvmFailure {
     override val exitCode: UInt = 4u
 
     override fun toString(): String = "TVM integer overflow, exit code: $exitCode"
 }
 
-object TvmIntegerOutOfRange : TvmFailure {
+object TvmIntegerOutOfRangeError : TvmFailure {
     override val exitCode: UInt = 5u
 
     override fun toString(): String = "TVM integer out of expected range, exit code: $exitCode" // TODO add expected range to the message?
 }
 
+// TODO add expected type
 object TvmTypeCheckError : TvmFailure {
     override val exitCode: UInt = 7u
 
     override fun toString(): String = "TVM type check error, exit code: $exitCode"
 }
 
-object TvmCellOverflow : TvmFailure {
+object TvmCellOverflowError : TvmFailure {
     override val exitCode: UInt = 8u
 
     override fun toString(): String = "TVM cell overflow, exit code: $exitCode"
 }
 
-object TvmCellUnderflow : TvmFailure {
+object TvmCellUnderflowError : TvmFailure {
     override val exitCode: UInt = 9u
 
     override fun toString(): String = "TVM cell underflow, exit code: $exitCode"

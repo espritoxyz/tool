@@ -100,15 +100,14 @@ import org.usvm.machine.TvmContext
 import org.usvm.machine.TvmContext.TvmInt257Ext1Sort
 import org.usvm.machine.TvmContext.TvmInt257Ext256Sort
 import org.usvm.machine.TvmContext.TvmInt257Sort
-import org.usvm.machine.state.TvmIntegerOutOfRange
-import org.usvm.machine.state.TvmIntegerOverflow
 import org.usvm.machine.state.bvMaxValueSignedExtended
 import org.usvm.machine.state.bvMinValueSignedExtended
 import org.usvm.machine.state.consumeDefaultGas
 import org.usvm.machine.state.newStmt
 import org.usvm.machine.state.nextStmt
-import org.usvm.machine.state.setFailure
 import org.usvm.machine.state.takeLastInt
+import org.usvm.machine.state.throwIntegerOutOfRangeError
+import org.usvm.machine.state.throwIntegerOverflowError
 
 class TvmArithDivInterpreter(private val ctx: TvmContext) {
 
@@ -813,7 +812,7 @@ class TvmArithDivInterpreter(private val ctx: TvmContext) {
         val neqZero = mkEq(expr, zeroValue).not()
         scope.fork(
             neqZero,
-            blockOnFalseState = setFailure(TvmIntegerOverflow)
+            blockOnFalseState = throwIntegerOverflowError
         )
     }
 
@@ -830,20 +829,20 @@ class TvmArithDivInterpreter(private val ctx: TvmContext) {
         val inBounds = mkBvSignedLessOrEqualExpr(minValue, expr) and mkBvSignedLessOrEqualExpr(expr, maxValue)
         scope.fork(
             inBounds,
-            blockOnFalseState = setFailure(TvmIntegerOverflow)
+            blockOnFalseState = throwIntegerOverflowError
         )
     }
 
     private fun checkOverflow(noOverflowExpr: UBoolExpr, scope: TvmStepScope): Unit? = scope.fork(
         noOverflowExpr,
-        blockOnFalseState = setFailure(TvmIntegerOverflow)
+        blockOnFalseState = throwIntegerOverflowError
     )
 
     private fun checkInRange(expr: UExpr<TvmInt257Sort>, scope: TvmStepScope, min: Int, max: Int) = with(ctx) {
         val cond = mkBvSignedLessOrEqualExpr(min.toBv257(), expr) and mkBvSignedLessOrEqualExpr(expr, max.toBv257())
         scope.fork(
             cond,
-            blockOnFalseState = setFailure(TvmIntegerOutOfRange)
+            blockOnFalseState = throwIntegerOutOfRangeError
         )
     }
 

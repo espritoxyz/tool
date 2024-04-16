@@ -12,18 +12,18 @@ import org.ton.bytecode.TvmSliceType
 import org.usvm.UHeapRef
 import org.usvm.api.makeSymbolicPrimitive
 import org.usvm.machine.TvmContext
-import org.usvm.machine.state.TvmCellUnderflow
 import org.usvm.machine.state.TvmStack
 import org.usvm.machine.state.TvmState
 import org.usvm.machine.state.consumeDefaultGas
 import org.usvm.machine.state.newStmt
 import org.usvm.machine.state.nextStmt
-import org.usvm.machine.state.setFailure
 import org.usvm.machine.state.slicePreloadDataBits
 import org.usvm.machine.state.takeLastBuilder
 import org.usvm.machine.state.takeLastCell
 import org.usvm.machine.state.takeLastInt
 import org.usvm.machine.state.takeLastSlice
+import org.usvm.machine.state.throwCellUnderflowError
+import org.usvm.machine.state.throwTypeCheckError
 
 class TvmCryptoInterpreter(private val ctx: TvmContext) {
     fun visitCryptoStmt(scope: TvmStepScope, stmt: TvmAppCryptoInst) {
@@ -58,13 +58,18 @@ class TvmCryptoInterpreter(private val ctx: TvmContext) {
 
         val key = scope.calcOnState { stack.takeLastInt() }
         val signature = scope.calcOnState { stack.takeLastSlice() }
+        if (signature == null) {
+            scope.doWithState(throwTypeCheckError)
+            return
+        }
+
         val hash = scope.calcOnState { stack.takeLastInt() }
 
         // Check that signature is correct - it contains at least 512 bits
         val bits = scope.slicePreloadDataBits(signature, bits = 512)
         if (bits == null) {
             scope.doWithState {
-                setFailure(TvmCellUnderflow)(this)
+                throwCellUnderflowError(this)
             }
 
             return
@@ -88,7 +93,7 @@ class TvmCryptoInterpreter(private val ctx: TvmContext) {
     }
 
     context(TvmState)
-    private fun TvmStack.popHashableStackValue(referenceType: TvmReferenceType): UHeapRef =
+    private fun TvmStack.popHashableStackValue(referenceType: TvmReferenceType): UHeapRef? =
         when (referenceType) {
             TvmBuilderType -> takeLastBuilder()
             TvmCellType -> takeLastCell()

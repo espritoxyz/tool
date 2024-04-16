@@ -1,7 +1,7 @@
 package org.ton.examples.overflow
 
 import org.ton.examples.analyzeAllMethods
-import org.usvm.machine.state.TvmIntegerOverflow
+import org.usvm.machine.state.TvmIntegerOverflowError
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
@@ -16,7 +16,7 @@ class OverflowExample {
         val methodStates = analyzeAllMethods(bytecodeResourcePath)
         val allStates = methodStates.values.flatten()
         val results = allStates.map { it.methodResult }
-        val exceptions = results.filterIsInstance<TvmIntegerOverflow>()
+        val exceptions = results.filterIsInstance<TvmIntegerOverflowError>()
         assertTrue(exceptions.isNotEmpty(), "Integer overflow was not found!")
     }
 }

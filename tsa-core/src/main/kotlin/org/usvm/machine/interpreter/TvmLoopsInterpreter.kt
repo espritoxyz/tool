@@ -26,13 +26,12 @@ import org.ton.bytecode.TvmInst
 import org.usvm.machine.TvmContext
 import org.usvm.machine.interpreter.TvmLoopsInterpreter.ContinuationExtractor.CC
 import org.usvm.machine.interpreter.TvmLoopsInterpreter.ContinuationExtractor.STACK
-import org.usvm.machine.state.TvmIntegerOutOfRange
 import org.usvm.machine.state.TvmState
 import org.usvm.machine.state.newStmt
 import org.usvm.machine.state.nextStmt
 import org.usvm.machine.state.returnFromMethod
 import org.usvm.machine.state.consumeDefaultGas
-import org.usvm.machine.state.setFailure
+import org.usvm.machine.state.throwIntegerOutOfRangeError
 import org.usvm.machine.state.signedIntegerFitsBits
 import org.usvm.machine.state.takeLastContinuation
 import org.usvm.machine.state.takeLastInt
@@ -79,7 +78,7 @@ class TvmLoopsInterpreter(private val ctx: TvmContext) {
 
             scope.fork(
                 inRangeConstraint,
-                blockOnFalseState = setFailure(TvmIntegerOutOfRange)
+                blockOnFalseState = throwIntegerOutOfRangeError
             ) ?: return
 
             val artificialRepeatInst = TvmArtificialRepeatInst(stmt, continuation, loopRepeatTimes, executeUntilEnd)

@@ -29,6 +29,7 @@ import org.usvm.machine.state.sliceCopy
 import org.usvm.machine.state.sliceMoveDataPtr
 import org.usvm.machine.state.slicePreloadDataBits
 import org.usvm.machine.state.takeLastSlice
+import org.usvm.machine.state.throwTypeCheckError
 import org.usvm.mkSizeAddExpr
 import org.usvm.mkSizeExpr
 import org.usvm.sizeSort
@@ -48,6 +49,11 @@ class TvmMessageAddrInterpreter(private val ctx: TvmContext) {
     private fun visitLoadMessageAddrInst(scope: TvmStepScope, inst: TvmAppAddrLdmsgaddrInst) {
         scope.doWithStateCtx {
             val slice = stack.takeLastSlice()
+            if (slice == null) {
+                throwTypeCheckError(this)
+                return@doWithStateCtx
+            }
+
             val updatedSlice = memory.allocConcrete(TvmSliceType).also { sliceCopy(slice, it) }
 
             stack.add(slice, TvmSliceType)
@@ -69,7 +75,9 @@ class TvmMessageAddrInterpreter(private val ctx: TvmContext) {
     private fun visitLoadAddrNone(scope: TvmStepScope, inst: TvmArtificialLoadAddrNoneInst) {
         scope.doWithStateCtx {
             val updatedSlice = stack.takeLastSlice()
+                ?: error("Unexpected null instead of just allocated updated slice")
             val originalSlice = stack.takeLastSlice()
+                ?: error("Unexpected null instead of already checked original slice")
 
             val prefixSlice = scope.readMessageTail(
                 originalSlice = originalSlice,
@@ -89,7 +97,9 @@ class TvmMessageAddrInterpreter(private val ctx: TvmContext) {
     private fun visitLoadAddrExtern(scope: TvmStepScope, inst: TvmArtificialLoadAddrExternInst) {
         scope.doWithStateCtx {
             val updatedSlice = stack.takeLastSlice()
+                ?: error("Unexpected null instead of just allocated updated slice")
             val originalSlice = stack.takeLastSlice()
+                ?: error("Unexpected null instead of already checked original slice")
 
             val addrLen = scope.loadAddrLen(updatedSlice)
                 ?: return@doWithStateCtx
@@ -107,7 +117,9 @@ class TvmMessageAddrInterpreter(private val ctx: TvmContext) {
     private fun visitLoadAddrStd(scope: TvmStepScope, inst: TvmArtificialLoadAddrStdInst) {
         scope.doWithStateCtx {
             val updatedSlice = stack.takeLastSlice()
+                ?: error("Unexpected null instead of just allocated updated slice")
             val originalSlice = stack.takeLastSlice()
+                ?: error("Unexpected null instead of already checked original slice")
 
             scope.readMaybeAnycast(updatedSlice)
 
@@ -125,7 +137,9 @@ class TvmMessageAddrInterpreter(private val ctx: TvmContext) {
     private fun visitLoadAddrVar(scope: TvmStepScope, inst: TvmArtificialLoadAddrVarInst) {
         scope.doWithStateCtx {
             val updatedSlice = stack.takeLastSlice()
+                ?: error("Unexpected null instead of just allocated updated slice")
             val originalSlice = stack.takeLastSlice()
+                ?: error("Unexpected null instead of already checked original slice")
 
             scope.readMaybeAnycast(updatedSlice)
 
@@ -146,6 +160,11 @@ class TvmMessageAddrInterpreter(private val ctx: TvmContext) {
     private fun visitParseStdAddr(scope: TvmStepScope, inst: TvmAppAddrRewritestdaddrInst) {
         scope.doWithStateCtx {
             val slice = stack.takeLastSlice()
+            if (slice == null) {
+                throwTypeCheckError(this)
+                return@doWithStateCtx
+            }
+
             val copySlice = memory.allocConcrete(TvmSliceType).also { sliceCopy(slice, it) }
             val addrConstructor = scope.slicePreloadDataBits(copySlice, bits = 2)
                 ?: TODO("Deal with incorrect address")
