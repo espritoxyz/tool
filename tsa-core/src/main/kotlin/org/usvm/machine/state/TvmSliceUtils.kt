@@ -2,6 +2,7 @@ package org.usvm.machine.state
 
 import io.ksmt.expr.KBitVecValue
 import io.ksmt.utils.BvUtils.toBigIntegerSigned
+import org.ton.bytecode.TvmBuilderType
 import org.ton.bytecode.TvmCellType
 import org.ton.bytecode.TvmSliceType
 import org.usvm.UBoolExpr
@@ -280,6 +281,45 @@ fun TvmState.builderStoreNextRef(builder: UHeapRef, ref: UHeapRef) = with(ctx) {
     memory.writeField(builder, cellRefsLengthField, sizeSort, updatedLength, guard = trueExpr)
 }
 
+context(TvmContext)
+fun TvmStepScope.builderStoreSlice(builder: UHeapRef, slice: UHeapRef, quietBlock: (TvmState.() -> Unit)?): Unit? {
+    val resultBuilder = calcOnState { memory.allocConcrete(TvmBuilderType).also { builderCopy(builder, it) } }
+
+    val cell = calcOnState { memory.readField(slice, sliceCellField, addressSort) }
+    val cellDataLength = calcOnState { memory.readField(cell, cellDataLengthField, sizeSort) }
+
+    assertDataLengthConstraint(cellDataLength)
+        ?: error("Cannot ensure correctness for data length in cell $cell")
+
+    val cellData = calcOnState { memory.readField(cell, cellDataField, cellDataSort) }
+    val dataPosition = calcOnState { memory.readField(slice, sliceDataPosField, sizeSort) }
+
+    val bitsToWriteLength = mkSizeSubExpr(cellDataLength, dataPosition)
+
+    val cellRefsSize = calcOnState { memory.readField(cell, cellRefsLengthField, sizeSort) }
+    val refsPosition = calcOnState { memory.readField(slice, sliceRefPosField, sizeSort) }
+    val builderRefsSize = calcOnState { memory.readField(builder, cellRefsLengthField, sizeSort) }
+
+    val refsToWriteSize = mkBvSubExpr(cellRefsSize, refsPosition)
+    val resultingRefsSize = mkBvAddExpr(builderRefsSize, refsToWriteSize)
+    val canWriteRefsConstraint = mkSizeLeExpr(resultingRefsSize, maxRefsLengthSizeExpr)
+
+    checkCellOverflow(canWriteRefsConstraint, this, quietBlock)
+        ?: return null
+
+    builderStoreDataBits(resultBuilder, cellData, bitsToWriteLength, quietBlock)
+        ?: return null
+
+    return doWithState {
+        for (i in 0 until TvmContext.MAX_REFS_NUMBER) {
+            val sliceRef = readCellRef(cell, mkSizeExpr(i))
+            writeCellRef(resultBuilder, mkSizeAddExpr(builderRefsSize, mkSizeExpr(i)), sliceRef)
+        }
+
+        memory.writeField(resultBuilder, cellRefsLengthField, sizeSort, resultingRefsSize, guard = trueExpr)
+    }
+}
+
 fun TvmState.makeSliceFromData(data: UExpr<UBvSort>): UHeapRef = with(ctx) {
     val sliceCell = memory.allocConcrete(TvmCellType)
     memory.writeField(sliceCell, cellDataField, cellDataSort, mkBv(0, cellDataSort), trueExpr)
@@ -310,6 +350,22 @@ fun TvmStepScope.allocSliceFromCell(cell: UHeapRef) = calcOnStateCtx {
         memory.writeField(slice, sliceDataPosField, sizeSort, zeroSizeExpr, trueExpr)
         memory.writeField(slice, sliceRefPosField, sizeSort, zeroSizeExpr, trueExpr)
     }
+}
+
+fun TvmState.getSliceRemainingRefsCount(slice: UHeapRef): UExpr<TvmSizeSort> = with(ctx) {
+    val cell = memory.readField(slice, sliceCellField, addressSort)
+    val refsLength = memory.readField(cell, cellRefsLengthField, sizeSort)
+    val refsPos = memory.readField(slice, sliceRefPosField, sizeSort)
+
+    mkBvSubExpr(refsLength, refsPos)
+}
+
+fun TvmState.getSliceRemainingBitsCount(slice: UHeapRef): UExpr<TvmSizeSort> = with(ctx) {
+    val cell = memory.readField(slice, sliceCellField, addressSort)
+    val dataLength = memory.readField(cell, cellDataLengthField, sizeSort)
+    val dataPos = memory.readField(slice, sliceDataPosField, sizeSort)
+
+    mkBvSubExpr(dataLength, dataPos)
 }
 
 private fun <Field, Sort : USort> UWritableMemory<*>.copyField(from: UHeapRef, to: UHeapRef, field: Field, sort: Sort) {

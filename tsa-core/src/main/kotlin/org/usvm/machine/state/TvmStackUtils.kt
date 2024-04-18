@@ -91,6 +91,8 @@ fun doXchg(scope: TvmStepScope, first: Int, second: Int) {
     }
 }
 
+fun doSwap(scope: TvmStepScope) = doXchg(scope, first = 0, second = 1)
+
 fun doPop(scope: TvmStepScope, i: Int) {
     scope.doWithState {
         stack.pop(i)

@@ -234,6 +234,9 @@ import org.usvm.sizeSort
 import org.usvm.solver.USatResult
 import org.usvm.targets.UTargetsSet
 import java.math.BigInteger
+import org.ton.bytecode.TvmCompareOtherSdeqInst
+import org.usvm.machine.state.getSliceRemainingBitsCount
+import org.usvm.machine.state.slicePreloadDataBits
 
 typealias TvmStepScope = StepScope<TvmState, TvmType, TvmInst, TvmContext>
 
@@ -1178,6 +1181,7 @@ class TvmInterpreter(
 
     private fun visitComparisonOtherInst(scope: TvmStepScope, stmt: TvmCompareOtherInst) {
         when (stmt) {
+            is TvmCompareOtherSdeqInst -> visitSliceDataEqInst(scope, stmt)
             is TvmCompareOtherSemptyInst -> {
                 scope.consumeDefaultGas(stmt)
 
@@ -1196,22 +1200,43 @@ class TvmInterpreter(
 
                     val isRemainingDataEmptyConstraint = mkSizeGeExpr(dataPos, dataLength)
                     val areRemainingRefsEmpty = mkSizeGeExpr(refsPos, refsLength)
+                    val result = mkAnd(isRemainingDataEmptyConstraint, areRemainingRefsEmpty).toBv257Bool()
 
-                    scope.fork(
-                        mkAnd(isRemainingDataEmptyConstraint, areRemainingRefsEmpty),
-                        blockOnFalseState = {
-                            stack.add(falseValue, TvmIntegerType)
-                            newStmt(stmt.nextStmt())
-                        },
-                        blockOnTrueState = {
-                            stack.add(trueValue, TvmIntegerType)
-                            newStmt(stmt.nextStmt())
-                        },
-                    )
+                    scope.doWithState {
+                        stack.add(result, TvmIntegerType)
+                        newStmt(stmt.nextStmt())
+                    }
                 }
             }
 
             else -> TODO("$stmt")
+        }
+    }
+
+    private fun visitSliceDataEqInst(scope: TvmStepScope, stmt: TvmCompareOtherSdeqInst) = with(ctx) {
+        scope.consumeDefaultGas(stmt)
+
+        val (slice1, slice2) = scope.calcOnState { stack.takeLastSlice() to stack.takeLastSlice() }
+        if (slice1 == null || slice2 == null) {
+            scope.doWithState(throwTypeCheckError)
+            return
+        }
+
+        val dataLeft1 = scope.calcOnState { getSliceRemainingBitsCount(slice1) }
+        val dataLeft2 = scope.calcOnState { getSliceRemainingBitsCount(slice2) }
+
+        val data1 = scope.slicePreloadDataBits(slice1, dataLeft1) ?: return
+        val data2 = scope.slicePreloadDataBits(slice2, dataLeft2) ?: return
+
+        val shift = mkBvSubExpr(mkSizeExpr(MAX_DATA_LENGTH), dataLeft1).zeroExtendToSort(cellDataSort)
+        val shiftedData1 = mkBvShiftLeftExpr(data1, shift)
+        val shiftedData2 = mkBvShiftLeftExpr(data2, shift)
+
+        val result = mkAnd(dataLeft1 eq dataLeft2, shiftedData1 eq shiftedData2).toBv257Bool()
+
+        scope.doWithState {
+            stack.add(result, TvmIntegerType)
+            newStmt(stmt.nextStmt())
         }
     }
 

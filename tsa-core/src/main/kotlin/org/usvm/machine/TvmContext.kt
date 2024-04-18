@@ -12,6 +12,7 @@ import org.ton.bytecode.TvmFieldImpl
 import org.ton.bytecode.TvmSliceType
 import org.ton.bytecode.TvmType
 import org.usvm.NULL_ADDRESS
+import org.usvm.UBoolExpr
 import org.usvm.UBv32Sort
 import org.usvm.UBvSort
 import org.usvm.UComponents
@@ -53,6 +54,14 @@ class TvmContext(components: UComponents<TvmType, TvmSizeSort>) : UContext<TvmSi
     fun nextInputStackEntryId(): Int = inputStackEntryCounter++
 
     val nullValue: UConcreteHeapRef = mkConcreteHeapRef(NULL_ADDRESS)
+
+    fun UBoolExpr.toBv257Bool(): UExpr<TvmInt257Sort> = with(ctx) {
+        mkIte(
+            condition = this@toBv257Bool,
+            trueBranch = trueValue,
+            falseBranch = falseValue,
+        )
+    }
 
     fun Number.toBv257(): KBitVecValue<TvmInt257Sort> = mkBv(toBigInteger(), int257sort)
 

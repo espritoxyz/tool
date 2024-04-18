@@ -33,6 +33,13 @@ class TvmConfigInterpreter(private val ctx: TvmContext) {
 
                     stack.add(now, TvmIntegerType)
                 }
+                5 -> { // LTIME
+                    val logicalTime = scope.calcOnState { makeSymbolicPrimitive(int257sort) }
+                    scope.assert(mkBvSignedGreaterExpr(logicalTime, zeroValue))
+                        ?: error("Cannot make positive LTIME")
+
+                    stack.add(logicalTime, TvmIntegerType)
+                }
                 7 -> { // BALANCE
                     // TODO read the real value
                     val balance = makeSymbolicPrimitive(int257sort)

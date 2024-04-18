@@ -5,6 +5,10 @@ import org.ton.bytecode.TvmBuilderType
 import org.ton.bytecode.TvmCellBuildEndcInst
 import org.ton.bytecode.TvmCellBuildInst
 import org.ton.bytecode.TvmCellBuildNewcInst
+import org.ton.bytecode.TvmCellBuildStbInst
+import org.ton.bytecode.TvmCellBuildStbqInst
+import org.ton.bytecode.TvmCellBuildStbrInst
+import org.ton.bytecode.TvmCellBuildStbrqInst
 import org.ton.bytecode.TvmCellBuildStiInst
 import org.ton.bytecode.TvmCellBuildStixInst
 import org.ton.bytecode.TvmCellBuildStrefAltInst
@@ -76,10 +80,7 @@ import org.usvm.UBoolExpr
 import org.usvm.UExpr
 import org.usvm.UHeapRef
 import org.usvm.api.readField
-import org.usvm.api.writeField
 import org.usvm.machine.TvmContext
-import org.usvm.machine.TvmContext.Companion.MAX_REFS_NUMBER
-import org.usvm.machine.TvmContext.Companion.cellDataField
 import org.usvm.machine.TvmContext.Companion.cellDataLengthField
 import org.usvm.machine.TvmContext.Companion.cellRefsLengthField
 import org.usvm.machine.TvmContext.Companion.sliceCellField
@@ -89,22 +90,23 @@ import org.usvm.machine.TvmSizeSort
 import org.usvm.machine.state.TvmState
 import org.usvm.machine.state.allocEmptyCell
 import org.usvm.machine.state.allocSliceFromCell
-import org.usvm.machine.state.assertDataLengthConstraint
 import org.usvm.machine.state.builderCopy
 import org.usvm.machine.state.builderStoreDataBits
 import org.usvm.machine.state.builderStoreInt
 import org.usvm.machine.state.builderStoreNextRef
+import org.usvm.machine.state.builderStoreSlice
 import org.usvm.machine.state.calcOnStateCtx
 import org.usvm.machine.state.checkCellOverflow
 import org.usvm.machine.state.checkCellUnderflow
 import org.usvm.machine.state.consumeDefaultGas
 import org.usvm.machine.state.consumeGas
 import org.usvm.machine.state.doPop
+import org.usvm.machine.state.doSwap
 import org.usvm.machine.state.doWithStateCtx
-import org.usvm.machine.state.doXchg
+import org.usvm.machine.state.getSliceRemainingBitsCount
+import org.usvm.machine.state.getSliceRemainingRefsCount
 import org.usvm.machine.state.newStmt
 import org.usvm.machine.state.nextStmt
-import org.usvm.machine.state.readCellRef
 import org.usvm.machine.state.signedIntegerFitsBits
 import org.usvm.machine.state.sliceCopy
 import org.usvm.machine.state.sliceMoveDataPtr
@@ -119,13 +121,9 @@ import org.usvm.machine.state.takeLastSlice
 import org.usvm.machine.state.throwIntegerOutOfRangeError
 import org.usvm.machine.state.throwTypeCheckError
 import org.usvm.machine.state.unsignedIntegerFitsBits
-import org.usvm.machine.state.writeCellRef
-import org.usvm.mkSizeAddExpr
 import org.usvm.mkSizeExpr
 import org.usvm.mkSizeGeExpr
-import org.usvm.mkSizeLeExpr
 import org.usvm.mkSizeLtExpr
-import org.usvm.mkSizeSubExpr
 import org.usvm.sizeSort
 
 class TvmCellInterpreter(private val ctx: TvmContext) {
@@ -214,7 +212,7 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
             is TvmCellBuildStslicerInst -> {
                 scope.consumeDefaultGas(stmt)
 
-                doXchg(scope, first = 0, second = 1)
+                doSwap(scope)
                 scope.doStoreSlice(stmt, quiet = false)
             }
             is TvmCellBuildStsliceqInst -> {
@@ -225,18 +223,40 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
             is TvmCellBuildStslicerqInst -> {
                 scope.consumeDefaultGas(stmt)
 
-                doXchg(scope, first = 0, second = 1)
+                doSwap(scope)
                 scope.doStoreSlice(stmt, quiet = true)
+            }
+            is TvmCellBuildStbInst -> {
+                scope.consumeDefaultGas(stmt)
+
+                scope.doStoreBuilder(stmt, quiet = false)
+            }
+            is TvmCellBuildStbrInst -> {
+                scope.consumeDefaultGas(stmt)
+
+                doSwap(scope)
+                scope.doStoreBuilder(stmt, quiet = false)
+            }
+            is TvmCellBuildStbqInst -> {
+                scope.consumeDefaultGas(stmt)
+
+                scope.doStoreBuilder(stmt, quiet = true)
+            }
+            is TvmCellBuildStbrqInst -> {
+                scope.consumeDefaultGas(stmt)
+
+                doSwap(scope)
+                scope.doStoreBuilder(stmt, quiet = true)
             }
             is TvmCellBuildStrefInst -> visitStoreRefInst(scope, stmt, quiet = false)
             is TvmCellBuildStrefqInst -> visitStoreRefInst(scope, stmt, quiet = true)
             is TvmCellBuildStrefAltInst -> visitStoreRefInst(scope, stmt, quiet = false)
             is TvmCellBuildStrefrInst -> {
-                doXchg(scope, first = 1, second = 0)
+                doSwap(scope)
                 visitStoreRefInst(scope, stmt, quiet = false)
             }
             is TvmCellBuildStrefrqInst -> {
-                doXchg(scope, first = 1, second = 0)
+                doSwap(scope)
                 visitStoreRefInst(scope, stmt, quiet = true)
             }
             else -> TODO("$stmt")
@@ -516,28 +536,6 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
         }
     }
 
-    private fun getSliceRemainingRefsCount(
-        scope: TvmStepScope,
-        slice: UHeapRef
-    ): UExpr<TvmSizeSort> = scope.calcOnStateCtx {
-        val cell = memory.readField(slice, sliceCellField, addressSort)
-        val refsLength = memory.readField(cell, cellRefsLengthField, sizeSort)
-        val refsPos = memory.readField(slice, sliceRefPosField, sizeSort)
-
-        mkBvSubExpr(refsLength, refsPos)
-    }
-
-    private fun getSliceRemainingBitsCount(
-        scope: TvmStepScope,
-        slice: UHeapRef
-    ): UExpr<TvmSizeSort> = scope.calcOnStateCtx {
-        val cell = memory.readField(slice, sliceCellField, addressSort)
-        val dataLength = memory.readField(cell, cellDataLengthField, sizeSort)
-        val dataPos = memory.readField(slice, sliceDataPosField, sizeSort)
-
-        mkBvSubExpr(dataLength, dataPos)
-    }
-
     private fun visitSizeRefsInst(
         scope: TvmStepScope,
         stmt: TvmCellParseSrefsInst
@@ -550,8 +548,7 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
                 throwTypeCheckError(this)
                 return@doWithStateCtx
             }
-
-            val result = getSliceRemainingRefsCount(scope, slice)
+            val result = getSliceRemainingRefsCount(slice)
 
             stack.add(result.signedExtendToInteger(), TvmIntegerType)
             newStmt(stmt.nextStmt())
@@ -568,7 +565,7 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
                 return@doWithStateCtx
             }
 
-            val result = getSliceRemainingBitsCount(scope, slice)
+            val result = getSliceRemainingBitsCount(slice)
 
             stack.add(result.signedExtendToInteger(), TvmIntegerType)
             newStmt(stmt.nextStmt())
@@ -584,9 +581,8 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
                 throwTypeCheckError(this)
                 return@doWithStateCtx
             }
-
-            val sizeBits = getSliceRemainingBitsCount(scope, slice)
-            val sizeRefs = getSliceRemainingRefsCount(scope, slice)
+            val sizeBits = getSliceRemainingBitsCount(slice)
+            val sizeRefs = getSliceRemainingRefsCount(slice)
 
             stack.add(sizeBits.signedExtendToInteger(), TvmIntegerType)
             stack.add(sizeRefs.signedExtendToInteger(), TvmIntegerType)
@@ -734,7 +730,7 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
         }
     }
 
-    private fun TvmStepScope.doStoreSlice(stmt: TvmCellBuildInst, quiet: Boolean) {
+    private fun TvmStepScope.doStoreSlice(stmt: TvmCellBuildInst, quiet: Boolean) = with(ctx) {
         val builder = calcOnState { stack.takeLastBuilder() }
         if (builder == null) {
             doWithState(throwTypeCheckError)
@@ -749,55 +745,52 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
 
         val resultBuilder = calcOnState { memory.allocConcrete(TvmBuilderType).also { builderCopy(builder, it) } }
 
-        with(ctx) {
-            val cell = calcOnState { memory.readField(slice, sliceCellField, addressSort) }
-            val cellDataLength = calcOnState { memory.readField(cell, cellDataLengthField, sizeSort) }
+        val quietBlock: (TvmState.() -> Unit)? = if (!quiet) null else fun TvmState.() {
+            stack.add(slice, TvmSliceType)
+            stack.add(builder, TvmBuilderType)
+            stack.add(minusOneValue, TvmIntegerType)
 
-            assertDataLengthConstraint(cellDataLength)
-                ?: error("Cannot ensure correctness for data length in cell $cell")
+            newStmt(stmt.nextStmt())
+        }
 
-            val cellData = calcOnState { memory.readField(cell, cellDataField, cellDataSort) }
-            val dataPosition = calcOnState { memory.readField(slice, sliceDataPosField, sizeSort) }
+        builderStoreSlice(resultBuilder, slice, quietBlock) ?: return
 
-            val bitsToWriteLength = mkSizeSubExpr(cellDataLength, dataPosition)
-
-            val cellRefsSize = calcOnState { memory.readField(cell, cellRefsLengthField, sizeSort) }
-            val refsPosition = calcOnState { memory.readField(slice, sliceRefPosField, sizeSort) }
-            val builderRefsSize = calcOnState { memory.readField(builder, cellRefsLengthField, sizeSort) }
-
-            val refsToWriteSize = mkBvSubExpr(cellRefsSize, refsPosition)
-            val resultingRefsSize = mkBvAddExpr(builderRefsSize, refsToWriteSize)
-            val canWriteRefsConstraint = mkSizeLeExpr(resultingRefsSize, maxRefsLengthSizeExpr)
-
-            val quietBlock: (TvmState.() -> Unit)? = if (!quiet) null else fun TvmState.() {
-                stack.add(slice, TvmSliceType)
-                stack.add(builder, TvmBuilderType)
-                stack.add(minusOneValue, TvmIntegerType)
-
-                newStmt(stmt.nextStmt())
+        doWithState {
+            stack.add(resultBuilder, TvmBuilderType)
+            if (quiet) {
+                stack.add(zeroValue, TvmIntegerType)
             }
 
-            checkCellOverflow(canWriteRefsConstraint, this@doStoreSlice, quietBlock)
-                ?: return
+            newStmt(stmt.nextStmt())
+        }
+    }
 
-            builderStoreDataBits(resultBuilder, cellData, bitsToWriteLength, quietBlock)
-                ?: return
+    private fun TvmStepScope.doStoreBuilder(stmt: TvmCellBuildInst, quiet: Boolean) = with(ctx) {
+        val (toBuilder, fromBuilder) = calcOnState { stack.takeLastBuilder() to stack.takeLastBuilder() }
+        if (toBuilder == null || fromBuilder == null) {
+            doWithState(throwTypeCheckError)
+            return
+        }
 
-            doWithState {
-                for (i in 0 until MAX_REFS_NUMBER) {
-                    val sliceRef = readCellRef(cell, mkSizeExpr(i))
-                    writeCellRef(resultBuilder, mkSizeAddExpr(builderRefsSize, mkSizeExpr(i)), sliceRef)
-                }
+        val resultBuilder = calcOnState { memory.allocConcrete(TvmBuilderType).also { builderCopy(toBuilder, it) } }
 
-                memory.writeField(resultBuilder, cellRefsLengthField, sizeSort, resultingRefsSize, guard = trueExpr)
+        val quietBlock: (TvmState.() -> Unit)? = if (!quiet) null else fun TvmState.() {
+            stack.add(fromBuilder, TvmBuilderType)
+            stack.add(toBuilder, TvmBuilderType)
+            stack.add(minusOneValue, TvmIntegerType)
 
-                stack.add(resultBuilder, TvmBuilderType)
-                if (quiet) {
-                    stack.add(zeroValue, TvmIntegerType)
-                }
+            newStmt(stmt.nextStmt())
+        }
 
-                newStmt(stmt.nextStmt())
+        builderStoreSlice(resultBuilder, allocSliceFromCell(fromBuilder), quietBlock) ?: return
+
+        doWithState {
+            stack.add(resultBuilder, TvmBuilderType)
+            if (quiet) {
+                stack.add(zeroValue, TvmIntegerType)
             }
+
+            newStmt(stmt.nextStmt())
         }
     }
 }
