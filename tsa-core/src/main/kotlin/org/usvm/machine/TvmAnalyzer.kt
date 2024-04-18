@@ -6,6 +6,7 @@ import org.ton.bytecode.TvmMethod
 import org.ton.cell.Cell
 import org.usvm.machine.FuncAnalyzer.Companion.FIFT_EXECUTABLE
 import org.usvm.machine.state.TvmState
+import org.usvm.utils.FileUtils
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.util.concurrent.TimeUnit
@@ -266,7 +267,11 @@ data object BocAnalyzer : TvmAnalyzer {
         return TvmContractCode.fromJson(bytecodeJson)
     }
 
-    private const val DISASSEMBLER_PATH = "../tvm-disasm"
+    private val DISASSEMBLER_PATH: String by lazy {
+        val disassemblerPath = FileUtils.tvmTempDirectory.resolve("tvm-disasm")
+        FileUtils.extractZipFromResource("lib/tvm-disasm.zip", disassemblerPath)
+        disassemblerPath.absolutePath
+    }
     private const val DISASSEMBLER_RUN_COMMAND = "node dist/index.js"
     private const val DISASSEMBLER_TIMEOUT = 5.toLong() // seconds
 }

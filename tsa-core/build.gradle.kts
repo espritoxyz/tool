@@ -30,3 +30,15 @@ dependencies {
         exclude(group = "io.ksmt", module = "ksmt-core")
     }
 }
+
+val zipTvmDisasm by tasks.registering(Zip::class) {
+    from("../tvm-disasm")
+    archiveFileName.set("tvm-disasm.zip")
+    destinationDirectory.set(layout.buildDirectory.dir("zips"))
+}
+
+tasks.processResources {
+    from(zipTvmDisasm) {
+        into("lib")
+    }
+}

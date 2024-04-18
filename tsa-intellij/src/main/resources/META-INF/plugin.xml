@@ -1,0 +1,25 @@
+<idea-plugin>
+  <id>com.explyt.plugin.ton.id</id>
+  <name>Explyt TON</name>
+  <vendor>explyt.com</vendor>
+
+  <description><![CDATA[
+    Symbolic analyzer for TVM (The Telegram Open Network Virtual Machine) based on USVM.
+  ]]></description>
+
+  <depends>com.intellij.modules.platform</depends>
+
+  <extensions defaultExtensionNs="com.intellij">
+
+  </extensions>
+  <actions>
+    <action id="com.explyt.ton.intellij.TonGenerateTestAction"
+            class="com.explyt.ton.intellij.TonGenerateTestAction" text="Generate TON Tests with Explyt"
+            description="Generates tests for TON smart contract using Explyt TON plugin">
+      <keyboard-shortcut keymap="$default" first-keystroke="ctrl T" second-keystroke="ctrl T"/>
+      <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
+      <add-to-group group-id="GenerateGroup" anchor="last"/>
+      <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+    </action>
+  </actions>
+</idea-plugin>
