@@ -1,6 +1,6 @@
 package org.ton.examples.conditions
 
-import org.ton.examples.compareMethodStateStack
+import org.ton.examples.compareSymbolicAndConcreteResults
 import org.ton.examples.compileAndAnalyzeFift
 import org.ton.examples.runFiftMethod
 import org.usvm.machine.TvmComponents
@@ -18,11 +18,11 @@ class IfConditionTest {
         val fiftResourcePath = this::class.java.getResource(ifConditionsFiftPath)?.path?.let { Path(it) }
             ?: error("Cannot find resource fift $ifConditionsFiftPath")
 
-        val methodStates = compileAndAnalyzeFift(fiftResourcePath)
+        val symbolicResult = compileAndAnalyzeFift(fiftResourcePath)
 
         val methodIds = (0..5).toSet()
-        compareMethodStateStack(methodIds, methodStates) { method ->
-            runFiftMethod(fiftResourcePath, method.id)
+        compareSymbolicAndConcreteResults(methodIds, symbolicResult) { methodId ->
+            runFiftMethod(fiftResourcePath, methodId)
         }
     }
 }

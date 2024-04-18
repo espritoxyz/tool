@@ -19,7 +19,7 @@ dependencies {
     implementation("org.ton:ton-kotlin-bigint:0.3.1")
 
     implementation("org.jetbrains.kotlinx:kotlinx-collections-immutable-jvm:${Versions.collections}")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-cbor:${Versions.kotlinx_serialization}")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:${Versions.kotlinx_serialization}")
 
     implementation(group = "org.slf4j", name = "slf4j-simple", version = Versions.slf4j)
 

@@ -1,12 +1,11 @@
 package org.ton.examples.ints
 
 import org.junit.jupiter.api.Test
-import org.ton.examples.compareMethodStateStack
+import org.ton.examples.compareSymbolicAndConcreteResults
 import org.ton.examples.compileAndAnalyzeAllMethods
 import org.ton.examples.compileAndAnalyzeFift
-import org.ton.examples.intValue
 import org.ton.examples.runFiftMethod
-import org.usvm.machine.state.takeLastInt
+import org.usvm.test.TvmTestIntegerValue
 import kotlin.io.path.Path
 import kotlin.test.assertEquals
 
@@ -19,11 +18,13 @@ class IntComparisonExample {
         val sourceResourcePath = this::class.java.getResource(sourcesPath)?.path?.let { Path(it) }
             ?: error("Cannot find resource source $sourcesPath")
 
-        val methodStates = compileAndAnalyzeAllMethods(sourceResourcePath)
-        methodStates.entries.forEach { (method, states) ->
-            if (method.id == 0)
+        val symbolicResult = compileAndAnalyzeAllMethods(sourceResourcePath)
+        symbolicResult.forEach { (methodId, tests) ->
+            if (methodId == 0)
                 return@forEach
-            val results = states.map { it.stack.takeLastInt().intValue() }.sorted()
+            val results = tests.flatMap { test ->
+                test.result.stack.map { (it as TvmTestIntegerValue).value.toInt() }
+            }.sorted()
             assertEquals(listOf(1, 2), results)
         }
     }
@@ -33,11 +34,11 @@ class IntComparisonExample {
         val fiftResourcePath = this::class.java.getResource(fiftPath)?.path?.let { Path(it) }
             ?: error("Cannot find resource fift $sourcesPath")
 
-        val methodStates = compileAndAnalyzeFift(fiftResourcePath)
+        val symbolicResult = compileAndAnalyzeFift(fiftResourcePath)
 
         val methodIds = (0..13).toSet()
-        compareMethodStateStack(methodIds, methodStates) { method ->
-            runFiftMethod(fiftResourcePath, method.id)
+        compareSymbolicAndConcreteResults(methodIds, symbolicResult) { methodId ->
+            runFiftMethod(fiftResourcePath, methodId)
         }
     }
 }

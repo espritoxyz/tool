@@ -32,7 +32,14 @@ fun TvmInst.nextStmt(): TvmInst = location.codeBlock.instList.getOrNull(location
 fun setFailure(failure: TvmMethodResult.TvmFailure): (TvmState) -> Unit = { state ->
     state.consumeGas(IMPLICIT_EXCEPTION_THROW_GAS)
     state.methodResult = failure
-    state.stack.add(state.ctx.zeroValue, TvmIntegerType) // Push default zero parameter to the stack
+
+    // Throwing exception clears the current stack and pushes its parameter and exit code
+    state.stack.clear()
+    // TODO push the real parameter, not always 0
+    state.stack.add(state.ctx.zeroValue, TvmIntegerType)
+    with(state.ctx) {
+        state.stack.add(failure.exitCode.toInt().toBv257(), TvmIntegerType)
+    }
 }
 
 val throwTypeCheckError: (TvmState) -> Unit = setFailure(TvmTypeCheckError)

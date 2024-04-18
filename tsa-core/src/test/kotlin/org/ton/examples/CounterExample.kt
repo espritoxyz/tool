@@ -12,9 +12,9 @@ class CounterExample {
         val bytecodeResourcePath = this::class.java.getResource(bytecodePath)?.path
             ?: error("Cannot find resource bytecode $bytecodePath")
 
-        val methodStates = analyzeAllMethods(bytecodeResourcePath)
-        val allStates = methodStates.values.flatten()
-        val results = allStates.map { it.methodResult }
+        val symbolicResult = analyzeAllMethods(bytecodeResourcePath)
+        val allTests = symbolicResult.map { it.tests }.flatten()
+        val results = allTests.map { it.result }
         assertTrue(results.isNotEmpty())
     }
 }

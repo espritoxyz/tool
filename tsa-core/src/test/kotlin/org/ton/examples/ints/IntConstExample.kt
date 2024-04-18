@@ -13,7 +13,7 @@ class IntConstExample {
         val bytecodeResourcePath = this::class.java.getResource(sourcesPath)?.path?.let { Path(it) }
             ?: error("Cannot find resource bytecode $sourcesPath")
 
-        val methodStates = compileAndAnalyzeAllMethods(bytecodeResourcePath)
-        assertTrue(methodStates.isNotEmpty())
+        val symbolicResult = compileAndAnalyzeAllMethods(bytecodeResourcePath)
+        assertTrue(symbolicResult.isNotEmpty())
     }
 }

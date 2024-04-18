@@ -193,12 +193,14 @@ import org.usvm.machine.TvmContext.Companion.sliceCellField
 import org.usvm.machine.TvmContext.Companion.sliceDataPosField
 import org.usvm.machine.TvmContext.Companion.sliceRefPosField
 import org.usvm.machine.TvmContext.TvmInt257Sort
+import org.usvm.machine.intValue
 import org.usvm.machine.state.C3Register
 import org.usvm.machine.state.C4Register
 import org.usvm.machine.state.TvmRefEmptyValue
 import org.usvm.machine.state.TvmRegisters
 import org.usvm.machine.state.TvmStack
 import org.usvm.machine.state.TvmState
+import org.usvm.machine.state.allocSliceFromCell
 import org.usvm.machine.state.bvMaxValueSignedExtended
 import org.usvm.machine.state.bvMaxValueUnsignedExtended
 import org.usvm.machine.state.bvMinValueSignedExtended
@@ -214,6 +216,7 @@ import org.usvm.machine.state.doXchg2
 import org.usvm.machine.state.doXchg3
 import org.usvm.machine.state.generateSymbolicCell
 import org.usvm.machine.state.lastStmt
+import org.usvm.machine.state.makeSliceFromData
 import org.usvm.machine.state.newStmt
 import org.usvm.machine.state.nextStmt
 import org.usvm.machine.state.returnFromMethod
@@ -336,7 +339,7 @@ class TvmInterpreter(
         writeField(emptyBuilder, cellRefsLengthField, sizeSort, mkSizeExpr(0), guard = trueExpr)
         writeField(emptyBuilder, cellDataLengthField, sizeSort, mkSizeExpr(0), guard = trueExpr)
 
-        val emptySlice = allocStatic(TvmBuilderType)
+        val emptySlice = allocStatic(TvmSliceType)
         writeField(emptySlice, sliceCellField, addressSort, emptyCell, guard = trueExpr)
         writeField(emptySlice, sliceRefPosField, sizeSort, mkSizeExpr(0), guard = trueExpr)
         writeField(emptySlice, sliceDataPosField, sizeSort, mkSizeExpr(0), guard = trueExpr)
@@ -641,20 +644,11 @@ class TvmInterpreter(
                 check(stmt.s.refs.isEmpty()) { "Unexpected refs in $stmt" }
 
                 scope.doWithStateCtx {
-                    val cell = memory.allocConcrete(TvmCellType)
-                    val slice = memory.allocConcrete(TvmSliceType)
-
-                    memory.writeField(cell, cellRefsLengthField, sizeSort, mkSizeExpr(0), guard = trueExpr)
-
                     val sliceBits = stmt.s.bitsToBv()
                     val bitLength = sliceBits.sort.sizeBits.toInt()
                     val sliceData = mkBvZeroExtensionExpr(MAX_DATA_LENGTH - bitLength, sliceBits)
-                    memory.writeField(cell, cellDataField, cellDataSort, sliceData, guard = trueExpr)
-                    memory.writeField(cell, cellDataLengthField, sizeSort, mkSizeExpr(bitLength), guard = trueExpr)
 
-                    memory.writeField(slice, sliceCellField, addressSort, cell, guard = trueExpr)
-                    memory.writeField(slice, sliceDataPosField, sizeSort, mkSizeExpr(0), guard = trueExpr)
-                    memory.writeField(slice, sliceRefPosField, sizeSort, mkSizeExpr(0), guard = trueExpr)
+                    val slice = scope.calcOnState { makeSliceFromData(sliceData) }
 
                     stack.add(slice, TvmSliceType)
                     newStmt(stmt.nextStmt())
@@ -1567,6 +1561,6 @@ class TvmInterpreter(
     private fun UExpr<TvmInt257Sort>.extractConcrete(inst: TvmInst): Int {
         if (this !is KInterpretedValue)
             TODO("symbolic value in $inst")
-        return (this as KBitVecValue<*>).toBigIntegerSigned().toInt()
+        return intValue()
     }
 }

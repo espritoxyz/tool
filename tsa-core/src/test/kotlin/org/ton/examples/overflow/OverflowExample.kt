@@ -2,6 +2,7 @@ package org.ton.examples.overflow
 
 import org.ton.examples.analyzeAllMethods
 import org.usvm.machine.state.TvmIntegerOverflowError
+import org.usvm.test.TvmMethodFailure
 import kotlin.test.Test
 import kotlin.test.assertTrue
 
@@ -13,10 +14,10 @@ class OverflowExample {
         val bytecodeResourcePath = this::class.java.getResource(bytecodePath)?.path
             ?: error("Cannot find resource bytecode $bytecodePath")
 
-        val methodStates = analyzeAllMethods(bytecodeResourcePath)
-        val allStates = methodStates.values.flatten()
-        val results = allStates.map { it.methodResult }
-        val exceptions = results.filterIsInstance<TvmIntegerOverflowError>()
+        val symbolicResult = analyzeAllMethods(bytecodeResourcePath)
+        val allTests = symbolicResult.map { it.tests }.flatten()
+        val results = allTests.map { it.result }
+        val exceptions = results.mapNotNull { (it as? TvmMethodFailure)?.failure }.filterIsInstance<TvmIntegerOverflowError>()
         assertTrue(exceptions.isNotEmpty(), "Integer overflow was not found!")
     }
 }

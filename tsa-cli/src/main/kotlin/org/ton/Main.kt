@@ -9,9 +9,13 @@ import com.github.ajalt.clikt.parameters.options.help
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
 import com.github.ajalt.clikt.parameters.types.path
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import org.usvm.machine.BocAnalyzer
 import org.usvm.machine.FiftAnalyzer
 import org.usvm.machine.FuncAnalyzer
+
+private val json = Json { prettyPrint = true }
 
 class ContractProperties : OptionGroup("Contract properties") {
     val contractData by option("-d", "--data").help("The serialized contract persistent data")
@@ -46,7 +50,7 @@ class FuncAnalysis : CliktCommand(name = "func", help = "Options for analyzing F
             funcStdlibPath = funcOptions.funcStdlibPath,
             fiftStdlibPath = fiftOptions.fiftStdlibPath
         ).analyzeAllMethods(funcSourcesPath, contractProperties.contractData).let {
-            echo("Success!")
+            echo(json.encodeToString(it))
         }
     }
 }
@@ -64,7 +68,7 @@ class FiftAnalysis : CliktCommand(name = "fift", help = "Options for analyzing s
         FiftAnalyzer(
             fiftStdlibPath = fiftOptions.fiftStdlibPath
         ).analyzeAllMethods(fiftSourcesPath, contractProperties.contractData).let {
-            echo("Success!")
+            echo(json.encodeToString(it))
         }
     }
 }
@@ -79,7 +83,7 @@ class BocAnalysis : CliktCommand(name = "boc", help = "Options for analyzing a s
 
     override fun run() {
         BocAnalyzer.analyzeAllMethods(bocPath, contractProperties.contractData).let {
-            echo("Success!")
+            echo(json.encodeToString(it))
         }
     }
 }

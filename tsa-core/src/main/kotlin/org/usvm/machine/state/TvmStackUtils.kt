@@ -27,19 +27,19 @@ context(TvmState)
 fun TvmStack.takeLastCell(): UHeapRef? =
     takeLastRef(this, TvmCellType, TvmStack.TvmStackValue::cellValue) {
         generateSymbolicCell()
-    }
+    }?.also { ensureSymbolicCellInitialized(it) }
 
 context(TvmState)
 fun TvmStack.takeLastSlice(): UHeapRef? =
     takeLastRef(this, TvmSliceType, TvmStack.TvmStackValue::sliceValue) {
         generateSymbolicSlice()
-    }
+    }?.also { ensureSymbolicSliceInitialized(it) }
 
 context(TvmState)
 fun TvmStack.takeLastBuilder(): UHeapRef? =
     takeLastRef(this, TvmBuilderType, TvmStack.TvmStackValue::builderValue) {
         generateSymbolicBuilder()
-    }
+    }?.also { ensureSymbolicBuilderInitialized(it) }
 
 fun TvmStepScope.takeLastTuple(): TvmStackTupleValue? = calcOnStateCtx {
     val lastEntry = stack.takeLastEntry()

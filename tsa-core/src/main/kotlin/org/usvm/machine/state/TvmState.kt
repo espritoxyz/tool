@@ -63,7 +63,6 @@ class TvmState(
         return TvmState(
             ctx = ctx,
             entrypoint = entrypoint,
-//            registers, // TODO clone?
             currentContinuation = currentContinuation, // TODO clone?
             stack = stack.clone(), // TODO clone?
             registers = registers.copy(),
@@ -95,7 +94,7 @@ class TvmState(
         referenceType: TvmReferenceType,
         initializer: TvmState.(UConcreteHeapRef) -> Unit = {}
     ) {
-        check(isStaticHeapRef(ref)) { "Symbolic ref expected, but $ref received" }
+        if (!isStaticHeapRef(ref)) return
 
         val refs = symbolicRefs.add(ref.address)
         if (refs === symbolicRefs) return

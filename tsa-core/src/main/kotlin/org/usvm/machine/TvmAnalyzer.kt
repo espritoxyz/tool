@@ -2,10 +2,10 @@ package org.usvm.machine
 
 import mu.KLogging
 import org.ton.bytecode.TvmContractCode
-import org.ton.bytecode.TvmMethod
 import org.ton.cell.Cell
 import org.usvm.machine.FuncAnalyzer.Companion.FIFT_EXECUTABLE
-import org.usvm.machine.state.TvmState
+import org.usvm.test.TvmContractSymbolicTestResult
+import org.usvm.test.TvmTestResolver
 import org.usvm.utils.FileUtils
 import java.nio.file.Path
 import java.nio.file.Paths
@@ -22,7 +22,7 @@ sealed interface TvmAnalyzer {
         sourcesPath: Path,
         contractDataHex: String? = null,
         methodsBlackList: Set<Int> = hashSetOf(Int.MAX_VALUE)
-    ): Map<TvmMethod, List<TvmState>>
+    ): TvmContractSymbolicTestResult
 }
 
 class FuncAnalyzer(
@@ -36,7 +36,7 @@ class FuncAnalyzer(
         sourcesPath: Path,
         contractDataHex: String?,
         methodsBlackList: Set<Int>
-    ): Map<TvmMethod, List<TvmState>> {
+    ): TvmContractSymbolicTestResult {
         val tmpBocFile = createTempFile(suffix = ".boc")
         try {
             compileFuncSourceToBoc(sourcesPath, tmpBocFile)
@@ -78,7 +78,7 @@ class FiftAnalyzer(
         sourcesPath: Path,
         contractDataHex: String?,
         methodsBlackList: Set<Int>
-    ): Map<TvmMethod, List<TvmState>> {
+    ): TvmContractSymbolicTestResult {
         val tmpBocFile = createTempFile(suffix = ".boc")
         try {
             compileFiftToBoc(sourcesPath, tmpBocFile)
@@ -241,7 +241,7 @@ data object BocAnalyzer : TvmAnalyzer {
         sourcesPath: Path,
         contractDataHex: String?,
         methodsBlackList: Set<Int>
-    ): Map<TvmMethod, List<TvmState>> {
+    ): TvmContractSymbolicTestResult {
         val contract = loadContractFromBoc(sourcesPath)
         return analyzeAllMethods(contract, methodsBlackList, contractDataHex)
     }
@@ -276,7 +276,11 @@ data object BocAnalyzer : TvmAnalyzer {
     private const val DISASSEMBLER_TIMEOUT = 5.toLong() // seconds
 }
 
-fun analyzeAllMethods(contract: TvmContractCode, methodsBlackList: Set<Int> = hashSetOf(Int.MAX_VALUE), contractDataHex: String? = null): Map<TvmMethod, List<TvmState>> {
+fun analyzeAllMethods(
+    contract: TvmContractCode,
+    methodsBlackList: Set<Int> = hashSetOf(Int.MAX_VALUE),
+    contractDataHex: String? = null
+): TvmContractSymbolicTestResult {
     val contractData = Cell.Companion.of(contractDataHex ?: DEFAULT_CONTRACT_DATA_HEX)
     val machine = TvmMachine()
     val methodsExceptDictPushConst = contract.methods.filterKeys { it !in methodsBlackList }
@@ -295,14 +299,14 @@ fun analyzeAllMethods(contract: TvmContractCode, methodsBlackList: Set<Int> = ha
         }
     }
     methodStates.forEach {
-        println("Method ${it.key}")
+        logger.debug("Method {}", it.key)
         val exceptionalStates = it.value.filter { state -> state.isExceptional }
-        println("States: ${it.value.size}, exceptional: ${exceptionalStates.size}")
-        exceptionalStates.forEach { state -> println(state.methodResult) }
-        println("=====".repeat(20))
+        logger.debug("States: ${it.value.size}, exceptional: ${exceptionalStates.size}")
+        exceptionalStates.forEach { state -> logger.debug(state.methodResult.toString()) }
+        logger.debug("=====".repeat(20))
     }
 
-    return methodStates
+    return TvmTestResolver.resolve(methodStates)
 }
 
 data class FiftInterpreterResult(

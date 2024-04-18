@@ -1,7 +1,7 @@
 package org.ton.examples.stack
 
 import org.junit.jupiter.api.Test
-import org.ton.examples.compareMethodStateStack
+import org.ton.examples.compareSymbolicAndConcreteResults
 import org.ton.examples.compileAndAnalyzeFift
 import org.ton.examples.runFiftMethod
 import kotlin.io.path.Path
@@ -14,10 +14,10 @@ class StackPopTest {
         val fiftResourcePath = this::class.java.getResource(fiftPath)?.path?.let { Path(it) }
             ?: error("Cannot find resource fift $fiftPath")
 
-        val methodStates = compileAndAnalyzeFift(fiftResourcePath)
+        val symbolicResult = compileAndAnalyzeFift(fiftResourcePath)
 
-        compareMethodStateStack(methodIds = setOf(0, 1), methodStates) { method ->
-            runFiftMethod(fiftResourcePath, method.id)
+        compareSymbolicAndConcreteResults(methodIds = setOf(0, 1), symbolicResult) { methodId ->
+            runFiftMethod(fiftResourcePath, methodId)
         }
     }
 }

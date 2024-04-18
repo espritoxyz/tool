@@ -1,7 +1,7 @@
 package org.ton.examples.stack
 
 import org.ton.bytecode.TvmIntegerType
-import org.ton.examples.compareMethodStateStack
+import org.ton.examples.compareSymbolicAndConcreteResults
 import org.ton.examples.compileAndAnalyzeFift
 import org.ton.examples.loadIntegers
 import org.ton.examples.runFiftMethod
@@ -38,11 +38,11 @@ class StackComplexOperationsTest {
         val fiftResourcePath = this::class.java.getResource(stackNullChecksFiftPath)?.path?.let { Path(it) }
             ?: error("Cannot find resource fift $stackNullChecksFiftPath")
 
-        val methodStates = compileAndAnalyzeFift(fiftResourcePath)
+        val symbolicResult = compileAndAnalyzeFift(fiftResourcePath)
 
         val methodIds = (0..15).toSet()
-        compareMethodStateStack(methodIds, methodStates) { method ->
-            runFiftMethod(fiftResourcePath, method.id)
+        compareSymbolicAndConcreteResults(methodIds, symbolicResult) { methodId ->
+            runFiftMethod(fiftResourcePath, methodId)
         }
     }
 
@@ -51,11 +51,11 @@ class StackComplexOperationsTest {
         val fiftResourcePath = this::class.java.getResource(stackComplexFiftPath)?.path?.let { Path(it) }
             ?: error("Cannot find resource fift $stackComplexFiftPath")
 
-        val methodStates = compileAndAnalyzeFift(fiftResourcePath)
+        val symbolicResult = compileAndAnalyzeFift(fiftResourcePath)
 
         val methodIds = (0..30).toSet()
-        compareMethodStateStack(methodIds, methodStates) { method ->
-            runFiftMethod(fiftResourcePath, method.id)
+        compareSymbolicAndConcreteResults(methodIds, symbolicResult) { methodId ->
+            runFiftMethod(fiftResourcePath, methodId)
         }
     }
 }

@@ -128,6 +128,7 @@ import org.usvm.apply
 import org.usvm.collection.set.primitive.USetEntryLValue
 import org.usvm.collection.set.primitive.setEntries
 import org.usvm.machine.TvmContext
+import org.usvm.machine.intValue
 import org.usvm.machine.setUnion
 import org.usvm.machine.state.TvmRefsMemoryRegion
 import org.usvm.machine.state.TvmState
@@ -323,8 +324,7 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
                 stack.add(ctx.nullValue, TvmNullType)
 
                 if (returnUpdatedSlice) {
-                    val updatedSlice = memory.allocConcrete(TvmSliceType)
-                    sliceCopy(slice, updatedSlice)
+                    val updatedSlice = memory.allocConcrete(TvmSliceType).also { sliceCopy(slice, it) }
                     sliceMoveDataPtr(updatedSlice, bits = 1)
                     stack.add(updatedSlice, TvmSliceType)
                 }
@@ -338,8 +338,7 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
             stack.add(dictCellRef, TvmCellType)
 
             if (returnUpdatedSlice) {
-                val updatedSlice = memory.allocConcrete(TvmSliceType)
-                sliceCopy(slice, updatedSlice)
+                val updatedSlice = memory.allocConcrete(TvmSliceType).also { sliceCopy(slice, it) }
                 sliceMoveDataPtr(updatedSlice, bits = 1)
                 sliceMoveRefPtr(updatedSlice)
                 stack.add(updatedSlice, TvmSliceType)
@@ -783,7 +782,7 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
             TODO("Non-concrete key length: $keyLengthExpr")
         }
 
-        val keyLength = keyLengthExpr.toBigIntegerSigned().toInt()
+        val keyLength = keyLengthExpr.intValue()
 
         check(keyLength <= TvmContext.MAX_DATA_LENGTH) {
             "Unexpected key length: $keyLength"

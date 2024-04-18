@@ -2,7 +2,6 @@ package org.ton.examples.gas
 
 import org.ton.examples.compileFiftCodeBlocksContract
 import org.ton.examples.executionCode
-import org.ton.examples.gasUsageValue
 import org.ton.examples.runFiftCodeBlock
 import org.usvm.machine.analyzeAllMethods
 import java.nio.file.FileVisitResult
@@ -27,16 +26,16 @@ class GasTest {
         val concreteResults = codeBlocks.map { runFiftCodeBlock(fiftWorkDir, it) }
         val contract = compileFiftCodeBlocksContract(fiftWorkDir, codeBlocks)
 
-        val methodStates = analyzeAllMethods(contract)
+        val symbolicResult = analyzeAllMethods(contract)
 
-        for ((method, states) in methodStates) {
-            val concreteResult = concreteResults.getOrNull(method.id) ?: continue
-            val state = states.single()
+        for ((methodId, tests) in symbolicResult) {
+            val concreteResult = concreteResults.getOrNull(methodId) ?: continue
+            val test = tests.single()
 
-            assertEquals(concreteResult.exitCode, state.executionCode(), "Method: ${codeBlocks[method.id]}}")
+            assertEquals(concreteResult.exitCode, test.executionCode(), "Method: ${codeBlocks[methodId]}}")
 
-            val stateGasUsage = state.gasUsageValue()
-            assertEquals(concreteResult.gasUsage, stateGasUsage, "Method: ${codeBlocks[method.id]}}")
+            val symbolicGasUsage = test.gasUsage
+            assertEquals(concreteResult.gasUsage, symbolicGasUsage, "Method: ${codeBlocks[methodId]}}")
         }
     }
 

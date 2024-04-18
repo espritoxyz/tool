@@ -1,6 +1,6 @@
 package org.ton.examples.tuple
 
-import org.ton.examples.compareMethodStateStack
+import org.ton.examples.compareSymbolicAndConcreteResults
 import org.ton.examples.compileAndAnalyzeFift
 import org.ton.examples.runFiftMethod
 import org.usvm.machine.TvmComponents
@@ -19,11 +19,11 @@ class TupleTest {
         val fiftResourcePath = this::class.java.getResource(tupleSuccessFiftPath)?.path?.let { Path(it) }
             ?: error("Cannot find resource fift $tupleSuccessFiftPath")
 
-        val methodStates = compileAndAnalyzeFift(fiftResourcePath)
+        val symbolicResult = compileAndAnalyzeFift(fiftResourcePath)
 
         val methodIds = (0..14).toSet()
-        compareMethodStateStack(methodIds, methodStates) { method ->
-            runFiftMethod(fiftResourcePath, method.id)
+        compareSymbolicAndConcreteResults(methodIds, symbolicResult) { methodId ->
+            runFiftMethod(fiftResourcePath, methodId)
         }
     }
 
@@ -32,11 +32,11 @@ class TupleTest {
         val fiftResourcePath = this::class.java.getResource(tupleFailureFiftPath)?.path?.let { Path(it) }
             ?: error("Cannot find resource fift $tupleFailureFiftPath")
 
-        val methodStates = compileAndAnalyzeFift(fiftResourcePath)
+        val symbolicResult = compileAndAnalyzeFift(fiftResourcePath)
 
         val methodIds = (0..12).toSet()
-        compareMethodStateStack(methodIds, methodStates) { method ->
-            runFiftMethod(fiftResourcePath, method.id)
+        compareSymbolicAndConcreteResults(methodIds, symbolicResult) { methodId ->
+            runFiftMethod(fiftResourcePath, methodId)
         }
     }
 }

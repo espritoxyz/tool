@@ -1,23 +1,19 @@
 package org.ton.examples
 
-import io.ksmt.expr.KBitVecValue
-import io.ksmt.utils.BvUtils.toBigIntegerSigned
 import org.ton.bytecode.TvmContractCode
 import org.ton.bytecode.TvmIntegerType
-import org.ton.bytecode.TvmMethod
-import org.usvm.UBvSort
-import org.usvm.UExpr
 import org.usvm.machine.BocAnalyzer
 import org.usvm.machine.FiftAnalyzer
 import org.usvm.machine.FiftInterpreterResult
 import org.usvm.machine.FuncAnalyzer
-import org.usvm.machine.state.TvmMethodResult
+import org.usvm.machine.intValue
 import org.usvm.machine.state.TvmStack
-import org.usvm.machine.state.TvmState
-import org.usvm.machine.state.calcConsumedGas
+import org.usvm.test.TvmContractSymbolicTestResult
+import org.usvm.test.TvmMethodFailure
+import org.usvm.test.TvmSuccessfulExecution
+import org.usvm.test.TvmSymbolicTest
 import org.usvm.test.TvmTestIntegerValue
 import org.usvm.test.TvmTestNullValue
-import org.usvm.test.TvmTestStateResolver
 import org.usvm.test.TvmTestTupleValue
 import org.usvm.test.TvmTestValue
 import java.nio.file.Path
@@ -37,7 +33,7 @@ fun compileAndAnalyzeAllMethods(
     funcSourcesPath: Path,
     contractDataHex: String? = null,
     methodsBlackList: Set<Int> = hashSetOf(Int.MAX_VALUE),
-): Map<TvmMethod, List<TvmState>> = FuncAnalyzer(funcStdlibPath = FUNC_STDLIB_RESOURCE, fiftStdlibPath = FIFT_STDLIB_RESOURCE).analyzeAllMethods(
+): TvmContractSymbolicTestResult = FuncAnalyzer(funcStdlibPath = FUNC_STDLIB_RESOURCE, fiftStdlibPath = FIFT_STDLIB_RESOURCE).analyzeAllMethods(
     funcSourcesPath,
     contractDataHex,
     methodsBlackList
@@ -47,7 +43,7 @@ fun compileAndAnalyzeFift(
     fiftPath: Path,
     contractDataHex: String? = null,
     methodsBlackList: Set<Int> = hashSetOf(Int.MAX_VALUE),
-): Map<TvmMethod, List<TvmState>> = FiftAnalyzer(fiftStdlibPath = FIFT_STDLIB_RESOURCE).analyzeAllMethods(
+): TvmContractSymbolicTestResult = FiftAnalyzer(fiftStdlibPath = FIFT_STDLIB_RESOURCE).analyzeAllMethods(
     fiftPath,
     contractDataHex,
     methodsBlackList,
@@ -65,7 +61,7 @@ fun analyzeAllMethods(
     bytecodePath: String,
     contractDataHex: String? = null,
     methodsBlackList: Set<Int> = hashSetOf(Int.MAX_VALUE),
-): Map<TvmMethod, List<TvmState>> = BocAnalyzer.analyzeAllMethods(Path(bytecodePath), contractDataHex, methodsBlackList)
+): TvmContractSymbolicTestResult = BocAnalyzer.analyzeAllMethods(Path(bytecodePath), contractDataHex, methodsBlackList)
 
 /**
  * Run method with [methodId].
@@ -85,29 +81,18 @@ internal fun TvmStack.loadIntegers(n: Int) = List(n) {
     takeLast(TvmIntegerType) { error("Impossible") }.intValue.intValue()
 }.reversed()
 
-internal fun TvmState.executionCode(): Int = when (val res = methodResult) {
-    TvmMethodResult.NoCall -> error("Unexpected method result: $res")
-    is TvmMethodResult.TvmFailure -> res.exitCode.toInt()
-    is TvmMethodResult.TvmSuccess -> 0
+internal fun TvmSymbolicTest.executionCode(): Int = when (val it = result) {
+    is TvmMethodFailure -> it.failure.exitCode.toInt()
+    is TvmSuccessfulExecution -> 0
 }
 
-internal fun TvmState.gasUsageValue(): Int {
-    val model = models.first()
-    return model.eval(calcConsumedGas()).intValue()
-}
-
-internal fun UExpr<out UBvSort>.intValue() = (this as KBitVecValue<*>).toBigIntegerSigned().toInt()
-
-internal fun compareMethodStateStack(
+internal fun compareSymbolicAndConcreteResults(
     methodIds: Set<Int>,
-    methodStates: Map<TvmMethod, List<TvmState>>,
-    expectedState: (TvmMethod) -> FiftInterpreterResult,
-) = compareMethodStateStack(methodIds, methodStates, expectedState,
-    stateStack = { state, expectedStackSize ->
-        val resolver = TvmTestStateResolver(state.ctx, state.models.first(), state)
-        List(expectedStackSize) { resolver.resolveEntry(state.stack.takeLastEntry()) }.reversed()
-    },
-    concreteStack = { fiftResult ->
+    symbolicResult: TvmContractSymbolicTestResult,
+    expectedState: (Int) -> FiftInterpreterResult,
+) = compareSymbolicAndConcreteResults(methodIds, symbolicResult, expectedState,
+    symbolicStack = { symbolicTest -> symbolicTest.result.stack },
+    concreteStackBlock = { fiftResult ->
         val result = mutableListOf<TvmTestValue>()
         parseFiftStack(fiftResult.stack, result, initialIndex = 0)
         result
@@ -146,37 +131,37 @@ private fun parseFiftStack(entries: List<String>, result: MutableList<TvmTestVal
     return index
 }
 
-internal fun <T> compareMethodStateStack(
+internal fun <T> compareSymbolicAndConcreteResults(
     methodIds: Set<Int>,
-    methodStates: Map<TvmMethod, List<TvmState>>,
-    expectedState: (TvmMethod) -> FiftInterpreterResult,
-    stateStack: (TvmState, Int) -> List<T>,
-    concreteStack: (FiftInterpreterResult) -> List<T>,
-) = compareMethodStates(methodIds, methodStates, expectedState) { method, actualState, concreteState ->
-    val actualStatus = actualState.executionCode()
-    assertEquals(concreteState.exitCode, actualStatus, "Wrong exit code for method id: ${method.id}")
+    symbolicResult: TvmContractSymbolicTestResult,
+    expectedResult: (Int) -> FiftInterpreterResult,
+    symbolicStack: (TvmSymbolicTest) -> List<T>,
+    concreteStackBlock: (FiftInterpreterResult) -> List<T>,
+) = compareMethodStates(methodIds, symbolicResult, expectedResult) { methodId, symbolicTest, concreteResult ->
+    val actualStatus = symbolicTest.executionCode()
+    assertEquals(concreteResult.exitCode, actualStatus, "Wrong exit code for method id: $methodId")
 
-    val concreteStackValue = concreteStack(concreteState)
-    val actualStack = stateStack(actualState, concreteStackValue.size)
-    assertEquals(concreteStackValue, actualStack, "Wrong stack for method id: ${method.id}")
+    val concreteStackValue = concreteStackBlock(concreteResult)
+    val actualStack = symbolicStack(symbolicTest)
+    assertEquals(concreteStackValue, actualStack, "Wrong stack for method id: $methodId")
 }
 
 internal fun compareMethodStates(
     methodIds: Set<Int>,
-    methodStates: Map<TvmMethod, List<TvmState>>,
-    expectedState: (TvmMethod) -> FiftInterpreterResult,
-    comparison: (TvmMethod, TvmState, FiftInterpreterResult) -> Unit
+    symbolicResult: TvmContractSymbolicTestResult,
+    expectedResult: (Int) -> FiftInterpreterResult,
+    comparison: (Int, TvmSymbolicTest, FiftInterpreterResult) -> Unit
 ) {
-    assertEquals(methodIds, methodStates.keys.mapTo(hashSetOf()) { it.id })
+    assertEquals(methodIds, symbolicResult.testSuites.mapTo(hashSetOf()) { it.methodId })
 
-    for ((method, states) in methodStates) {
-        val state = states.single()
-        val concreteState = expectedState(method)
-        comparison(method, state, concreteState)
+    for ((method, tests) in symbolicResult.testSuites) {
+        val test = tests.single()
+        val concreteResult = expectedResult(method)
+        comparison(method, test, concreteResult)
     }
 }
 
-internal fun checkAtLeastOneStateForAllMethods(methodsNumber: Int, methodStates: Map<TvmMethod, List<TvmState>>) {
-    assertEquals(methodsNumber, methodStates.size)
-    assertTrue(methodStates.all { it.value.isNotEmpty() })
+internal fun checkAtLeastOneStateForAllMethods(methodsNumber: Int, symbolicResult: TvmContractSymbolicTestResult) {
+    assertEquals(methodsNumber, symbolicResult.size)
+    assertTrue(symbolicResult.all { it.tests.isNotEmpty() })
 }

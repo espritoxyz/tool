@@ -28,6 +28,9 @@ class TvmStack(
 ) {
     private inline val size: Int get() = stack.size
 
+    val results: PersistentList<TvmStackEntry>
+        get() = stack
+
     fun takeLast(expectedType: TvmType, createEntry: (Int) -> UExpr<out USort>): TvmStackValue {
         val lastEntry = takeLastEntry()
 
@@ -152,6 +155,10 @@ class TvmStack(
         val tmp = stack[first]
         stack = stack.set(first, stack[second])
         stack = stack.set(second, tmp)
+    }
+
+    fun clear() {
+        stack = stack.clear()
     }
 
     fun clone(): TvmStack = TvmStack(ctx, stack, inputElements)

@@ -5,19 +5,26 @@ import io.ksmt.utils.BvUtils.toBigIntegerSigned
 import org.ton.bytecode.TvmCodeBlock
 import org.ton.bytecode.TvmType
 import org.usvm.NULL_ADDRESS
+import org.usvm.UAddressSort
 import org.usvm.UConcreteHeapAddress
 import org.usvm.UConcreteHeapRef
 import org.usvm.UExpr
 import org.usvm.UHeapRef
 import org.usvm.USort
 import org.usvm.api.readField
+import org.usvm.isTrue
 import org.usvm.machine.TvmContext
+import org.usvm.machine.TvmSizeSort
+import org.usvm.machine.intValue
+import org.usvm.machine.state.TvmMethodResult
 import org.usvm.machine.state.TvmRefsMemoryRegion
 import org.usvm.machine.state.TvmStack
 import org.usvm.machine.state.TvmStack.TvmStackEntry
 import org.usvm.machine.state.TvmStack.TvmStackTupleValue
 import org.usvm.machine.state.TvmStack.TvmStackTupleValueConcreteNew
 import org.usvm.machine.state.TvmState
+import org.usvm.machine.state.calcConsumedGas
+import org.usvm.machine.state.lastStmt
 import org.usvm.machine.state.tvmCellRefsRegion
 import org.usvm.memory.UMemory
 import org.usvm.model.UModelBase
@@ -38,6 +45,22 @@ class TvmTestStateResolver(
     private val resolvedCache = mutableMapOf<UConcreteHeapAddress, TvmTestCellValue>()
 
     fun resolveParameters(): List<TvmTestValue> = stack.inputElements.mapNotNull { resolveEntry(it) }.reversed()
+
+    fun resolveResult(): TvmMethodSymbolicResult {
+        val results = state.stack.results
+
+        // Do not include exit code for exceptional results to the result
+        val resultsWithoutExitCode = if (state.methodResult is TvmMethodResult.TvmFailure) results.dropLast(1) else results
+        val resolvedResults = resultsWithoutExitCode.mapNotNull { resolveEntry(it) }
+
+        return when (val it = state.methodResult) {
+            TvmMethodResult.NoCall -> error("Missed result for state $state")
+            is TvmMethodResult.TvmFailure -> TvmMethodFailure(it, state.lastStmt, resolvedResults)
+            is TvmMethodResult.TvmSuccess -> TvmSuccessfulExecution(resolvedResults)
+        }
+    }
+
+    fun resolveGasUsage(): Int = model.eval(state.calcConsumedGas()).intValue()
 
     fun resolveEntry(entry: TvmStackEntry): TvmTestValue? {
         val stackValue = entry.cell ?: return null
@@ -90,42 +113,26 @@ class TvmTestStateResolver(
 
     private fun resolveCell(cell: UHeapRef): TvmTestCellValue = with(ctx) {
         val ref = evaluateInModel(cell) as UConcreteHeapRef
-        if (ref.address == NULL_ADDRESS) error("Unexpected null address")
+        if (ref.address == NULL_ADDRESS) {
+            return@with TvmTestCellValue()
+        }
 
         val cached = resolvedCache[ref.address]
         if (cached != null) return cached
 
         val data = resolveCellData(cell)
 
-        val refsLength = resolveInt(memory.readField(cell, TvmContext.cellRefsLengthField, sizeSort))
+        val refsLength = resolveInt(memory.readField(cell, TvmContext.cellRefsLengthField, sizeSort)).coerceAtMost(TvmContext.MAX_REFS_NUMBER)
         val refs = mutableListOf<TvmTestCellValue>()
 
-        val storedRefs = mutableMapOf<Int, UHeapRef>()
-        var updateNode = memory.tvmCellRefsRegion().getRefsUpdateNode(ref)
+        val storedRefs = mutableMapOf<Int, TvmTestCellValue>()
+        val updateNode = memory.tvmCellRefsRegion().getRefsUpdateNode(ref)
 
-        while (updateNode != null) {
-            when (updateNode) {
-                is TvmRefsMemoryRegion.TvmRefsRegionInputNode -> {
-                    val idx = resolveInt(updateNode.key)
-                    storedRefs.putIfAbsent(idx, updateNode.value)
-                }
-
-                is TvmRefsMemoryRegion.TvmRefsRegionEmptyUpdateNode -> {}
-
-                else -> error("Unexpected update node $updateNode")
-            }
-
-            updateNode = updateNode.prevUpdate
-        }
+        resolveRefUpdates(updateNode, storedRefs)
 
         for (idx in 0 until refsLength) {
-            val unresolvedRefCell = storedRefs[idx]
-
-            val refCell = if (unresolvedRefCell != null) {
-                resolveCell(unresolvedRefCell)
-            } else {
-                TvmTestCellValue()
-            }
+            val refCell = storedRefs[idx]
+                ?: TvmTestCellValue()
 
             refs.add(refCell)
         }
@@ -133,6 +140,42 @@ class TvmTestStateResolver(
         val tvmCellValue = TvmTestCellValue(data, refs)
 
         tvmCellValue.also { resolvedCache[ref.address] = tvmCellValue }
+    }
+
+    private fun resolveRefUpdates(
+        updateNode: TvmRefsMemoryRegion.TvmRefsRegionUpdateNode<TvmSizeSort, UAddressSort>?,
+        storedRefs: MutableMap<Int, TvmTestCellValue>
+    ) {
+        @Suppress("NAME_SHADOWING")
+        var updateNode = updateNode
+
+        while (updateNode != null) {
+            when (updateNode) {
+                is TvmRefsMemoryRegion.TvmRefsRegionInputNode -> {
+                    val idx = resolveInt(updateNode.key)
+                    val refCell = resolveCell(updateNode.value)
+                    storedRefs.putIfAbsent(idx, refCell)
+                }
+
+                is TvmRefsMemoryRegion.TvmRefsRegionEmptyUpdateNode -> {}
+                is TvmRefsMemoryRegion.TvmRefsRegionCopyUpdateNode -> {
+                    val guardValue = evaluateInModel(updateNode.guard)
+                    if (guardValue.isTrue) {
+                        resolveRefUpdates(updateNode.updates, storedRefs)
+                    }
+                }
+                is TvmRefsMemoryRegion.TvmRefsRegionPinpointUpdateNode -> {
+                    val guardValue = evaluateInModel(updateNode.guard)
+                    if (guardValue.isTrue) {
+                        val idx = resolveInt(updateNode.key)
+                        val refCell = resolveCell(updateNode.value)
+                        storedRefs.putIfAbsent(idx, refCell)
+                    }
+                }
+            }
+
+            updateNode = updateNode.prevUpdate
+        }
     }
 
     private fun resolveInt257(expr: UExpr<out USort>): TvmTestIntegerValue {
@@ -144,6 +187,7 @@ class TvmTestStateResolver(
         val symbolicData = memory.readField(cell, TvmContext.cellDataField, cellDataSort)
         val data = extractCellData(evaluateInModel(symbolicData))
         val dataLength = resolveInt(memory.readField(cell, TvmContext.cellDataLengthField, sizeSort))
+            .coerceAtMost(TvmContext.MAX_DATA_LENGTH).coerceAtLeast(0)
 
         return data.drop(TvmContext.MAX_DATA_LENGTH - dataLength)
     }

@@ -62,7 +62,6 @@ class TvmExceptionsInterpreter(private val ctx: TvmContext) {
                 if (invertCondition) it.not() else it
             }
 
-            // TODO push parameter to the stack
             scope.fork(
                 throwCondition,
                 blockOnFalseState = {

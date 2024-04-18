@@ -1,6 +1,6 @@
 package org.ton.examples.cell
 
-import org.ton.examples.compareMethodStateStack
+import org.ton.examples.compareSymbolicAndConcreteResults
 import org.ton.examples.compileAndAnalyzeFift
 import org.ton.examples.runFiftMethod
 import kotlin.io.path.Path
@@ -15,11 +15,11 @@ class CellParseTest {
         val fiftResourcePath = this::class.java.getResource(cellParseFiftPath)?.path?.let { Path(it) }
             ?: error("Cannot find resource fift $cellParseFiftPath")
 
-        val methodStates = compileAndAnalyzeFift(fiftResourcePath)
+        val symbolicResult = compileAndAnalyzeFift(fiftResourcePath)
         val methodIds = (0..6).toSet()
 
-        compareMethodStateStack(methodIds, methodStates) { method ->
-            runFiftMethod(fiftResourcePath, method.id)
+        compareSymbolicAndConcreteResults(methodIds, symbolicResult) { methodId ->
+            runFiftMethod(fiftResourcePath, methodId)
         }
     }
 
@@ -28,11 +28,11 @@ class CellParseTest {
         val fiftResourcePath = this::class.java.getResource(cellParseFiftFailurePath)?.path?.let { Path(it) }
             ?: error("Cannot find resource fift $cellParseFiftFailurePath")
 
-        val methodStates = compileAndAnalyzeFift(fiftResourcePath)
+        val symbolicResult = compileAndAnalyzeFift(fiftResourcePath)
         val methodIds = (0..6).toSet()
 
-        compareMethodStateStack(methodIds, methodStates) { method ->
-            runFiftMethod(fiftResourcePath, method.id)
+        compareSymbolicAndConcreteResults(methodIds, symbolicResult) { methodId ->
+            runFiftMethod(fiftResourcePath, methodId)
         }
     }
 }

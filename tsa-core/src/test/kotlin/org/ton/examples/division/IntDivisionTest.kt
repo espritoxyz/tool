@@ -1,7 +1,7 @@
 package org.ton.examples.division
 
 import org.junit.jupiter.api.Test
-import org.ton.examples.compareMethodStateStack
+import org.ton.examples.compareSymbolicAndConcreteResults
 import org.ton.examples.compileAndAnalyzeFift
 import org.ton.examples.runFiftMethod
 import kotlin.io.path.Path
@@ -16,11 +16,11 @@ class IntDivisionTest {
         val fiftResourcePath = this::class.java.getResource(fiftPathBasic)?.path?.let { Path(it) }
             ?: error("Cannot find resource fift $fiftPathBasic")
 
-        val methodStates = compileAndAnalyzeFift(fiftResourcePath)
+        val symbolicResult = compileAndAnalyzeFift(fiftResourcePath)
 
         val methodIds = (0..30).toSet()
-        compareMethodStateStack(methodIds, methodStates) { method ->
-            runFiftMethod(fiftResourcePath, method.id)
+        compareSymbolicAndConcreteResults(methodIds, symbolicResult) { methodId ->
+            runFiftMethod(fiftResourcePath, methodId)
         }
     }
 
@@ -29,11 +29,11 @@ class IntDivisionTest {
         val fiftResourcePath = this::class.java.getResource(fiftPath)?.path?.let { Path(it) }
             ?: error("Cannot find resource fift $fiftPath")
 
-        val methodStates = compileAndAnalyzeFift(fiftResourcePath)
+        val symbolicResult = compileAndAnalyzeFift(fiftResourcePath)
 
         val methodIds = (0..190).toSet()
-        compareMethodStateStack(methodIds, methodStates) { method ->
-            runFiftMethod(fiftResourcePath, method.id)
+        compareSymbolicAndConcreteResults(methodIds, symbolicResult) { methodId ->
+            runFiftMethod(fiftResourcePath, methodId)
         }
     }
 
@@ -42,11 +42,11 @@ class IntDivisionTest {
         val fiftResourcePath = this::class.java.getResource(fiftPathFail)?.path?.let { Path(it) }
             ?: error("Cannot find resource fift $fiftPathFail")
 
-        val methodStates = compileAndAnalyzeFift(fiftResourcePath)
+        val symbolicResult = compileAndAnalyzeFift(fiftResourcePath)
 
         val methodIds = (0..94).toSet()
-        compareMethodStateStack(methodIds, methodStates) { method ->
-            runFiftMethod(fiftResourcePath, method.id)
+        compareSymbolicAndConcreteResults(methodIds, symbolicResult) { methodId ->
+            runFiftMethod(fiftResourcePath, methodId)
         }
     }
 }

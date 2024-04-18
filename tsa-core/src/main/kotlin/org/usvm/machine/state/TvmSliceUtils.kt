@@ -24,6 +24,7 @@ import org.usvm.machine.TvmContext.Companion.sliceRefPosField
 import org.usvm.machine.TvmContext.TvmCellDataSort
 import org.usvm.machine.TvmContext.TvmInt257Sort
 import org.usvm.machine.TvmSizeSort
+import org.usvm.machine.intValue
 import org.usvm.machine.interpreter.TvmStepScope
 import org.usvm.memory.UWritableMemory
 import org.usvm.mkSizeAddExpr
@@ -189,7 +190,7 @@ fun TvmState.builderStoreDataBits(builder: UHeapRef, bits: UExpr<UBvSort>) = wit
     val builderDataLength = memory.readField(builder, cellDataLengthField, sizeSort)
 
     val updatedData: UExpr<TvmCellDataSort> = if (builderDataLength is KBitVecValue<*>) {
-        val size = builderDataLength.toBigIntegerSigned().toInt()
+        val size = builderDataLength.intValue()
         val updatedData = if (size > 0) {
             val oldData = mkBvExtractExpr(high = size - 1, low = 0, builderData)
             mkBvConcatExpr(oldData, bits)
