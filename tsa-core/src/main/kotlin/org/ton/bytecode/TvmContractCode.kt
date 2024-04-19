@@ -28,6 +28,7 @@ interface TvmContractCode {
                 }
 
                 registerTvmInstSerializer()
+                registerTvmArtificialLoadAddrInstSerializer()
             }
 
         fun fromJson(bytecode: String): TvmContractCode {

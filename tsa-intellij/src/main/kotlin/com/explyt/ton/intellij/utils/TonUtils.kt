@@ -8,4 +8,5 @@ val TonFileType.requiredStdLibs: List<TonStdLibKind>
     get() = when (this) {
         FIF -> listOf(TonStdLibKind.FIFT, TonStdLibKind.FUNC)
         FC -> listOf(TonStdLibKind.FUNC)
+        TACT -> emptyList()
     }

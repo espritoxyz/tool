@@ -11,10 +11,15 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
 import org.usvm.machine.FiftAnalyzer
 import org.usvm.machine.FuncAnalyzer
+import org.usvm.machine.TactAnalyzer
 import java.io.File
 import java.nio.file.Path
+
+private val json = Json { prettyPrint = true }
 
 @Service(Service.Level.PROJECT)
 class TonTestGenerator(private val project: Project) {
@@ -39,8 +44,9 @@ class TonTestGenerator(private val project: Project) {
         val sourcesPath = Path.of(generateTestModel.fileUnderTest.path)
         val testFile = withBackgroundProgressOnPooledThread(project, "Generating TON tests") {
             val tvmAnalyzer = createTvmAnalyzer(generateTestModel)
-            val testFileContent = tvmAnalyzer.analyzeAllMethods(sourcesPath).toString()
-            getTestFile(sourcesPath.toFile()).also { it.writeText(testFileContent) }
+            val testResult = tvmAnalyzer.analyzeAllMethods(sourcesPath)
+            val testReport = json.encodeToString(testResult)
+            getTestFile(sourcesPath.toFile()).also { it.writeText(testReport) }
         }
 
         ExplytFileManager.getInstance(project).openFileInEditor(testFile)
@@ -53,7 +59,7 @@ class TonTestGenerator(private val project: Project) {
             val suffix = "_test" + if (i == 1) "" else "$i"
             val testFileCandidate = fileUnderTest
                 .parentFile
-                .resolve(fileUnderTest.nameWithoutExtension + suffix + ".txt") // TODO: discuss output file extension
+                .resolve(fileUnderTest.nameWithoutExtension + suffix + ".json")
             if (!testFileCandidate.exists()) {
                 return testFileCandidate
             }
@@ -68,6 +74,7 @@ class TonTestGenerator(private val project: Project) {
             fiftStdlibPath = generateTestModel.fiftStdLib!!.toPath(),
             funcStdlibPath = generateTestModel.funcStdLib!!.toPath(),
         )
+        TonFileType.TACT -> TactAnalyzer
     }
 
     companion object {
