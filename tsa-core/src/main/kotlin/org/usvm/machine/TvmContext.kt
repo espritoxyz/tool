@@ -2,6 +2,7 @@ package org.usvm.machine
 
 import io.ksmt.KContext
 import io.ksmt.expr.KBitVecValue
+import io.ksmt.expr.KExpr
 import io.ksmt.sort.KBvCustomSizeSort
 import io.ksmt.sort.KBvSort
 import io.ksmt.utils.asExpr
@@ -19,6 +20,8 @@ import org.usvm.UComponents
 import org.usvm.UConcreteHeapRef
 import org.usvm.UContext
 import org.usvm.UExpr
+import org.usvm.machine.state.bvMaxValueSignedExtended
+import org.usvm.machine.state.bvMinValueSignedExtended
 import org.usvm.mkSizeExpr
 import org.usvm.sizeSort
 
@@ -45,6 +48,8 @@ class TvmContext(components: UComponents<TvmType, TvmSizeSort>) : UContext<TvmSi
     val intBitsValue: KBitVecValue<TvmInt257Sort> = INT_BITS.toInt().toBv257()
     val maxTupleSizeValue: KBitVecValue<TvmInt257Sort> = MAX_TUPLE_SIZE.toBv257()
     val unitTimeMinValue: KBitVecValue<TvmInt257Sort> = UNIX_TIME_MIN.toBv257()
+    val min257BitValue: KExpr<TvmInt257Sort> = bvMinValueSignedExtended(intBitsValue)
+    val max257BitValue: KExpr<TvmInt257Sort> = bvMaxValueSignedExtended(intBitsValue)
 
     val zeroSizeExpr: UExpr<TvmSizeSort> = mkSizeExpr(0)
     val maxDataLengthSizeExpr: UExpr<TvmSizeSort> = mkSizeExpr(MAX_DATA_LENGTH)

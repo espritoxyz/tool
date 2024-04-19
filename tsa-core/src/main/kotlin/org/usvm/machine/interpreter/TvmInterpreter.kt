@@ -16,6 +16,7 @@ import org.ton.bytecode.TvmAppConfigInst
 import org.ton.bytecode.TvmAppCryptoInst
 import org.ton.bytecode.TvmAppCurrencyInst
 import org.ton.bytecode.TvmAppGasInst
+import org.ton.bytecode.TvmAppGlobalInst
 import org.ton.bytecode.TvmArithmBasicAddInst
 import org.ton.bytecode.TvmArithmBasicAddconstInst
 import org.ton.bytecode.TvmArithmBasicDecInst
@@ -23,6 +24,7 @@ import org.ton.bytecode.TvmArithmBasicIncInst
 import org.ton.bytecode.TvmArithmBasicInst
 import org.ton.bytecode.TvmArithmBasicMulInst
 import org.ton.bytecode.TvmArithmBasicMulconstInst
+import org.ton.bytecode.TvmArithmBasicNegateInst
 import org.ton.bytecode.TvmArithmBasicSubInst
 import org.ton.bytecode.TvmArithmDivInst
 import org.ton.bytecode.TvmArithmLogicalAbsInst
@@ -90,6 +92,7 @@ import org.ton.bytecode.TvmConstIntTenAliasInst
 import org.ton.bytecode.TvmConstIntTrueAliasInst
 import org.ton.bytecode.TvmConstIntTwoAliasInst
 import org.ton.bytecode.TvmConstIntZeroAliasInst
+import org.ton.bytecode.TvmContBasicCallrefInst
 import org.ton.bytecode.TvmContBasicExecuteInst
 import org.ton.bytecode.TvmContBasicInst
 import org.ton.bytecode.TvmContBasicRetInst
@@ -265,6 +268,7 @@ class TvmInterpreter(
     private val actionsInterpreter = TvmActionsInterpreter(ctx)
     private val cryptoInterpreter = TvmCryptoInterpreter(ctx)
     private val gasInterpreter = TvmGasInterpreter(ctx)
+    private val globalsInterpreter = TvmGlobalsInterpreter(ctx)
 
     fun getInitialState(contractCode: TvmContractCode, contractData: Cell, methodId: Int, targets: List<TvmTarget> = emptyList()): TvmState {
         /*val contract = contractCode.methods[0]!!
@@ -290,11 +294,11 @@ class TvmInterpreter(
 
         return state*/
         val method = contractCode.methods[methodId] ?: error("Unknown method $methodId")
-        val registers = TvmRegisters()
+        val registers = TvmRegisters(ctx)
         val currentContinuation = TvmContinuationValue(
             method,
             TvmStack(ctx),
-            TvmRegisters()
+            registers
         )
         registers.c3 = C3Register(currentContinuation)
         // TODO for now, ignore contract data value
@@ -402,6 +406,7 @@ class TvmInterpreter(
             is TvmAppActionsInst -> actionsInterpreter.visitActionsStmt(scope, stmt)
             is TvmAppCryptoInst -> cryptoInterpreter.visitCryptoStmt(scope, stmt)
             is TvmAppGasInst -> gasInterpreter.visitGasInst(scope, stmt)
+            is TvmAppGlobalInst -> globalsInterpreter.visitGlobalInst(scope, stmt)
             else -> TODO("$stmt")
         }
     }
@@ -766,6 +771,16 @@ class TvmInterpreter(
                     checkUnderflow(resNoUnderflow, scope) ?: return
 
                     mkBvSubExpr(firstOperand, secondOperand)
+                }
+                is TvmArithmBasicNegateInst -> {
+                    val operand = scope.calcOnState { stack.takeLastInt() }
+
+                    scope.fork(
+                        operand eq min257BitValue,
+                        blockOnFalseState = throwIntegerOverflowError
+                    ) ?: return
+
+                    mkBvNegationExpr(operand)
                 }
                 else -> TODO("$stmt")
             }
@@ -1296,25 +1311,30 @@ class TvmInterpreter(
         scope: TvmStepScope,
         stmt: TvmContBasicInst
     ) {
-        scope.consumeDefaultGas(stmt)
-
         when (stmt) {
             is TvmContBasicExecuteInst -> {
+                scope.consumeDefaultGas(stmt)
+
                 scope.doWithState {
                     val continuationValue = stack.takeLastContinuation()
 
-                    // TODO really?
-//                        registers = continuation.registers
-//                        stack = continuation.stack
-
-                    currentContinuation = continuationValue
-                    // TODO discard remainder of the current continuation?
-                    newStmt(continuationValue.codeBlock.instList.first())
+                    jumpToContinuation(continuationValue, from = stmt, returnToTheNextStmt = true)
                 }
             }
             is TvmContBasicRetInst, is TvmArtificialImplicitRetInst -> {
+                scope.consumeDefaultGas(stmt)
+
                 scope.doWithState {
                     returnFromMethod()
+                }
+            }
+            is TvmContBasicCallrefInst -> {
+                scope.doWithState { consumeGas(126) } // TODO complex gas 126/51
+
+                scope.doWithState {
+                    val continuationValue = TvmContinuationValue(TvmLambda(stmt.c.list.toMutableList()), stack, registers)
+
+                    jumpToContinuation(continuationValue, from = stmt, returnToTheNextStmt = true)
                 }
             }
             else -> TODO("$stmt")

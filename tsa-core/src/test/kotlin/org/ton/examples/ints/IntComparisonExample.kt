@@ -2,7 +2,7 @@ package org.ton.examples.ints
 
 import org.junit.jupiter.api.Test
 import org.ton.examples.compareSymbolicAndConcreteResults
-import org.ton.examples.compileAndAnalyzeAllMethods
+import org.ton.examples.funcCompileAndAnalyzeAllMethods
 import org.ton.examples.compileAndAnalyzeFift
 import org.ton.examples.runFiftMethod
 import org.usvm.test.TvmTestIntegerValue
@@ -18,7 +18,7 @@ class IntComparisonExample {
         val sourceResourcePath = this::class.java.getResource(sourcesPath)?.path?.let { Path(it) }
             ?: error("Cannot find resource source $sourcesPath")
 
-        val symbolicResult = compileAndAnalyzeAllMethods(sourceResourcePath)
+        val symbolicResult = funcCompileAndAnalyzeAllMethods(sourceResourcePath)
         symbolicResult.forEach { (methodId, tests) ->
             if (methodId == 0)
                 return@forEach

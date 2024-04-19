@@ -288,6 +288,4 @@ class TvmStack(
         TvmSliceType -> TvmStackSliceValue(this as UHeapRef)
         TvmTupleType -> TODO("Unexpected $this for constructing stack value of $TvmTupleType")
     }
-
-    private fun TvmStackValue.toStackEntry(): TvmConcreteStackEntry = TvmConcreteStackEntry(this)
 }

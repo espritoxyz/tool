@@ -6,6 +6,7 @@ import org.usvm.machine.BocAnalyzer
 import org.usvm.machine.FiftAnalyzer
 import org.usvm.machine.FiftInterpreterResult
 import org.usvm.machine.FuncAnalyzer
+import org.usvm.machine.TactAnalyzer
 import org.usvm.machine.intValue
 import org.usvm.machine.state.TvmStack
 import org.usvm.test.TvmContractSymbolicTestResult
@@ -29,7 +30,17 @@ private const val FIFT_STDLIB_PATH = "/fiftstdlib"
 private val FIFT_STDLIB_RESOURCE: Path = object {}.javaClass.getResource(FIFT_STDLIB_PATH)?.path?.let { Path(it) }
     ?: error("Cannot find fift stdlib in $FIFT_STDLIB_PATH")
 
-fun compileAndAnalyzeAllMethods(
+fun tactCompileAndAnalyzeAllMethods(
+    tactSourcesPath: Path,
+    contractDataHex: String? = null,
+    methodsBlackList: Set<Int> = hashSetOf(Int.MAX_VALUE),
+): TvmContractSymbolicTestResult = TactAnalyzer.analyzeAllMethods(
+    tactSourcesPath,
+    contractDataHex,
+    methodsBlackList
+)
+
+fun funcCompileAndAnalyzeAllMethods(
     funcSourcesPath: Path,
     contractDataHex: String? = null,
     methodsBlackList: Set<Int> = hashSetOf(Int.MAX_VALUE),

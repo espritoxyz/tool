@@ -1,5 +1,9 @@
 package org.usvm.machine
 
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.encodeToStream
 import mu.KLogging
 import org.ton.bytecode.TvmContractCode
 import org.ton.cell.Cell
@@ -10,12 +14,18 @@ import org.usvm.utils.FileUtils
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.util.concurrent.TimeUnit
+import kotlin.io.path.ExperimentalPathApi
 import kotlin.io.path.absolutePathString
+import kotlin.io.path.copyTo
+import kotlin.io.path.createTempDirectory
 import kotlin.io.path.createTempFile
 import kotlin.io.path.deleteIfExists
+import kotlin.io.path.deleteRecursively
 import kotlin.io.path.exists
+import kotlin.io.path.outputStream
 import kotlin.io.path.readBytes
 import kotlin.io.path.readText
+import kotlin.io.path.walk
 
 sealed interface TvmAnalyzer {
     fun analyzeAllMethods(
@@ -23,6 +33,79 @@ sealed interface TvmAnalyzer {
         contractDataHex: String? = null,
         methodsBlackList: Set<Int> = hashSetOf(Int.MAX_VALUE)
     ): TvmContractSymbolicTestResult
+}
+
+data object TactAnalyzer : TvmAnalyzer {
+    @OptIn(ExperimentalPathApi::class)
+    override fun analyzeAllMethods(
+        sourcesPath: Path,
+        contractDataHex: String?,
+        methodsBlackList: Set<Int>
+    ): TvmContractSymbolicTestResult {
+        val outputDir = createTempDirectory(CONFIG_OUTPUT_PREFIX)
+        val sourcesInOutputDir = sourcesPath.copyTo(outputDir.resolve(sourcesPath.fileName))
+        val configFile = createTactConfig(sourcesInOutputDir, outputDir)
+
+        try {
+            compileTact(configFile)
+
+            val bocFile = outputDir.walk().singleOrNull { it.toFile().extension == "boc" }
+                ?: error("Cannot find .boc file after compiling the Tact source $sourcesPath")
+
+            return BocAnalyzer.analyzeAllMethods(bocFile, contractDataHex, methodsBlackList)
+        } finally {
+            outputDir.deleteRecursively()
+            configFile.deleteIfExists()
+        }
+    }
+
+    @OptIn(ExperimentalSerializationApi::class)
+    private fun createTactConfig(sourcesPath: Path, outputDir: Path): Path {
+        val config = TactConfig(
+            listOf(
+                TactProject(
+                    name = CONFIG_NAME_OPTION,
+                    path = sourcesPath.absolutePathString(),
+                    output = outputDir.absolutePathString(),
+                )
+            )
+        )
+
+        val configFile = createTempFile("tact_config")
+        configFile.outputStream().use { Json.encodeToStream(config, it) }
+
+        return configFile
+    }
+
+    private fun compileTact(configFile: Path) {
+        val command = "$TACT_EXECUTABLE --config ${configFile.absolutePathString()}"
+        val compilerProcess = ProcessBuilder(listOf("/bin/sh", "-c", command))
+            .start()
+        val exited = compilerProcess.waitFor(COMPILER_TIMEOUT, TimeUnit.SECONDS)
+
+        check(exited) {
+            compilerProcess.destroyForcibly()
+            "Tact compilation process has not finished in $COMPILER_TIMEOUT seconds"
+        }
+
+        check(compilerProcess.exitValue() == 0) {
+            "Compilation failed, error: ${compilerProcess.errorStream.bufferedReader().readText()}"
+        }
+    }
+
+    @Serializable
+    private data class TactConfig(val projects: List<TactProject>)
+
+    @Serializable
+    private data class TactProject(
+        val name: String,
+        val path: String,
+        val output: String,
+    )
+
+    private const val CONFIG_NAME_OPTION: String = "sample"
+    private const val CONFIG_OUTPUT_PREFIX: String = "output"
+    private const val TACT_EXECUTABLE: String = "tact"
 }
 
 class FuncAnalyzer(

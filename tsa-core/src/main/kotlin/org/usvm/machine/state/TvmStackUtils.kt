@@ -14,6 +14,9 @@ import org.usvm.machine.interpreter.TvmStepScope
 import org.usvm.machine.state.TvmStack.TvmConcreteStackEntry
 import org.usvm.machine.state.TvmStack.TvmInputStackEntry
 import org.usvm.machine.state.TvmStack.TvmStackTupleValue
+import org.usvm.machine.state.TvmStack.TvmStackValue
+
+fun TvmStackValue.toStackEntry(): TvmConcreteStackEntry = TvmConcreteStackEntry(this)
 
 fun TvmStack.takeLastInt(): UExpr<TvmInt257Sort> {
     val intStackValue = takeLast(TvmIntegerType) { id ->
@@ -25,19 +28,19 @@ fun TvmStack.takeLastInt(): UExpr<TvmInt257Sort> {
 
 context(TvmState)
 fun TvmStack.takeLastCell(): UHeapRef? =
-    takeLastRef(this, TvmCellType, TvmStack.TvmStackValue::cellValue) {
+    takeLastRef(this, TvmCellType, TvmStackValue::cellValue) {
         generateSymbolicCell()
     }?.also { ensureSymbolicCellInitialized(it) }
 
 context(TvmState)
 fun TvmStack.takeLastSlice(): UHeapRef? =
-    takeLastRef(this, TvmSliceType, TvmStack.TvmStackValue::sliceValue) {
+    takeLastRef(this, TvmSliceType, TvmStackValue::sliceValue) {
         generateSymbolicSlice()
     }?.also { ensureSymbolicSliceInitialized(it) }
 
 context(TvmState)
 fun TvmStack.takeLastBuilder(): UHeapRef? =
-    takeLastRef(this, TvmBuilderType, TvmStack.TvmStackValue::builderValue) {
+    takeLastRef(this, TvmBuilderType, TvmStackValue::builderValue) {
         generateSymbolicBuilder()
     }?.also { ensureSymbolicBuilderInitialized(it) }
 
@@ -78,7 +81,7 @@ context(TvmState)
 private fun takeLastRef(
     stack: TvmStack,
     referenceType: TvmReferenceType,
-    extractValue: TvmStack.TvmStackValue.() -> UHeapRef?,
+    extractValue: TvmStackValue.() -> UHeapRef?,
     generateSymbolicRef: (Int) -> UHeapRef
 ): UHeapRef? {
     val lastRefValue = stack.takeLast(referenceType, generateSymbolicRef)

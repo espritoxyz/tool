@@ -2,7 +2,7 @@ package org.ton.resolver
 
 import org.ton.bigint.plus
 import org.ton.bytecode.TvmArithmDivInst
-import org.ton.examples.compileAndAnalyzeAllMethods
+import org.ton.examples.funcCompileAndAnalyzeAllMethods
 import org.usvm.machine.state.TvmIntegerOverflowError
 import org.usvm.test.TvmContractSymbolicTestResult
 import org.usvm.test.TvmMethodFailure
@@ -99,7 +99,7 @@ class TestResolverTest {
         val bytecodeResourcePath = this::class.java.getResource(sourcePath)?.path?.let { Path(it) }
             ?: error("Cannot find resource bytecode $sourcePath")
 
-        return compileAndAnalyzeAllMethods(bytecodeResourcePath)
+        return funcCompileAndAnalyzeAllMethods(bytecodeResourcePath)
     }
 
     private fun findMethodTest(

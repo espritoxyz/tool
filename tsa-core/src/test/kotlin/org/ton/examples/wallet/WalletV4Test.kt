@@ -1,7 +1,7 @@
 package org.ton.examples.wallet
 
 import org.ton.examples.checkAtLeastOneStateForAllMethods
-import org.ton.examples.compileAndAnalyzeAllMethods
+import org.ton.examples.funcCompileAndAnalyzeAllMethods
 import kotlin.io.path.Path
 import kotlin.test.Test
 
@@ -14,7 +14,7 @@ class WalletV4Test {
             ?: error("Cannot find resource bytecode $sourcesPath")
 
         val methodsBlackList = hashSetOf(-1, Int.MAX_VALUE) // TODO exclude recv_external because of dict_add_builder (DICTADDB) instruction
-        val symbolicResult = compileAndAnalyzeAllMethods(bytecodeResourcePath, methodsBlackList = methodsBlackList)
+        val symbolicResult = funcCompileAndAnalyzeAllMethods(bytecodeResourcePath, methodsBlackList = methodsBlackList)
         checkAtLeastOneStateForAllMethods(methodsNumber = 6, symbolicResult) // TODO methodsNumber = 7
     }
 }

@@ -100,8 +100,6 @@ import org.usvm.machine.TvmContext
 import org.usvm.machine.TvmContext.TvmInt257Ext1Sort
 import org.usvm.machine.TvmContext.TvmInt257Ext256Sort
 import org.usvm.machine.TvmContext.TvmInt257Sort
-import org.usvm.machine.state.bvMaxValueSignedExtended
-import org.usvm.machine.state.bvMinValueSignedExtended
 import org.usvm.machine.state.consumeDefaultGas
 import org.usvm.machine.state.newStmt
 import org.usvm.machine.state.nextStmt
@@ -815,9 +813,6 @@ class TvmArithDivInterpreter(private val ctx: TvmContext) {
             blockOnFalseState = throwIntegerOverflowError
         )
     }
-
-    private val min257BitValue = with(ctx) { bvMinValueSignedExtended(intBitsValue) }
-    private val max257BitValue = with(ctx) { bvMaxValueSignedExtended(intBitsValue) }
 
     /**
      * Checks whether N-bit (N > 257) signed integer fits in range -2^256..(2^256 - 1).

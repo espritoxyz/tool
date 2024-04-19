@@ -8885,6 +8885,7 @@ data class TvmConstDataPushcontShortInst(
 @SerialName(TvmConstDataPushrefInst.MNEMONIC)
 data class TvmConstDataPushrefInst(
     override val location: TvmInstLocation,
+    val c: TvmInstList, // ref
 ): TvmInst, TvmConstDataInst, TvmRefOperandLoader {
     override val mnemonic: String get() = MNEMONIC
     override val gasConsumption get() = TvmFixedGas(value = 18)
@@ -9233,6 +9234,7 @@ data class TvmContBasicCallccvarargsInst(
 @SerialName(TvmContBasicCallrefInst.MNEMONIC)
 data class TvmContBasicCallrefInst(
     override val location: TvmInstLocation,
+    val c: TvmInstList, // ref
 ): TvmInst, TvmContBasicInst, TvmRefOperandLoader {
     override val mnemonic: String get() = MNEMONIC
     override val gasConsumption get() = TvmComplexGas(this, description = "126/51")

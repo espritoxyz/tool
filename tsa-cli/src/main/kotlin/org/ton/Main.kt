@@ -14,6 +14,7 @@ import kotlinx.serialization.json.Json
 import org.usvm.machine.BocAnalyzer
 import org.usvm.machine.FiftAnalyzer
 import org.usvm.machine.FuncAnalyzer
+import org.usvm.machine.TactAnalyzer
 
 private val json = Json { prettyPrint = true }
 
@@ -30,9 +31,24 @@ class FiftOptions : OptionGroup("Fift options") {
 
 class FuncOptions : OptionGroup("FunC options") {
     val funcStdlibPath by option("--func-std")
-        .path(mustExist = true, canBeDir = true, canBeFile = false)
+        .path(mustExist = true, canBeFile = true, canBeDir = false)
         .required()
         .help("The path to the dir containing FunC standard library file (stdlib.fc)")
+}
+
+class TactAnalysis : CliktCommand(name = "tact", help = "Options for analyzing Tact sources of smart contracts") {
+    private val tactSourcesPath by option("-i", "--input")
+        .path(mustExist = true, canBeFile = true, canBeDir = false)
+        .required()
+        .help("The path to the Tact source of the smart contract")
+
+    private val contractProperties by ContractProperties()
+
+    override fun run() {
+        TactAnalyzer.analyzeAllMethods(tactSourcesPath, contractProperties.contractData).let {
+            echo("Success!")
+        }
+    }
 }
 
 class FuncAnalysis : CliktCommand(name = "func", help = "Options for analyzing FunC sources of smart contracts") {
@@ -90,4 +106,6 @@ class BocAnalysis : CliktCommand(name = "boc", help = "Options for analyzing a s
 
 class TonAnalysis : NoOpCliktCommand()
 
-fun main(args: Array<String>) = TonAnalysis().subcommands(FuncAnalysis(), FiftAnalysis(), BocAnalysis()).main(args)
+fun main(args: Array<String>) = TonAnalysis()
+    .subcommands(TactAnalysis(), FuncAnalysis(), FiftAnalysis(), BocAnalysis())
+    .main(args)

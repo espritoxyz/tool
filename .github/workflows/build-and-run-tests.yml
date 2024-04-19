@@ -11,7 +11,7 @@ jobs:
   run-tests:
     name: 'Run tests'
     runs-on: [ self-hosted, ex44 ]
-    container: explyt/tsa-env:v1.0.0
+    container: explyt/tsa-env:v1.1.0
 
     steps:
       - name: 'Checkout repository'
