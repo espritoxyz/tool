@@ -176,3 +176,6 @@ internal fun checkAtLeastOneStateForAllMethods(methodsNumber: Int, symbolicResul
     assertEquals(methodsNumber, symbolicResult.size)
     assertTrue(symbolicResult.all { it.tests.isNotEmpty() })
 }
+
+internal const val runHardTestsVar = "TSA_RUN_HARD_TESTS"
+internal const val runHardTestsRegex = ".+"

@@ -33,6 +33,8 @@ jobs:
 
       - name: 'Build and run test'
         run: gradle clean build
+        env:
+          TSA_RUN_HARD_TESTS: 1
 
       - name: 'Save test report'
         if: always()
