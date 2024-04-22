@@ -1,0 +1,14 @@
+(int) add(int second, int subtrahend, int flag) method_id {
+    int first = 42;
+    if (flag == -1) {
+        second = second - subtrahend;
+    } else {
+        second = 0;
+    }
+
+    return first + second;
+}
+
+() recv_internal(int msg_value, cell in_msg, slice in_msg_body) impure {
+    ;; Do nothing
+}

@@ -1,0 +1,22 @@
+#include "../../stdlib.fc";
+
+(builder) write(int loop_count) method_id {
+    builder b = begin_cell();
+
+    if (loop_count < 0) {
+        return b;
+    }
+
+    var i = 0;
+    repeat(loop_count) {
+        builder value = begin_cell().store_int(i, 32);
+
+        b = b.store_ref(value.end_cell());
+    }
+
+    return b;
+}
+
+() recv_internal(int msg_value, cell in_msg, slice in_msg_body) impure {
+    ;; Do nothing
+}

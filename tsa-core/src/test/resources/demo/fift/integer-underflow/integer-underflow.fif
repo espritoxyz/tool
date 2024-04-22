@@ -1,0 +1,16 @@
+"Fift.fif" include
+"Asm.fif" include
+
+PROGRAM{
+  0 DECLMETHOD integer_underflow
+  integer_underflow PROC:<{
+    -1 EQINT
+    IF:<{
+      SUB
+    }>ELSE<{
+      2DROP
+      0 PUSHINT
+    }>
+    -42 ADDCONST
+  }>
+}END>c

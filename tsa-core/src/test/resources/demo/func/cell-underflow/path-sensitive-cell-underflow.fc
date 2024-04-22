@@ -1,0 +1,17 @@
+#include "../../stdlib.fc";
+
+(int) read(slice value, int flag) method_id {
+    if (flag) {
+        if (value.slice_bits() >= 4) {
+            return value~load_uint(4);
+        }
+
+        return -1;
+    }
+
+    return value~load_int(3);
+}
+
+() recv_internal(int msg_value, cell in_msg, slice in_msg_body) impure {
+    ;; Do nothing
+}
