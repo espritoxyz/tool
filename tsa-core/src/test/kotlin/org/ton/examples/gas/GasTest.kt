@@ -49,7 +49,7 @@ class GasTest {
         resourceRoot.visitFileTree {
             onPreVisitDirectory { dir, _ ->
                 when (dir.name) {
-                    "fiftstdlib", "fift-examples" -> FileVisitResult.SKIP_SUBTREE
+                    "fiftstdlib", "fift-examples", "demo" -> FileVisitResult.SKIP_SUBTREE
                     else -> FileVisitResult.CONTINUE
                 }
             }
