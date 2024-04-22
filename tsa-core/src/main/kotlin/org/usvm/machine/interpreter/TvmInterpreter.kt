@@ -2,11 +2,8 @@ package org.usvm.machine.interpreter
 
 import io.ksmt.expr.KBitVecValue
 import io.ksmt.expr.KInterpretedValue
-import io.ksmt.sort.KBvSort
-import io.ksmt.utils.BvUtils.bigIntValue
 import io.ksmt.utils.BvUtils.bvMaxValueSigned
 import io.ksmt.utils.BvUtils.bvMinValueSigned
-import io.ksmt.utils.BvUtils.toBigIntegerSigned
 import kotlinx.collections.immutable.persistentListOf
 import mu.KLogging
 import org.ton.bytecode.TvmAliasInst
@@ -1517,9 +1514,8 @@ class TvmInterpreter(
 
         when (stmt) {
             is TvmDictSpecialDictigetjmpzInst -> {
-                val methodId =
-                    (scope.calcOnState { stack.takeLastInt() } as KBitVecValue<KBvSort>).bigIntValue()
-                val method = contractCode.methods[methodId.toInt()]!!
+                val methodId = scope.calcOnState { stack.takeLastInt() }.extractConcrete(stmt)
+                val method = contractCode.methods[methodId]!!
 
                 scope.doWithState {
                     // The remainder of the previous current continuation cc is discarded.

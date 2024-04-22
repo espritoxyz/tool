@@ -1,0 +1,111 @@
+#include "stdlib.fc";
+
+;; Util methods
+
+(int, int, int, int) parse_employee_data(slice employee_data_slice) {
+    var (employer_id, hiring_time_seconds, stocks_number, payment_period_days) = (
+        employee_data_slice~load_uint(32),
+        employee_data_slice~load_uint(64),
+        employee_data_slice~load_uint(64),
+        employee_data_slice~load_uint(32)
+    );
+
+    return (hiring_time_seconds, employer_id, stocks_number, payment_period_days);
+}
+
+int get_employee_balance_internal(slice employee_data_slice) {
+    var (_, hiring_time_seconds, stocks_number, payment_period_days) = parse_employee_data(employee_data_slice);
+    int current_time = now();
+    int elapsed_time_seconds = current_time - hiring_time_seconds;
+    int elapsed_days = elapsed_time_seconds / 86400;
+
+    int granted_stocks = stocks_number * elapsed_days / payment_period_days;
+    return granted_stocks;
+}
+
+;; The persistent data consists of the following dictionary:
+;; employee_id :: uint32 -> (employer_id :: uint32, hiring_time_seconds :: unit64, stocks_number :: uint64, payment_period_days :: uint32)
+;; and one number total_stocks :: uint64
+
+;; All external messages must contain the following data: (employer_id :: uint32, operation :: uint8, employee_id :: uint32).
+;; Firing messages also contain (stocks_number :: uint64, payment_period_seconds :: uint32).
+() recv_external(slice in_msg) impure {
+    var (employer_id, operation, employee_id) = (in_msg~load_uint(32), in_msg~load_uint(8), in_msg~load_uint(32));
+    throw_if(0xffff, operation > 1); ;; Unknown operation
+
+    var ds = get_data().begin_parse();
+    var staff_info = ds~load_dict();
+    var total_stocks = ds~load_uint(64);
+
+    if (operation == 0) { ;; Hire employee
+        var (stocks_number, payment_period_days) = (in_msg~load_uint(64), in_msg~load_uint(32));
+        throw_if(-1, total_stocks < stocks_number); ;; If there are not enough stocks
+
+        var hiring_time_seconds = now();
+        var employee_value = begin_cell()
+            .store_uint(employer_id, 32)
+            .store_uint(hiring_time_seconds, 64)
+            .store_uint(stocks_number, 64)
+            .store_uint(payment_period_days, 32)
+            .end_cell()
+            .begin_parse();
+;;        TODO support DICTUADDB and use udict_add_builder below
+        (staff_info, var success) = staff_info.udict_add?(32, employee_id, employee_value);
+        throw_unless(-2, success); ;; If this employee was already hired
+    }
+    if (operation == 1) { ;; Fire employee
+        var (employee_data_slice, success) = staff_info.udict_get?(32, employee_id);
+        throw_unless(-3, success); ;; If there is no such employee
+
+        var real_employer_id = employee_data_slice.preload_uint(32);
+        throw_unless(-4, employer_id == real_employer_id); ;; If this employee was hired by another employer
+
+        (staff_info, _) = staff_info.udict_delete?(32, employee_id);
+
+        ;; Update total stocks
+        var employee_balance = get_employee_balance_internal(employee_data_slice);
+        total_stocks -= employee_balance;
+    }
+
+    set_data(begin_cell()
+        .store_dict(staff_info)
+        .store_uint(64, total_stocks)
+        .end_cell()
+    );
+}
+
+() recv_internal(int msg_value, cell in_msg, slice in_msg_body) impure {
+;;    Do nothing
+}
+
+;; Get methods
+
+;; Returns the current stock balance for this employee_id, if such employee exists, and returns -1 otherwise.
+int get_employee_balance(int employee_id) method_id {
+    var ds = get_data().begin_parse();
+    var staff_info = ds~load_dict();
+    var (employee_data_slice, found) = staff_info.udict_get?(32, employee_id);
+
+    if (~ found) {
+        return -1;
+    }
+
+    return get_employee_balance_internal(employee_data_slice);
+}
+
+;; Returns the number of the total remaining stocks = total_stocks - total_granted_stocks.
+int get_remaining_stocks() method_id {
+    var ds = get_data().begin_parse();
+    var (staff_info, total_stocks) = (ds~load_dict(), ds~load_uint(64));
+    int total_granted_stocks = 0;
+    int i = 0;
+    do {
+        (i, var employee_data_slice, var found) = staff_info.udict_get_next?(32, i);
+        if (found) {
+            var employee_balance = get_employee_balance_internal(employee_data_slice);
+            total_granted_stocks += employee_balance;
+        }
+    } until (~ found);
+
+    return total_stocks - total_granted_stocks;
+}
