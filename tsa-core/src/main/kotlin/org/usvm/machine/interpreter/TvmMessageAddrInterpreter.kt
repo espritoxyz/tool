@@ -250,21 +250,26 @@ class TvmMessageAddrInterpreter(private val ctx: TvmContext) {
 
         sliceMoveDataPtr(updatedSlice, bits = 2)
 
-        forkMulti(
-            listOf(
-                (prefix eq addrNone) to {
-                    newStmt(TvmArtificialLoadAddrNoneInst(inst))
-                },
-                (prefix eq addrExtern) to {
-                    newStmt(TvmArtificialLoadAddrExternInst(inst))
-                },
-                (prefix eq addrStd) to {
-                    newStmt(TvmArtificialLoadAddrStdInst(inst))
-                },
-                (prefix eq addrVar) to {
-                    newStmt(TvmArtificialLoadAddrVarInst(inst))
-                },
-            )
-        )
+        // TODO hack! assume that the address is std, since it is the only one we can handle
+        assert(prefix eq addrStd) ?: error("Cannot make address std")
+
+        // TODO go back to the correct implementation
+        newStmt(TvmArtificialLoadAddrStdInst(inst))
+//        forkMulti(
+//            listOf(
+//                (prefix eq addrNone) to {
+//                    newStmt(TvmArtificialLoadAddrNoneInst(inst))
+//                },
+//                (prefix eq addrExtern) to {
+//                    newStmt(TvmArtificialLoadAddrExternInst(inst))
+//                },
+//                (prefix eq addrStd) to {
+//                    newStmt(TvmArtificialLoadAddrStdInst(inst))
+//                },
+//                (prefix eq addrVar) to {
+//                    newStmt(TvmArtificialLoadAddrVarInst(inst))
+//                },
+//            )
+//        )
     }
 }

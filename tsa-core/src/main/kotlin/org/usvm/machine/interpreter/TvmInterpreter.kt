@@ -200,7 +200,6 @@ import org.usvm.machine.state.TvmRefEmptyValue
 import org.usvm.machine.state.TvmRegisters
 import org.usvm.machine.state.TvmStack
 import org.usvm.machine.state.TvmState
-import org.usvm.machine.state.allocSliceFromCell
 import org.usvm.machine.state.bvMaxValueSignedExtended
 import org.usvm.machine.state.bvMaxValueUnsignedExtended
 import org.usvm.machine.state.bvMinValueSignedExtended
@@ -238,6 +237,7 @@ import org.usvm.solver.USatResult
 import org.usvm.targets.UTargetsSet
 import java.math.BigInteger
 import org.ton.bytecode.TvmCompareOtherSdeqInst
+import org.ton.bytecode.TvmContConditionalIfjmprefInst
 import org.usvm.machine.state.getSliceRemainingBitsCount
 import org.usvm.machine.state.slicePreloadDataBits
 
@@ -1365,6 +1365,7 @@ class TvmInterpreter(
             is TvmContConditionalIfInst -> visitIfInst(scope, stmt)
             is TvmContConditionalIfrefInst -> visitIfRefInst(scope, stmt)
             is TvmContConditionalIfjmpInst -> visitIfJmpInst(scope, stmt)
+            is TvmContConditionalIfjmprefInst -> visitIfJmpRefInst(scope, stmt)
             is TvmContConditionalIfelseInst -> visitIfElseInst(scope, stmt)
             is TvmContConditionalIfrefelseInst -> visitIfRefElseInst(scope, stmt)
             else -> TODO("$stmt")
@@ -1375,7 +1376,7 @@ class TvmInterpreter(
         scope.consumeDefaultGas(stmt)
 
         val continuation = scope.calcOnState { stack.takeLastContinuation() }
-        return scope.doIf(continuation, stmt)
+        return scope.doIf(continuation, stmt, isJmp = false)
     }
 
     private fun visitIfRefInst(scope: TvmStepScope, stmt: TvmContConditionalIfrefInst) {
@@ -1384,7 +1385,7 @@ class TvmInterpreter(
 
             TvmContinuationValue(TvmLambda(stmt.c.list.toMutableList()), stack, registers)
         }
-        return scope.doIf(continuation, stmt)
+        return scope.doIf(continuation, stmt, isJmp = false)
     }
 
     private fun visitIfElseInst(scope: TvmStepScope, stmt: TvmContConditionalIfelseInst) {
@@ -1411,14 +1412,15 @@ class TvmInterpreter(
 
     private fun TvmStepScope.doIf(
         continuation: TvmContinuationValue,
-        stmt: TvmInst
+        stmt: TvmInst,
+        isJmp: Boolean,
     ) = with(ctx) {
         val flag = calcOnState { stack.takeLastInt() }
 
         fork(
             flag eq zeroValue,
             blockOnFalseState = {
-                jumpToContinuation(continuation, stmt, returnToTheNextStmt = true)
+                jumpToContinuation(continuation, stmt, returnToTheNextStmt = !isJmp)
             }
         ) ?: return@with
 
@@ -1454,28 +1456,23 @@ class TvmInterpreter(
         }
     }
 
+
     private fun visitIfJmpInst(scope: TvmStepScope, stmt: TvmContConditionalIfjmpInst) {
         scope.consumeDefaultGas(stmt)
 
-        with(ctx) {
-            scope.doWithState {
-                val (continuation, flag) = stack.takeLastContinuation() to stack.takeLastInt()
-                val ifConstraint = mkEq(flag, zeroValue).not()
+        val continuation = scope.calcOnState { stack.takeLastContinuation() }
+        scope.doIf(continuation, stmt, isJmp = true)
+    }
 
-                scope.fork(
-                    ifConstraint,
-                    blockOnTrueState = {
-                        // TODO really?
-//                        registers = continuation.registers
-//                        stack = continuation.stack
-
-                        //  The remainder of the previous current continuation cc is discarded.
-                        jumpToContinuation(continuation, stmt, returnToTheNextStmt = false)
-                    },
-                    blockOnFalseState = { newStmt(stmt.nextStmt()) }
-                )
-            }
+    private fun visitIfJmpRefInst(scope: TvmStepScope, stmt: TvmContConditionalIfjmprefInst) {
+        scope.doWithState {
+            consumeGas(26) // TODO complex gas "26/126/51"
         }
+
+        val continuation = scope.calcOnState {
+            TvmContinuationValue(TvmLambda(stmt.c.list.toMutableList()), stack, registers)
+        }
+        scope.doIf(continuation, stmt, isJmp = true)
     }
 
     private fun visitTvmDictionaryJumpInst(scope: TvmStepScope, stmt: TvmContDictInst) {
