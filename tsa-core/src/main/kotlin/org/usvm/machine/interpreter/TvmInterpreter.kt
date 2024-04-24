@@ -646,9 +646,7 @@ class TvmInterpreter(
                 check(stmt.s.refs.isEmpty()) { "Unexpected refs in $stmt" }
 
                 scope.doWithStateCtx {
-                    val sliceBits = stmt.s.bitsToBv()
-                    val bitLength = sliceBits.sort.sizeBits.toInt()
-                    val sliceData = mkBvZeroExtensionExpr(MAX_DATA_LENGTH - bitLength, sliceBits)
+                    val sliceData = stmt.s.bitsToBv()
 
                     val slice = scope.calcOnState { makeSliceFromData(sliceData) }
 

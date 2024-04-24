@@ -9,6 +9,7 @@ import kotlin.test.Test
 class CellParseTest {
     private val cellParseFiftPath: String = "/cell/CellParse.fif"
     private val cellParseFiftFailurePath: String = "/cell/CellParseFailure.fif"
+    private val slicePushFiftPath: String = "/cell/SlicePush.fif"
 
     @Test
     fun cellLoadIntTest() {
@@ -30,6 +31,19 @@ class CellParseTest {
 
         val symbolicResult = compileAndAnalyzeFift(fiftResourcePath)
         val methodIds = (0..6).toSet()
+
+        compareSymbolicAndConcreteResults(methodIds, symbolicResult) { methodId ->
+            runFiftMethod(fiftResourcePath, methodId)
+        }
+    }
+
+    @Test
+    fun slicePushTest() {
+        val fiftResourcePath = this::class.java.getResource(slicePushFiftPath)?.path?.let { Path(it) }
+            ?: error("Cannot find resource fift $slicePushFiftPath")
+
+        val symbolicResult = compileAndAnalyzeFift(fiftResourcePath)
+        val methodIds = (0..0).toSet()
 
         compareSymbolicAndConcreteResults(methodIds, symbolicResult) { methodId ->
             runFiftMethod(fiftResourcePath, methodId)

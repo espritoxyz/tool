@@ -1,0 +1,10 @@
+"Fift.fif" include
+"Asm.fif" include
+
+PROGRAM{
+  0 DECLMETHOD slice_underflow
+  slice_underflow PROC:<{
+      x{61} PUSHSLICE  // Supposed to be string "a" (found this by compiling FunC file)
+      100 LDI
+  }>
+}END>c
