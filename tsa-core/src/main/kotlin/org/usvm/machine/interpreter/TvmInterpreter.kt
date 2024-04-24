@@ -237,7 +237,14 @@ import org.usvm.solver.USatResult
 import org.usvm.targets.UTargetsSet
 import java.math.BigInteger
 import org.ton.bytecode.TvmCompareOtherSdeqInst
+import org.ton.bytecode.TvmContConditionalIfelserefInst
 import org.ton.bytecode.TvmContConditionalIfjmprefInst
+import org.ton.bytecode.TvmContConditionalIfnotInst
+import org.ton.bytecode.TvmContConditionalIfnotjmpInst
+import org.ton.bytecode.TvmContConditionalIfnotjmprefInst
+import org.ton.bytecode.TvmContConditionalIfnotrefInst
+import org.ton.bytecode.TvmContConditionalIfrefelserefInst
+import org.ton.bytecode.TvmInstList
 import org.usvm.machine.state.getSliceRemainingBitsCount
 import org.usvm.machine.state.slicePreloadDataBits
 
@@ -1360,30 +1367,36 @@ class TvmInterpreter(
                 }
             }
 
-            is TvmContConditionalIfInst -> visitIfInst(scope, stmt)
-            is TvmContConditionalIfrefInst -> visitIfRefInst(scope, stmt)
-            is TvmContConditionalIfjmpInst -> visitIfJmpInst(scope, stmt)
-            is TvmContConditionalIfjmprefInst -> visitIfJmpRefInst(scope, stmt)
+            is TvmContConditionalIfInst -> visitIf(scope, stmt, invertCondition = false)
+            is TvmContConditionalIfnotInst -> visitIf(scope, stmt, invertCondition = true)
+            is TvmContConditionalIfrefInst -> visitIfRef(scope, stmt, stmt.c, invertCondition = false)
+            is TvmContConditionalIfnotrefInst -> visitIfRef(scope, stmt, stmt.c, invertCondition = true)
+            is TvmContConditionalIfjmpInst -> visitIfJmp(scope, stmt, invertCondition = false)
+            is TvmContConditionalIfnotjmpInst -> visitIfJmp(scope, stmt, invertCondition = true)
+            is TvmContConditionalIfjmprefInst -> visitIfJmpRef(scope, stmt, stmt.c, invertCondition = false)
+            is TvmContConditionalIfnotjmprefInst -> visitIfJmpRef(scope, stmt, stmt.c, invertCondition = true)
             is TvmContConditionalIfelseInst -> visitIfElseInst(scope, stmt)
+            is TvmContConditionalIfrefelserefInst -> visitIfRefElseRefInst(scope, stmt)
             is TvmContConditionalIfrefelseInst -> visitIfRefElseInst(scope, stmt)
+            is TvmContConditionalIfelserefInst -> visitIfElseRefInst(scope, stmt)
             else -> TODO("$stmt")
         }
     }
 
-    private fun visitIfInst(scope: TvmStepScope, stmt: TvmContConditionalIfInst) {
+    private fun visitIf(scope: TvmStepScope, stmt: TvmContConditionalInst, invertCondition: Boolean) {
         scope.consumeDefaultGas(stmt)
 
         val continuation = scope.calcOnState { stack.takeLastContinuation() }
-        return scope.doIf(continuation, stmt, isJmp = false)
+        return scope.doIf(continuation, stmt, invertCondition, isJmp = false)
     }
 
-    private fun visitIfRefInst(scope: TvmStepScope, stmt: TvmContConditionalIfrefInst) {
+    private fun visitIfRef(scope: TvmStepScope, stmt: TvmContConditionalInst, ref: TvmInstList, invertCondition: Boolean) {
         val continuation = scope.calcOnState {
             consumeGas(26) // TODO complex gas "26/126/51"
 
-            TvmContinuationValue(TvmLambda(stmt.c.list.toMutableList()), stack, registers)
+            TvmContinuationValue(TvmLambda(ref.list.toMutableList()), stack, registers)
         }
-        return scope.doIf(continuation, stmt, isJmp = false)
+        return scope.doIf(continuation, stmt, invertCondition, isJmp = false)
     }
 
     private fun visitIfElseInst(scope: TvmStepScope, stmt: TvmContConditionalIfelseInst) {
@@ -1397,12 +1410,34 @@ class TvmInterpreter(
         }
     }
 
+    private fun visitIfRefElseRefInst(scope: TvmStepScope, stmt: TvmContConditionalIfrefelserefInst) {
+        scope.doWithState {
+            consumeGas(51) // TODO complex gas "126/51"
+
+            val firstContinuation = TvmContinuationValue(TvmLambda(stmt.c1.list.toMutableList()), stack, registers)
+            val secondContinuation = TvmContinuationValue(TvmLambda(stmt.c2.list.toMutableList()), stack, registers)
+
+            scope.doIfElse(firstContinuation, secondContinuation, stmt)
+        }
+    }
+
     private fun visitIfRefElseInst(scope: TvmStepScope, stmt: TvmContConditionalIfrefelseInst) {
         scope.doWithState {
             consumeGas(26) // TODO complex gas "26/126/51"
 
-            val secondContinuation = TvmContinuationValue(TvmLambda(stmt.c.list.toMutableList()), stack, registers)
+            val firstContinuation = TvmContinuationValue(TvmLambda(stmt.c.list.toMutableList()), stack, registers)
+            val secondContinuation = stack.takeLastContinuation()
+
+            scope.doIfElse(firstContinuation, secondContinuation, stmt)
+        }
+    }
+
+    private fun visitIfElseRefInst(scope: TvmStepScope, stmt: TvmContConditionalIfelserefInst) {
+        scope.doWithState {
+            consumeGas(26) // TODO complex gas "26/126/51"
+
             val firstContinuation = stack.takeLastContinuation()
+            val secondContinuation = TvmContinuationValue(TvmLambda(stmt.c.list.toMutableList()), stack, registers)
 
             scope.doIfElse(firstContinuation, secondContinuation, stmt)
         }
@@ -1411,12 +1446,16 @@ class TvmInterpreter(
     private fun TvmStepScope.doIf(
         continuation: TvmContinuationValue,
         stmt: TvmInst,
+        invertCondition: Boolean,
         isJmp: Boolean,
     ) = with(ctx) {
         val flag = calcOnState { stack.takeLastInt() }
+        val cond = (flag eq zeroValue).let {
+            if (invertCondition) it.not() else it
+        }
 
         fork(
-            flag eq zeroValue,
+            cond,
             blockOnFalseState = {
                 jumpToContinuation(continuation, stmt, returnToTheNextStmt = !isJmp)
             }
@@ -1455,22 +1494,27 @@ class TvmInterpreter(
     }
 
 
-    private fun visitIfJmpInst(scope: TvmStepScope, stmt: TvmContConditionalIfjmpInst) {
+    private fun visitIfJmp(scope: TvmStepScope, stmt: TvmContConditionalInst, invertCondition: Boolean) {
         scope.consumeDefaultGas(stmt)
 
         val continuation = scope.calcOnState { stack.takeLastContinuation() }
-        scope.doIf(continuation, stmt, isJmp = true)
+        scope.doIf(continuation, stmt, invertCondition, isJmp = true)
     }
 
-    private fun visitIfJmpRefInst(scope: TvmStepScope, stmt: TvmContConditionalIfjmprefInst) {
+    private fun visitIfJmpRef(
+        scope: TvmStepScope,
+        stmt: TvmContConditionalInst,
+        ref: TvmInstList,
+        invertCondition: Boolean
+    ) {
         scope.doWithState {
             consumeGas(26) // TODO complex gas "26/126/51"
         }
 
         val continuation = scope.calcOnState {
-            TvmContinuationValue(TvmLambda(stmt.c.list.toMutableList()), stack, registers)
+            TvmContinuationValue(TvmLambda(ref.list.toMutableList()), stack, registers)
         }
-        scope.doIf(continuation, stmt, isJmp = true)
+        scope.doIf(continuation, stmt, invertCondition, isJmp = true)
     }
 
     private fun visitTvmDictionaryJumpInst(scope: TvmStepScope, stmt: TvmContDictInst) {

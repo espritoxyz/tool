@@ -72,6 +72,24 @@ import org.ton.bytecode.TvmDictSerialPlddictqInst
 import org.ton.bytecode.TvmDictSerialPlddictsInst
 import org.ton.bytecode.TvmDictSerialSkipdictInst
 import org.ton.bytecode.TvmDictSerialStdictInst
+import org.ton.bytecode.TvmDictSetBuilderDictaddbInst
+import org.ton.bytecode.TvmDictSetBuilderDictaddgetbInst
+import org.ton.bytecode.TvmDictSetBuilderDictiaddbInst
+import org.ton.bytecode.TvmDictSetBuilderDictiaddgetbInst
+import org.ton.bytecode.TvmDictSetBuilderDictireplacebInst
+import org.ton.bytecode.TvmDictSetBuilderDictireplacegetbInst
+import org.ton.bytecode.TvmDictSetBuilderDictisetbInst
+import org.ton.bytecode.TvmDictSetBuilderDictisetgetbInst
+import org.ton.bytecode.TvmDictSetBuilderDictreplacebInst
+import org.ton.bytecode.TvmDictSetBuilderDictreplacegetbInst
+import org.ton.bytecode.TvmDictSetBuilderDictsetbInst
+import org.ton.bytecode.TvmDictSetBuilderDictsetgetbInst
+import org.ton.bytecode.TvmDictSetBuilderDictuaddbInst
+import org.ton.bytecode.TvmDictSetBuilderDictuaddgetbInst
+import org.ton.bytecode.TvmDictSetBuilderDictureplacebInst
+import org.ton.bytecode.TvmDictSetBuilderDictureplacegetbInst
+import org.ton.bytecode.TvmDictSetBuilderDictusetbInst
+import org.ton.bytecode.TvmDictSetBuilderDictusetgetbInst
 import org.ton.bytecode.TvmDictSetBuilderInst
 import org.ton.bytecode.TvmDictSetDictaddInst
 import org.ton.bytecode.TvmDictSetDictaddgetInst
@@ -132,6 +150,7 @@ import org.usvm.machine.intValue
 import org.usvm.machine.setUnion
 import org.usvm.machine.state.TvmRefsMemoryRegion
 import org.usvm.machine.state.TvmState
+import org.usvm.machine.state.allocSliceFromCell
 import org.usvm.machine.state.assertIfSat
 import org.usvm.machine.state.builderCopy
 import org.usvm.machine.state.builderStoreDataBits
@@ -171,7 +190,7 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
         when (inst) {
             is TvmDictGetInst -> visitDictGet(scope, inst)
             is TvmDictSetInst -> visitDictSet(scope, inst)
-            is TvmDictSetBuilderInst -> TODO()
+            is TvmDictSetBuilderInst -> visitDictSetBuilder(scope, inst)
             is TvmDictDeleteInst -> visitDictDelete(scope, inst)
             is TvmDictSerialInst -> visitDictSerial(scope, inst)
             is TvmDictMinInst -> visitDictMin(scope, inst)
@@ -184,43 +203,70 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
     }
 
     private fun visitDictSet(scope: TvmStepScope, inst: TvmDictSetInst) {
+        val isSetBuilder = false
+        
         when (inst) {
-            is TvmDictSetDictaddInst -> doDictSet(inst, scope, DictKeyType.SLICE, DictValueType.SLICE, getOldValue = false, DictSetMode.ADD)
-            is TvmDictSetDictaddgetInst -> doDictSet(inst, scope, DictKeyType.SLICE, DictValueType.SLICE, getOldValue = true, DictSetMode.ADD)
-            is TvmDictSetDictaddrefInst -> doDictSet(inst, scope, DictKeyType.SLICE, DictValueType.CELL, getOldValue = false, DictSetMode.ADD)
-            is TvmDictSetDictaddgetrefInst -> doDictSet(inst, scope, DictKeyType.SLICE, DictValueType.CELL, getOldValue = true, DictSetMode.ADD)
-            is TvmDictSetDictreplaceInst -> doDictSet(inst, scope, DictKeyType.SLICE, DictValueType.SLICE, getOldValue = false, DictSetMode.REPLACE)
-            is TvmDictSetDictreplacegetInst -> doDictSet(inst, scope, DictKeyType.SLICE, DictValueType.SLICE, getOldValue = true, DictSetMode.REPLACE)
-            is TvmDictSetDictreplacerefInst -> doDictSet(inst, scope, DictKeyType.SLICE, DictValueType.CELL, getOldValue = false, DictSetMode.REPLACE)
-            is TvmDictSetDictreplacegetrefInst -> doDictSet(inst, scope, DictKeyType.SLICE, DictValueType.CELL, getOldValue = true, DictSetMode.REPLACE)
-            is TvmDictSetDictsetInst -> doDictSet(inst, scope, DictKeyType.SLICE, DictValueType.SLICE, getOldValue = false, DictSetMode.SET)
-            is TvmDictSetDictsetgetInst -> doDictSet(inst, scope, DictKeyType.SLICE, DictValueType.SLICE, getOldValue = true, DictSetMode.SET)
-            is TvmDictSetDictsetrefInst -> doDictSet(inst, scope, DictKeyType.SLICE, DictValueType.CELL, getOldValue = false, DictSetMode.SET)
-            is TvmDictSetDictsetgetrefInst -> doDictSet(inst, scope, DictKeyType.SLICE, DictValueType.CELL, getOldValue = true, DictSetMode.SET)
-            is TvmDictSetDictiaddInst -> doDictSet(inst, scope, DictKeyType.SIGNED_INT, DictValueType.SLICE, getOldValue = false, DictSetMode.ADD)
-            is TvmDictSetDictiaddgetInst -> doDictSet(inst, scope, DictKeyType.SIGNED_INT, DictValueType.SLICE, getOldValue = true, DictSetMode.ADD)
-            is TvmDictSetDictiaddrefInst -> doDictSet(inst, scope, DictKeyType.SIGNED_INT, DictValueType.CELL, getOldValue = false, DictSetMode.ADD)
-            is TvmDictSetDictiaddgetrefInst -> doDictSet(inst, scope, DictKeyType.SIGNED_INT, DictValueType.CELL, getOldValue = true, DictSetMode.ADD)
-            is TvmDictSetDictireplaceInst -> doDictSet(inst, scope, DictKeyType.SIGNED_INT, DictValueType.SLICE, getOldValue = false, DictSetMode.REPLACE)
-            is TvmDictSetDictireplacegetInst -> doDictSet(inst, scope, DictKeyType.SIGNED_INT, DictValueType.SLICE, getOldValue = true, DictSetMode.REPLACE)
-            is TvmDictSetDictireplacerefInst -> doDictSet(inst, scope, DictKeyType.SIGNED_INT, DictValueType.CELL, getOldValue = false, DictSetMode.REPLACE)
-            is TvmDictSetDictireplacegetrefInst -> doDictSet(inst, scope, DictKeyType.SIGNED_INT, DictValueType.CELL, getOldValue = true, DictSetMode.REPLACE)
-            is TvmDictSetDictisetInst -> doDictSet(inst, scope, DictKeyType.SIGNED_INT, DictValueType.SLICE, getOldValue = false, DictSetMode.SET)
-            is TvmDictSetDictisetgetInst -> doDictSet(inst, scope, DictKeyType.SIGNED_INT, DictValueType.SLICE, getOldValue = true, DictSetMode.SET)
-            is TvmDictSetDictisetrefInst -> doDictSet(inst, scope, DictKeyType.SIGNED_INT, DictValueType.CELL, getOldValue = false, DictSetMode.SET)
-            is TvmDictSetDictisetgetrefInst -> doDictSet(inst, scope, DictKeyType.SIGNED_INT, DictValueType.CELL, getOldValue = true, DictSetMode.SET)
-            is TvmDictSetDictuaddInst -> doDictSet(inst, scope, DictKeyType.UNSIGNED_INT, DictValueType.SLICE, getOldValue = false, DictSetMode.ADD)
-            is TvmDictSetDictuaddgetInst -> doDictSet(inst, scope, DictKeyType.UNSIGNED_INT, DictValueType.SLICE, getOldValue = true, DictSetMode.ADD)
-            is TvmDictSetDictuaddrefInst -> doDictSet(inst, scope, DictKeyType.UNSIGNED_INT, DictValueType.CELL, getOldValue = false, DictSetMode.ADD)
-            is TvmDictSetDictuaddgetrefInst -> doDictSet(inst, scope, DictKeyType.UNSIGNED_INT, DictValueType.CELL, getOldValue = true, DictSetMode.ADD)
-            is TvmDictSetDictureplaceInst -> doDictSet(inst, scope, DictKeyType.UNSIGNED_INT, DictValueType.SLICE, getOldValue = false, DictSetMode.REPLACE)
-            is TvmDictSetDictureplacegetInst -> doDictSet(inst, scope, DictKeyType.UNSIGNED_INT, DictValueType.SLICE, getOldValue = true, DictSetMode.REPLACE)
-            is TvmDictSetDictureplacerefInst -> doDictSet(inst, scope, DictKeyType.UNSIGNED_INT, DictValueType.CELL, getOldValue = false, DictSetMode.REPLACE)
-            is TvmDictSetDictureplacegetrefInst -> doDictSet(inst, scope, DictKeyType.UNSIGNED_INT, DictValueType.CELL, getOldValue = true, DictSetMode.REPLACE)
-            is TvmDictSetDictusetInst -> doDictSet(inst, scope, DictKeyType.UNSIGNED_INT, DictValueType.SLICE, getOldValue = false, DictSetMode.SET)
-            is TvmDictSetDictusetgetInst -> doDictSet(inst, scope, DictKeyType.UNSIGNED_INT, DictValueType.SLICE, getOldValue = true, DictSetMode.SET)
-            is TvmDictSetDictusetrefInst -> doDictSet(inst, scope, DictKeyType.UNSIGNED_INT, DictValueType.CELL, getOldValue = false, DictSetMode.SET)
-            is TvmDictSetDictusetgetrefInst -> doDictSet(inst, scope, DictKeyType.UNSIGNED_INT, DictValueType.CELL, getOldValue = true, DictSetMode.SET)
+            is TvmDictSetDictaddInst -> doDictSet(inst, scope, DictKeyType.SLICE, DictValueType.SLICE, isSetBuilder, getOldValue = false, DictSetMode.ADD)
+            is TvmDictSetDictaddgetInst -> doDictSet(inst, scope, DictKeyType.SLICE, DictValueType.SLICE, isSetBuilder, getOldValue = true, DictSetMode.ADD)
+            is TvmDictSetDictaddrefInst -> doDictSet(inst, scope, DictKeyType.SLICE, DictValueType.CELL, isSetBuilder, getOldValue = false, DictSetMode.ADD)
+            is TvmDictSetDictaddgetrefInst -> doDictSet(inst, scope, DictKeyType.SLICE, DictValueType.CELL, isSetBuilder, getOldValue = true, DictSetMode.ADD)
+            is TvmDictSetDictreplaceInst -> doDictSet(inst, scope, DictKeyType.SLICE, DictValueType.SLICE, isSetBuilder, getOldValue = false, DictSetMode.REPLACE)
+            is TvmDictSetDictreplacegetInst -> doDictSet(inst, scope, DictKeyType.SLICE, DictValueType.SLICE, isSetBuilder, getOldValue = true, DictSetMode.REPLACE)
+            is TvmDictSetDictreplacerefInst -> doDictSet(inst, scope, DictKeyType.SLICE, DictValueType.CELL, isSetBuilder, getOldValue = false, DictSetMode.REPLACE)
+            is TvmDictSetDictreplacegetrefInst -> doDictSet(inst, scope, DictKeyType.SLICE, DictValueType.CELL, isSetBuilder, getOldValue = true, DictSetMode.REPLACE)
+            is TvmDictSetDictsetInst -> doDictSet(inst, scope, DictKeyType.SLICE, DictValueType.SLICE, isSetBuilder, getOldValue = false, DictSetMode.SET)
+            is TvmDictSetDictsetgetInst -> doDictSet(inst, scope, DictKeyType.SLICE, DictValueType.SLICE, isSetBuilder, getOldValue = true, DictSetMode.SET)
+            is TvmDictSetDictsetrefInst -> doDictSet(inst, scope, DictKeyType.SLICE, DictValueType.CELL, isSetBuilder, getOldValue = false, DictSetMode.SET)
+            is TvmDictSetDictsetgetrefInst -> doDictSet(inst, scope, DictKeyType.SLICE, DictValueType.CELL, isSetBuilder, getOldValue = true, DictSetMode.SET)
+            is TvmDictSetDictiaddInst -> doDictSet(inst, scope, DictKeyType.SIGNED_INT, DictValueType.SLICE, isSetBuilder, getOldValue = false, DictSetMode.ADD)
+            is TvmDictSetDictiaddgetInst -> doDictSet(inst, scope, DictKeyType.SIGNED_INT, DictValueType.SLICE, isSetBuilder, getOldValue = true, DictSetMode.ADD)
+            is TvmDictSetDictiaddrefInst -> doDictSet(inst, scope, DictKeyType.SIGNED_INT, DictValueType.CELL, isSetBuilder, getOldValue = false, DictSetMode.ADD)
+            is TvmDictSetDictiaddgetrefInst -> doDictSet(inst, scope, DictKeyType.SIGNED_INT, DictValueType.CELL, isSetBuilder, getOldValue = true, DictSetMode.ADD)
+            is TvmDictSetDictireplaceInst -> doDictSet(inst, scope, DictKeyType.SIGNED_INT, DictValueType.SLICE, isSetBuilder, getOldValue = false, DictSetMode.REPLACE)
+            is TvmDictSetDictireplacegetInst -> doDictSet(inst, scope, DictKeyType.SIGNED_INT, DictValueType.SLICE, isSetBuilder, getOldValue = true, DictSetMode.REPLACE)
+            is TvmDictSetDictireplacerefInst -> doDictSet(inst, scope, DictKeyType.SIGNED_INT, DictValueType.CELL, isSetBuilder, getOldValue = false, DictSetMode.REPLACE)
+            is TvmDictSetDictireplacegetrefInst -> doDictSet(inst, scope, DictKeyType.SIGNED_INT, DictValueType.CELL, isSetBuilder, getOldValue = true, DictSetMode.REPLACE)
+            is TvmDictSetDictisetInst -> doDictSet(inst, scope, DictKeyType.SIGNED_INT, DictValueType.SLICE, isSetBuilder, getOldValue = false, DictSetMode.SET)
+            is TvmDictSetDictisetgetInst -> doDictSet(inst, scope, DictKeyType.SIGNED_INT, DictValueType.SLICE, isSetBuilder, getOldValue = true, DictSetMode.SET)
+            is TvmDictSetDictisetrefInst -> doDictSet(inst, scope, DictKeyType.SIGNED_INT, DictValueType.CELL, isSetBuilder, getOldValue = false, DictSetMode.SET)
+            is TvmDictSetDictisetgetrefInst -> doDictSet(inst, scope, DictKeyType.SIGNED_INT, DictValueType.CELL, isSetBuilder, getOldValue = true, DictSetMode.SET)
+            is TvmDictSetDictuaddInst -> doDictSet(inst, scope, DictKeyType.UNSIGNED_INT, DictValueType.SLICE, isSetBuilder, getOldValue = false, DictSetMode.ADD)
+            is TvmDictSetDictuaddgetInst -> doDictSet(inst, scope, DictKeyType.UNSIGNED_INT, DictValueType.SLICE, isSetBuilder, getOldValue = true, DictSetMode.ADD)
+            is TvmDictSetDictuaddrefInst -> doDictSet(inst, scope, DictKeyType.UNSIGNED_INT, DictValueType.CELL, isSetBuilder, getOldValue = false, DictSetMode.ADD)
+            is TvmDictSetDictuaddgetrefInst -> doDictSet(inst, scope, DictKeyType.UNSIGNED_INT, DictValueType.CELL, isSetBuilder, getOldValue = true, DictSetMode.ADD)
+            is TvmDictSetDictureplaceInst -> doDictSet(inst, scope, DictKeyType.UNSIGNED_INT, DictValueType.SLICE, isSetBuilder, getOldValue = false, DictSetMode.REPLACE)
+            is TvmDictSetDictureplacegetInst -> doDictSet(inst, scope, DictKeyType.UNSIGNED_INT, DictValueType.SLICE, isSetBuilder, getOldValue = true, DictSetMode.REPLACE)
+            is TvmDictSetDictureplacerefInst -> doDictSet(inst, scope, DictKeyType.UNSIGNED_INT, DictValueType.CELL, isSetBuilder, getOldValue = false, DictSetMode.REPLACE)
+            is TvmDictSetDictureplacegetrefInst -> doDictSet(inst, scope, DictKeyType.UNSIGNED_INT, DictValueType.CELL, isSetBuilder, getOldValue = true, DictSetMode.REPLACE)
+            is TvmDictSetDictusetInst -> doDictSet(inst, scope, DictKeyType.UNSIGNED_INT, DictValueType.SLICE, isSetBuilder, getOldValue = false, DictSetMode.SET)
+            is TvmDictSetDictusetgetInst -> doDictSet(inst, scope, DictKeyType.UNSIGNED_INT, DictValueType.SLICE, isSetBuilder, getOldValue = true, DictSetMode.SET)
+            is TvmDictSetDictusetrefInst -> doDictSet(inst, scope, DictKeyType.UNSIGNED_INT, DictValueType.CELL, isSetBuilder, getOldValue = false, DictSetMode.SET)
+            is TvmDictSetDictusetgetrefInst -> doDictSet(inst, scope, DictKeyType.UNSIGNED_INT, DictValueType.CELL, isSetBuilder, getOldValue = true, DictSetMode.SET)
+        }
+    }
+
+    private fun visitDictSetBuilder(scope: TvmStepScope, inst: TvmDictSetBuilderInst) {
+        val isSetBuilder = true
+
+        when (inst) {
+            is TvmDictSetBuilderDictaddbInst -> doDictSet(inst, scope, DictKeyType.SLICE, DictValueType.SLICE, isSetBuilder, getOldValue = false, DictSetMode.ADD)
+            is TvmDictSetBuilderDictaddgetbInst -> doDictSet(inst, scope, DictKeyType.SLICE, DictValueType.SLICE, isSetBuilder, getOldValue = true, DictSetMode.ADD)
+            is TvmDictSetBuilderDictreplacebInst -> doDictSet(inst, scope, DictKeyType.SLICE, DictValueType.SLICE, isSetBuilder, getOldValue = false, DictSetMode.REPLACE)
+            is TvmDictSetBuilderDictreplacegetbInst -> doDictSet(inst, scope, DictKeyType.SLICE, DictValueType.SLICE, isSetBuilder, getOldValue = true, DictSetMode.REPLACE)
+            is TvmDictSetBuilderDictsetbInst -> doDictSet(inst, scope, DictKeyType.SLICE, DictValueType.SLICE, isSetBuilder, getOldValue = false, DictSetMode.SET)
+            is TvmDictSetBuilderDictsetgetbInst -> doDictSet(inst, scope, DictKeyType.SLICE, DictValueType.SLICE, isSetBuilder, getOldValue = true, DictSetMode.SET)
+            is TvmDictSetBuilderDictiaddbInst -> doDictSet(inst, scope, DictKeyType.SIGNED_INT, DictValueType.SLICE, isSetBuilder, getOldValue = false, DictSetMode.ADD)
+            is TvmDictSetBuilderDictiaddgetbInst -> doDictSet(inst, scope, DictKeyType.SIGNED_INT, DictValueType.SLICE, isSetBuilder, getOldValue = true, DictSetMode.ADD)
+            is TvmDictSetBuilderDictireplacebInst -> doDictSet(inst, scope, DictKeyType.SIGNED_INT, DictValueType.SLICE, isSetBuilder, getOldValue = false, DictSetMode.REPLACE)
+            is TvmDictSetBuilderDictireplacegetbInst -> doDictSet(inst, scope, DictKeyType.SIGNED_INT, DictValueType.SLICE, isSetBuilder, getOldValue = true, DictSetMode.REPLACE)
+            is TvmDictSetBuilderDictisetbInst -> doDictSet(inst, scope, DictKeyType.SIGNED_INT, DictValueType.SLICE, isSetBuilder, getOldValue = false, DictSetMode.SET)
+            is TvmDictSetBuilderDictisetgetbInst -> doDictSet(inst, scope, DictKeyType.SIGNED_INT, DictValueType.SLICE, isSetBuilder, getOldValue = true, DictSetMode.SET)
+            is TvmDictSetBuilderDictuaddbInst -> doDictSet(inst, scope, DictKeyType.UNSIGNED_INT, DictValueType.SLICE, isSetBuilder, getOldValue = false, DictSetMode.ADD)
+            is TvmDictSetBuilderDictuaddgetbInst -> doDictSet(inst, scope, DictKeyType.UNSIGNED_INT, DictValueType.SLICE, isSetBuilder, getOldValue = true, DictSetMode.ADD)
+            is TvmDictSetBuilderDictureplacebInst -> doDictSet(inst, scope, DictKeyType.UNSIGNED_INT, DictValueType.SLICE, isSetBuilder, getOldValue = false, DictSetMode.REPLACE)
+            is TvmDictSetBuilderDictureplacegetbInst -> doDictSet(inst, scope, DictKeyType.UNSIGNED_INT, DictValueType.SLICE, isSetBuilder, getOldValue = true, DictSetMode.REPLACE)
+            is TvmDictSetBuilderDictusetbInst -> doDictSet(inst, scope, DictKeyType.UNSIGNED_INT, DictValueType.SLICE, isSetBuilder, getOldValue = false, DictSetMode.SET)
+            is TvmDictSetBuilderDictusetgetbInst -> doDictSet(inst, scope, DictKeyType.UNSIGNED_INT, DictValueType.SLICE, isSetBuilder, getOldValue = true, DictSetMode.SET)
         }
     }
 
@@ -376,17 +422,18 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
     }
 
     private fun doDictSet(
-        inst: TvmDictSetInst,
+        inst: TvmDictInst,
         scope: TvmStepScope,
         keyType: DictKeyType,
         valueType: DictValueType,
+        isSetBuilder: Boolean,
         getOldValue: Boolean,
         mode: DictSetMode
     ) {
         val keyLength = loadKeyLength(scope)
         val dictCellRef = loadDict(scope)
         val key = loadKey(scope, keyType, keyLength) ?: return
-        val value = loadValue(scope, valueType)
+        val value = loadValue(scope, valueType, isSetBuilder)
         if (value == null) {
             scope.doWithState(throwTypeCheckError)
             return
@@ -842,10 +889,17 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
         }
     }
 
-    private fun loadValue(scope: TvmStepScope, valueType: DictValueType) = scope.calcOnState {
+    private fun loadValue(scope: TvmStepScope, valueType: DictValueType, isSetBuilder: Boolean) = scope.calcOnState {
         when (valueType) {
-            DictValueType.SLICE -> stack.takeLastSlice() // todo: data?
             DictValueType.CELL -> stack.takeLastCell()
+            DictValueType.SLICE -> {
+                if (isSetBuilder) {
+                    val builder = stack.takeLastBuilder() ?: return@calcOnState null
+                    scope.allocSliceFromCell(builder)
+                } else {
+                    stack.takeLastSlice() // todo: data?
+                }
+            } 
         }
     }
 

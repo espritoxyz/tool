@@ -6,12 +6,25 @@ import org.ton.examples.funcCompileAndAnalyzeAllMethods
 import org.ton.examples.runHardTestsRegex
 import org.ton.examples.runHardTestsVar
 import kotlin.io.path.Path
+import kotlin.test.Ignore
 import kotlin.test.Test
 
 class ContractsTest {
     private val nftItemPath: String = "/contracts/nft-item/nft-item.fc"
     private val walletPath: String = "/contracts/wallet-v4/wallet-v4-code.fc"
     private val jettonMinterPath: String = "/contracts/modern-jetton/jetton-minter.func"
+    private val jettonWalletPath: String = "/contracts/modern-jetton/jetton-wallet.func"
+    private val universalLockupWalletPath: String = "/contracts/universal-lockup-wallet/uni-lockup-wallet.fc"
+    private val vestingLockupWalletPath: String = "/contracts/vesting-lockup-wallet/vesting-lockup-wallet.fc"
+    private val bridgePath: String = "/contracts/bridge/bridge_code.fc"
+    private val bridgeMultisigPath: String = "/contracts/bridge/multisig-code.fc"
+    private val bridgeVotesCollectorPath: String = "/contracts/bridge/votes-collector.fc"
+    private val multisigPath: String = "/contracts/multisig/multisig-code.fc"
+    private val storagePath: String = "/contracts/storage/storage-contract.fc"
+    private val storageProviderPath: String = "/contracts/storage/storage-provider.fc"
+    private val vestingPath: String = "/contracts/vesting/vesting_wallet.fc"
+    private val singleNominatorPath: String = "/contracts/single-nominator/single-nominator.fc"
+    private val nominatorPoolPath: String = "/contracts/nominator-pool/pool.fc"
 
     @Test
     fun testWallet() {
@@ -28,6 +41,77 @@ class ContractsTest {
     @Test
     fun jettonMinter() {
         analyzeContract(jettonMinterPath, methodsNumber = 4)
+    }
+
+    @Test
+    fun jettonWallet() {
+        analyzeContract(jettonWalletPath, methodsNumber = 3)
+    }
+
+    @Ignore
+    @Test
+    fun universalLockupWallet() {
+        analyzeContract(universalLockupWalletPath, methodsNumber = 13)
+    }
+
+    @Ignore
+    @Test
+    fun vestingLockupWallet() {
+        analyzeContract(vestingLockupWalletPath, methodsNumber = 6)
+    }
+
+    @Ignore
+    @Test
+    fun bridge() {
+        analyzeContract(bridgePath, methodsNumber = 8)
+    }
+
+    @Ignore
+    @Test
+    fun bridgeMultisig() {
+        analyzeContract(bridgeMultisigPath, methodsNumber = 18)
+    }
+
+    @Ignore
+    @Test
+    fun bridgeVotesCollector() {
+        analyzeContract(bridgeVotesCollectorPath, methodsNumber = 5)
+    }
+
+    @Ignore
+    @Test
+    fun multisig() {
+        analyzeContract(multisigPath, methodsNumber = 16)
+    }
+
+    @Ignore
+    @Test
+    fun storage() {
+        analyzeContract(storagePath, methodsNumber = 7)
+    }
+
+    @Ignore
+    @Test
+    fun storageProvider() {
+        analyzeContract(storageProviderPath, methodsNumber = 14)
+    }
+
+    @Ignore
+    @Test
+    fun vesting() {
+        analyzeContract(vestingPath, methodsNumber = 9)
+    }
+
+    @Ignore
+    @Test
+    fun singleNominator() {
+        analyzeContract(singleNominatorPath, methodsNumber = 3)
+    }
+
+    @Ignore
+    @Test
+    fun nominatorPool() {
+        analyzeContract(nominatorPoolPath, methodsNumber = 3)
     }
 
     private fun analyzeContract(
