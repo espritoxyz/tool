@@ -29,13 +29,14 @@ class GasTest {
         val symbolicResult = analyzeAllMethods(contract)
 
         for ((methodId, tests) in symbolicResult) {
-            val concreteResult = concreteResults.getOrNull(methodId) ?: continue
+            val methodIdInt = methodId.toInt()
+            val concreteResult = concreteResults.getOrNull(methodIdInt) ?: continue
             val test = tests.single()
 
-            assertEquals(concreteResult.exitCode, test.executionCode(), "Method: ${codeBlocks[methodId]}}")
+            assertEquals(concreteResult.exitCode, test.executionCode(), "Method: ${codeBlocks[methodIdInt]}}")
 
             val symbolicGasUsage = test.gasUsage
-            assertEquals(concreteResult.gasUsage, symbolicGasUsage, "Method: ${codeBlocks[methodId]}}")
+            assertEquals(concreteResult.gasUsage, symbolicGasUsage, "Method: ${codeBlocks[methodIdInt]}}")
         }
     }
 

@@ -1,7 +1,9 @@
 package org.ton.bytecode
 
+import kotlinx.serialization.Contextual
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import java.math.BigInteger
 
 @Serializable
 sealed class TvmInstLocation {
@@ -12,7 +14,7 @@ sealed class TvmInstLocation {
 
 @Serializable
 @SerialName("TvmInstMethodLocation")
-data class TvmInstMethodLocation(val methodId: Int, override val index: Int) : TvmInstLocation() {
+data class TvmInstMethodLocation(val methodId: @Contextual BigInteger, override val index: Int) : TvmInstLocation() {
     @kotlinx.serialization.Transient
     override lateinit var codeBlock: TvmCodeBlock
 

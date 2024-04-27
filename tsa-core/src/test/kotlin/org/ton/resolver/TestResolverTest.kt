@@ -109,6 +109,6 @@ class TestResolverTest {
         val test = tests.firstOrNull(predicate)
             ?: return@firstNotNullOf null
 
-        method to test
+        method.toInt() to test
     }
 }

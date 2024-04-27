@@ -20,7 +20,7 @@ class IntComparisonExample {
 
         val symbolicResult = funcCompileAndAnalyzeAllMethods(sourceResourcePath)
         symbolicResult.forEach { (methodId, tests) ->
-            if (methodId == 0)
+            if (methodId.toInt() == 0)
                 return@forEach
             val results = tests.flatMap { test ->
                 test.result.stack.map { (it as TvmTestIntegerValue).value.toInt() }

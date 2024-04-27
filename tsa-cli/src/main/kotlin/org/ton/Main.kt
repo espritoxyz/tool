@@ -10,13 +10,11 @@ import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
 import com.github.ajalt.clikt.parameters.types.path
 import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
+import org.ton.bytecode.TvmContractCode.Companion.json
 import org.usvm.machine.BocAnalyzer
 import org.usvm.machine.FiftAnalyzer
 import org.usvm.machine.FuncAnalyzer
 import org.usvm.machine.TactAnalyzer
-
-private val json = Json { prettyPrint = true }
 
 class ContractProperties : OptionGroup("Contract properties") {
     val contractData by option("-d", "--data").help("The serialized contract persistent data")

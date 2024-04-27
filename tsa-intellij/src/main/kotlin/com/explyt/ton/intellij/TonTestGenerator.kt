@@ -12,14 +12,12 @@ import com.intellij.openapi.vfs.VirtualFile
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
+import org.ton.bytecode.TvmContractCode.Companion.json
 import org.usvm.machine.FiftAnalyzer
 import org.usvm.machine.FuncAnalyzer
 import org.usvm.machine.TactAnalyzer
 import java.io.File
 import java.nio.file.Path
-
-private val json = Json { prettyPrint = true }
 
 @Service(Service.Level.PROJECT)
 class TonTestGenerator(private val project: Project) {

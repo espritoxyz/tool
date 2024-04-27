@@ -1,7 +1,7 @@
 package org.usvm.test
 
+import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
-import org.ton.bigint.BigIntSerializer
 import java.math.BigInteger
 
 @Serializable
@@ -9,8 +9,7 @@ sealed interface TvmTestValue
 
 @Serializable
 data class TvmTestIntegerValue(
-    @Serializable(with = BigIntSerializer::class)
-    val value: BigInteger
+    val value: @Contextual BigInteger
 ): TvmTestValue
 
 @Serializable

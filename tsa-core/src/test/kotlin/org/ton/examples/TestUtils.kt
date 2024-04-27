@@ -163,12 +163,13 @@ internal fun compareMethodStates(
     expectedResult: (Int) -> FiftInterpreterResult,
     comparison: (Int, TvmSymbolicTest, FiftInterpreterResult) -> Unit
 ) {
-    assertEquals(methodIds, symbolicResult.testSuites.mapTo(hashSetOf()) { it.methodId })
+    assertEquals(methodIds, symbolicResult.testSuites.mapTo(hashSetOf()) { it.methodId.toInt() })
 
     for ((method, tests) in symbolicResult.testSuites) {
         val test = tests.single()
-        val concreteResult = expectedResult(method)
-        comparison(method, test, concreteResult)
+        val methodId = method.toInt()
+        val concreteResult = expectedResult(methodId)
+        comparison(methodId, test, concreteResult)
     }
 }
 

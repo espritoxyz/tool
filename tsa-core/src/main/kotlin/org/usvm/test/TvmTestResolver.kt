@@ -1,10 +1,12 @@
 package org.usvm.test
 
+import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 import org.ton.bytecode.TvmInst
 import org.ton.bytecode.TvmMethod
 import org.usvm.machine.state.TvmMethodResult.TvmFailure
 import org.usvm.machine.state.TvmState
+import java.math.BigInteger
 
 data object TvmTestResolver {
     fun resolve(method: TvmMethod, state: TvmState): TvmSymbolicTest {
@@ -32,13 +34,13 @@ data class TvmContractSymbolicTestResult(val testSuites: List<TvmSymbolicTestSui
 
 @Serializable
 data class TvmSymbolicTestSuite(
-    val methodId: Int,
+    val methodId: @Contextual BigInteger,
     val tests: List<TvmSymbolicTest>
 ) : List<TvmSymbolicTest> by tests
 
 @Serializable
 data class TvmSymbolicTest(
-    val methodId: Int,
+    val methodId: @Contextual BigInteger,
     val usedParameters: List<TvmTestValue>,
     val result: TvmMethodSymbolicResult,
     val gasUsage: Int

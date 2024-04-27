@@ -245,6 +245,7 @@ import org.ton.bytecode.TvmContConditionalIfnotjmprefInst
 import org.ton.bytecode.TvmContConditionalIfnotrefInst
 import org.ton.bytecode.TvmContConditionalIfrefelserefInst
 import org.ton.bytecode.TvmInstList
+import org.usvm.machine.bigIntValue
 import org.usvm.machine.state.getSliceRemainingBitsCount
 import org.usvm.machine.state.slicePreloadDataBits
 
@@ -274,7 +275,7 @@ class TvmInterpreter(
     private val gasInterpreter = TvmGasInterpreter(ctx)
     private val globalsInterpreter = TvmGlobalsInterpreter(ctx)
 
-    fun getInitialState(contractCode: TvmContractCode, contractData: Cell, methodId: Int, targets: List<TvmTarget> = emptyList()): TvmState {
+    fun getInitialState(contractCode: TvmContractCode, contractData: Cell, methodId: BigInteger, targets: List<TvmTarget> = emptyList()): TvmState {
         /*val contract = contractCode.methods[0]!!
         val registers = TvmRegisters()
         val currentContinuation = TvmContinuationValue(
@@ -1297,7 +1298,7 @@ class TvmInterpreter(
                     newStmt(stmt.nextStmt())
                 }
                 3 -> {
-                    val mainMethod = contractCode.methods[Int.MAX_VALUE]
+                    val mainMethod = contractCode.methods[Int.MAX_VALUE.toBigInteger()]
                         ?: error("No main method found")
                     val continuationValue = TvmContinuationValue(mainMethod, stack, registers)
                     stack.addContinuation(continuationValue)
@@ -1522,7 +1523,7 @@ class TvmInterpreter(
 
         when (stmt) {
             is TvmContDictCalldictInst -> {
-                val methodId = stmt.n
+                val methodId = stmt.n.toBigInteger()
 
                 scope.doWithState {
 //                    stack += argument.toBv257()
@@ -1553,7 +1554,7 @@ class TvmInterpreter(
 
         when (stmt) {
             is TvmDictSpecialDictigetjmpzInst -> {
-                val methodId = scope.calcOnState { stack.takeLastInt() }.extractConcrete(stmt)
+                val methodId = scope.calcOnState { stack.takeLastInt() }.bigIntValue()
                 val method = contractCode.methods[methodId]!!
 
                 scope.doWithState {
