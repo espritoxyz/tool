@@ -2,7 +2,7 @@ package org.ton.examples.tact
 
 import org.ton.examples.tactCompileAndAnalyzeAllMethods
 import org.usvm.machine.state.TvmIntegerOverflowError
-import org.usvm.test.TvmMethodFailure
+import org.usvm.test.resolver.TvmMethodFailure
 import kotlin.io.path.Path
 import kotlin.test.Test
 import kotlin.test.assertTrue

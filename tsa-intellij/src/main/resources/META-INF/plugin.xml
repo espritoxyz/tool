@@ -8,6 +8,7 @@
   ]]></description>
 
   <depends>com.intellij.modules.platform</depends>
+  <depends>org.ton.intellij-ton</depends>
 
   <extensions defaultExtensionNs="com.intellij">
 

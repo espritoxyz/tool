@@ -11,13 +11,16 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.serialization.encodeToString
-import org.ton.bytecode.TvmContractCode.Companion.json
+import org.ton.intellij.func.psi.FuncFunction
+import org.ton.mapping.makeMethodsMapping
+import org.ton.sarif.toSarifReport
 import org.usvm.machine.FiftAnalyzer
 import org.usvm.machine.FuncAnalyzer
 import org.usvm.machine.TactAnalyzer
 import java.io.File
+import java.math.BigInteger
 import java.nio.file.Path
+import java.util.concurrent.atomic.AtomicInteger
 
 @Service(Service.Level.PROJECT)
 class TonTestGenerator(private val project: Project) {
@@ -43,8 +46,13 @@ class TonTestGenerator(private val project: Project) {
         val testFile = withBackgroundProgressOnPooledThread(project, "Generating TON tests") {
             val tvmAnalyzer = createTvmAnalyzer(generateTestModel)
             val testResult = tvmAnalyzer.analyzeAllMethods(sourcesPath)
-            val testReport = json.encodeToString(testResult)
-            getTestFile(sourcesPath.toFile()).also { it.writeText(testReport) }
+
+            val methodsMapping = hashMapOf<BigInteger, FuncFunction>()
+            makeMethodsMapping(sourcesPath, project, methodsMapping, AtomicInteger(1))
+
+            val sarifReport = testResult.toSarifReport(methodsMapping.mapValues { it.value.name!! })
+
+            getTestFile(sourcesPath.toFile()).also { it.writeText(sarifReport) }
         }
 
         ExplytFileManager.getInstance(project).openFileInEditor(testFile)

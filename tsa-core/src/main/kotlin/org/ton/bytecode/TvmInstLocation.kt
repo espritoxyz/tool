@@ -14,7 +14,10 @@ sealed class TvmInstLocation {
 
 @Serializable
 @SerialName("TvmInstMethodLocation")
-data class TvmInstMethodLocation(val methodId: @Contextual BigInteger, override val index: Int) : TvmInstLocation() {
+data class TvmInstMethodLocation(
+    val methodId: @Contextual BigInteger,
+    override val index: Int
+) : TvmInstLocation() {
     @kotlinx.serialization.Transient
     override lateinit var codeBlock: TvmCodeBlock
 

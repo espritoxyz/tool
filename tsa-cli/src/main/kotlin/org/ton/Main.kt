@@ -9,12 +9,11 @@ import com.github.ajalt.clikt.parameters.options.help
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
 import com.github.ajalt.clikt.parameters.types.path
-import kotlinx.serialization.encodeToString
-import org.ton.bytecode.TvmContractCode.Companion.json
 import org.usvm.machine.BocAnalyzer
 import org.usvm.machine.FiftAnalyzer
 import org.usvm.machine.FuncAnalyzer
 import org.usvm.machine.TactAnalyzer
+import org.ton.sarif.toSarifReport
 
 class ContractProperties : OptionGroup("Contract properties") {
     val contractData by option("-d", "--data").help("The serialized contract persistent data")
@@ -44,7 +43,7 @@ class TactAnalysis : CliktCommand(name = "tact", help = "Options for analyzing T
 
     override fun run() {
         TactAnalyzer.analyzeAllMethods(tactSourcesPath, contractProperties.contractData).let {
-            echo("Success!")
+            echo(it.toSarifReport(methodsMapping = emptyMap()))
         }
     }
 }
@@ -64,7 +63,8 @@ class FuncAnalysis : CliktCommand(name = "func", help = "Options for analyzing F
             funcStdlibPath = funcOptions.funcStdlibPath,
             fiftStdlibPath = fiftOptions.fiftStdlibPath
         ).analyzeAllMethods(funcSourcesPath, contractProperties.contractData).let {
-            echo(json.encodeToString(it))
+            // TODO parse FunC sources in CLI without TON plugin usage
+            echo(it.toSarifReport(methodsMapping = emptyMap()))
         }
     }
 }
@@ -82,7 +82,7 @@ class FiftAnalysis : CliktCommand(name = "fift", help = "Options for analyzing s
         FiftAnalyzer(
             fiftStdlibPath = fiftOptions.fiftStdlibPath
         ).analyzeAllMethods(fiftSourcesPath, contractProperties.contractData).let {
-            echo(json.encodeToString(it))
+            echo(it.toSarifReport(methodsMapping = emptyMap()))
         }
     }
 }
@@ -97,7 +97,7 @@ class BocAnalysis : CliktCommand(name = "boc", help = "Options for analyzing a s
 
     override fun run() {
         BocAnalyzer.analyzeAllMethods(bocPath, contractProperties.contractData).let {
-            echo(json.encodeToString(it))
+            echo(it.toSarifReport(methodsMapping = emptyMap()))
         }
     }
 }

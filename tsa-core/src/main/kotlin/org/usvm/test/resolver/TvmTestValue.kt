@@ -1,4 +1,4 @@
-package org.usvm.test
+package org.usvm.test.resolver
 
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable

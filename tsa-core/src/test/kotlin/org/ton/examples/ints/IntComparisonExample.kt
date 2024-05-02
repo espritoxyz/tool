@@ -5,7 +5,7 @@ import org.ton.examples.compareSymbolicAndConcreteResults
 import org.ton.examples.funcCompileAndAnalyzeAllMethods
 import org.ton.examples.compileAndAnalyzeFift
 import org.ton.examples.runFiftMethod
-import org.usvm.test.TvmTestIntegerValue
+import org.usvm.test.resolver.TvmTestIntegerValue
 import kotlin.io.path.Path
 import kotlin.test.assertEquals
 

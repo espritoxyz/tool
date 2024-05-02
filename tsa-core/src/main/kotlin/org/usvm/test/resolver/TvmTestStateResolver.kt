@@ -1,4 +1,4 @@
-package org.usvm.test
+package org.usvm.test.resolver
 
 import io.ksmt.expr.KBitVecValue
 import io.ksmt.utils.BvUtils.toBigIntegerSigned
@@ -46,7 +46,7 @@ class TvmTestStateResolver(
 
     fun resolveParameters(): List<TvmTestValue> = stack.inputElements.mapNotNull { resolveEntry(it) }.reversed()
 
-    fun resolveResult(): TvmMethodSymbolicResult {
+    fun resolveResultStack(): TvmMethodSymbolicResult {
         val results = state.stack.results
 
         // Do not include exit code for exceptional results to the result

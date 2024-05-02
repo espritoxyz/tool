@@ -2,7 +2,7 @@ package org.ton.examples.overflow
 
 import org.ton.examples.analyzeAllMethods
 import org.usvm.machine.state.TvmIntegerOverflowError
-import org.usvm.test.TvmMethodFailure
+import org.usvm.test.resolver.TvmMethodFailure
 import kotlin.test.Test
 import kotlin.test.assertTrue
 

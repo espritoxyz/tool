@@ -10,3 +10,4 @@ pluginManagement {
 include("tsa-core")
 include("tsa-cli")
 include("tsa-intellij")
+include("tsa-sarif")

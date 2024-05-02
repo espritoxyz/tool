@@ -3,8 +3,8 @@ plugins {
   id("org.jetbrains.intellij") version "1.16.1"
 }
 
-group = "org.explyt.rd"
-version = "1.0-SNAPSHOT"
+group = "org.ton"
+version = "0.1.0-SNAPSHOT"
 
 repositories {
   mavenCentral()
@@ -39,11 +39,14 @@ intellij {
   version.set("2024.1")
   type.set("IC")
 
-  plugins.set(listOf(/* Plugin Dependencies */))
+  plugins.set(listOf("org.ton.intellij-ton:2.1.0"))
 }
 
 dependencies {
   implementation(project(":tsa-core"))
+  implementation(project(":tsa-sarif"))
+
+  implementation("com.github.snksoft:java-crc:1.1.0")
 }
 
 tasks {

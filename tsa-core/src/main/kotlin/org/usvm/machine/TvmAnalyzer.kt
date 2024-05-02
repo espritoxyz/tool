@@ -8,8 +8,8 @@ import mu.KLogging
 import org.ton.bytecode.TvmContractCode
 import org.ton.cell.Cell
 import org.usvm.machine.FuncAnalyzer.Companion.FIFT_EXECUTABLE
-import org.usvm.test.TvmContractSymbolicTestResult
-import org.usvm.test.TvmTestResolver
+import org.usvm.test.resolver.TvmContractSymbolicTestResult
+import org.usvm.test.resolver.TvmTestResolver
 import org.usvm.utils.FileUtils
 import java.nio.file.Path
 import java.nio.file.Paths
