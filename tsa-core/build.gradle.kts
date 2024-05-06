@@ -1,6 +1,3 @@
-val usvmRepo = "com.github.UnitTestBot.usvm"
-val usvmVersion = "875f4e236c"
-
 plugins {
     id("tsa.kotlin-conventions")
     id("org.jetbrains.kotlin.plugin.serialization") version "1.9.22"
@@ -26,7 +23,7 @@ dependencies {
     // todo: remove ksmt-core exclude after upgrading ksmt version in USVM
     implementation("io.ksmt:ksmt-core:${Versions.ksmt}")
 
-    implementation(group = usvmRepo, name = "usvm-core", version = usvmVersion) {
+    implementation(group = Packages.usvm, name = "usvm-core", version = Versions.usvm) {
         exclude(group = "io.ksmt", module = "ksmt-core")
     }
 }

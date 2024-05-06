@@ -9,4 +9,9 @@ object Versions {
     const val mockk = "1.13.4"
     const val junitParams = "5.9.3"
     const val logback = "1.4.8"
+    const val usvm = "0290d10672"
+}
+
+object Packages {
+    const val usvm = "com.github.UnitTestBot.usvm"
 }

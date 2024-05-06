@@ -9,6 +9,7 @@ import org.usvm.UExpr
 import org.usvm.UHeapRef
 import org.usvm.USort
 import org.usvm.isFalse
+import org.usvm.isStaticHeapRef
 import org.usvm.machine.map
 import org.usvm.memory.UMemoryRegion
 import org.usvm.memory.foldHeapRef
@@ -43,10 +44,8 @@ class TvmRefsMemoryRegion<LValue, KeySort : USort, ValueSort: USort>(
         ref = ref,
         initial = this,
         initialGuard = guard,
+        staticIsConcrete = true,
         blockOnConcrete = { region, (concreteRef, refGuard) ->
-            region.writeRefValue(concreteRef.address, key, value, refGuard)
-        },
-        blockOnStatic = { region, (concreteRef, refGuard) ->
             region.writeRefValue(concreteRef.address, key, value, refGuard)
         },
         blockOnSymbolic = { _, (ref, _) -> error("Unexpected input cell $ref") }
@@ -57,11 +56,14 @@ class TvmRefsMemoryRegion<LValue, KeySort : USort, ValueSort: USort>(
             ref = src,
             initial = this,
             initialGuard = src.ctx.trueExpr,
+            staticIsConcrete = true,
             blockOnConcrete = { region, (concreteRef, refGuard) ->
-                region.copyRefValues(concreteRef.address, dst.address, copyFromInputRef = false, refGuard)
-            },
-            blockOnStatic = { region, (concreteRef, refGuard) ->
-                region.copyRefValues(concreteRef.address, dst.address, copyFromInputRef = true, refGuard)
+                region.copyRefValues(
+                    src = concreteRef.address,
+                    dst = dst.address,
+                    copyFromInputRef = isStaticHeapRef(concreteRef),
+                    guard = refGuard
+                )
             },
             blockOnSymbolic = { _, (ref, _) -> error("Unexpected input ref $ref") }
         )
