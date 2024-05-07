@@ -5,10 +5,10 @@ import org.ton.bytecode.TvmAppGasCommitInst
 import org.ton.bytecode.TvmAppGasGasconsumedInst
 import org.ton.bytecode.TvmAppGasInst
 import org.ton.bytecode.TvmAppGasSetgaslimitInst
-import org.ton.bytecode.TvmIntegerType
 import org.usvm.machine.TvmContext
 import org.usvm.machine.TvmStepScope
 import org.usvm.machine.state.TvmOutOfGas
+import org.usvm.machine.state.addInt
 import org.usvm.machine.state.calcConsumedGas
 import org.usvm.machine.state.consumeDefaultGas
 import org.usvm.machine.state.doWithStateCtx
@@ -39,14 +39,14 @@ class TvmGasInterpreter(private val ctx: TvmContext) {
         scope.doWithStateCtx {
             val usedGas = calcConsumedGas()
 
-            stack.add(usedGas, TvmIntegerType)
+            stack.addInt(usedGas.extractToInt257Sort())
             newStmt(stmt.nextStmt())
         }
     }
 
     private fun visitSetGasLimitInst(scope: TvmStepScope, stmt: TvmAppGasSetgaslimitInst) {
         with(ctx) {
-            val gasLimit = scope.calcOnState { stack.takeLastInt() }.extractToSizeSort()
+            val gasLimit = scope.takeLastInt().extractToSizeSort()
             val consumedGas = scope.calcOnState { calcConsumedGas() }
 
             scope.fork(

@@ -7,11 +7,11 @@ import io.ksmt.sort.KBvCustomSizeSort
 import io.ksmt.sort.KBvSort
 import io.ksmt.utils.asExpr
 import io.ksmt.utils.toBigInteger
-import org.ton.bytecode.TvmCellType
+import org.usvm.machine.types.TvmCellType
 import org.ton.bytecode.TvmField
 import org.ton.bytecode.TvmFieldImpl
-import org.ton.bytecode.TvmSliceType
-import org.ton.bytecode.TvmType
+import org.usvm.machine.types.TvmSliceType
+import org.usvm.machine.types.TvmType
 import org.usvm.NULL_ADDRESS
 import org.usvm.UBoolExpr
 import org.usvm.UBv32Sort

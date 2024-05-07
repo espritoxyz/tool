@@ -5,8 +5,7 @@ import kotlinx.collections.immutable.toPersistentList
 import org.ton.bytecode.TvmAliasInst
 import org.ton.bytecode.TvmComplexGas
 import org.ton.bytecode.TvmInst
-import org.ton.bytecode.TvmIntegerType
-import org.ton.bytecode.TvmNullType
+import org.usvm.machine.types.TvmNullType
 import org.ton.bytecode.TvmTupleExplodeInst
 import org.ton.bytecode.TvmTupleExplodevarInst
 import org.ton.bytecode.TvmTupleIndex2Inst
@@ -47,6 +46,9 @@ import org.usvm.machine.TvmStepScope
 import org.usvm.machine.state.SIMPLE_GAS_USAGE
 import org.usvm.machine.state.TvmStack
 import org.usvm.machine.state.TvmStack.TvmStackTupleValueConcreteNew
+import org.usvm.machine.state.addInt
+import org.usvm.machine.state.addOnStack
+import org.usvm.machine.state.addTuple
 import org.usvm.machine.state.calcOnStateCtx
 import org.usvm.machine.state.consumeDefaultGas
 import org.usvm.machine.state.consumeGas
@@ -190,7 +192,7 @@ class TvmTupleInterpreter(private val ctx: TvmContext) {
                 scope.doWithState(throwTypeCheckError)
             } else {
                 scope.doWithStateCtx {
-                    stack.add(minusOneValue, TvmIntegerType)
+                    stack.addInt(minusOneValue)
                     newStmt(stmt.nextStmt())
                 }
             }
@@ -199,7 +201,7 @@ class TvmTupleInterpreter(private val ctx: TvmContext) {
         }
 
         scope.doWithStateCtx {
-            stack.add(tuple.size, TvmIntegerType)
+            stack.addInt(tuple.size)
             newStmt(stmt.nextStmt())
         }
     }
@@ -231,7 +233,7 @@ class TvmTupleInterpreter(private val ctx: TvmContext) {
             with(ctx) { mkBvSignedLessExpr(index.toBv257(), size) },
             blockOnFalseState = {
                 if (quiet) {
-                    stack.add(ctx.nullValue, TvmNullType)
+                    addOnStack(ctx.nullValue, TvmNullType)
                     newStmt(stmt.nextStmt())
                 } else {
                     throwIntegerOutOfRangeError(this)
@@ -331,18 +333,18 @@ class TvmTupleInterpreter(private val ctx: TvmContext) {
     private fun visitIsNull(scope: TvmStepScope, stmt: TvmTupleIsnullInst) = scope.doWithStateCtx {
         val isNull = stack.lastIsNull()
         stack.pop(0)
-        stack.add(if (isNull) trueValue else falseValue, TvmIntegerType)
+        stack.addInt(if (isNull) trueValue else falseValue)
         newStmt(stmt.nextStmt())
     }
 
     private fun visitIsTupleInst(scope: TvmStepScope, stmt: TvmTupleIstupleInst) = scope.doWithStateCtx {
         val lastTuple = scope.takeLastTuple()
-        stack.add(if (lastTuple != null) trueValue else falseValue, TvmIntegerType)
+        stack.addInt(if (lastTuple != null) trueValue else falseValue)
         newStmt(stmt.nextStmt())
     }
 
     private fun visitNullInst(scope: TvmStepScope, stmt: TvmTupleNullInst) = scope.doWithStateCtx {
-        stack.add(nullValue, TvmNullType)
+        scope.addOnStack(nullValue, TvmNullType)
         newStmt(stmt.nextStmt())
     }
 
@@ -353,7 +355,7 @@ class TvmTupleInterpreter(private val ctx: TvmContext) {
         nullsCount: Int,
         skipOneEntryUnderTop: Boolean
     ) {
-        val value = scope.calcOnState { stack.takeLastInt() }
+        val value = scope.takeLastInt()
         val condition = scope.calcOnStateCtx {
             val cond = mkEq(value, zeroValue)
             if (swapIfZero) cond else cond.not()
@@ -364,16 +366,16 @@ class TvmTupleInterpreter(private val ctx: TvmContext) {
                 val entryUnderTop = if (skipOneEntryUnderTop) stack.takeLastEntry() else null
 
                 repeat(nullsCount) {
-                    stack.add(ctx.nullValue, TvmNullType)
+                    addOnStack(ctx.nullValue, TvmNullType)
                 }
 
                 if (entryUnderTop != null) stack.addStackEntry(entryUnderTop)
 
-                stack.add(value, TvmIntegerType)
+                stack.addInt(value)
                 newStmt(stmt.nextStmt())
             },
             blockOnFalseState = {
-                stack.add(value, TvmIntegerType)
+                stack.addInt(value)
                 newStmt(stmt.nextStmt())
             }
         )

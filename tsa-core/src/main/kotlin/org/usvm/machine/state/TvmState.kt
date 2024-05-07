@@ -7,8 +7,8 @@ import kotlinx.collections.immutable.persistentListOf
 import org.ton.bytecode.TvmCodeBlock
 import org.ton.bytecode.TvmContinuationValue
 import org.ton.bytecode.TvmInst
-import org.ton.bytecode.TvmReferenceType
-import org.ton.bytecode.TvmType
+import org.usvm.machine.types.TvmRealReferenceType
+import org.usvm.machine.types.TvmType
 import org.ton.targets.TvmTarget
 import org.usvm.PathNode
 import org.usvm.UBv32Sort
@@ -21,6 +21,8 @@ import org.usvm.UState
 import org.usvm.constraints.UPathConstraints
 import org.usvm.isStaticHeapRef
 import org.usvm.machine.TvmContext
+import org.usvm.machine.types.CellDataTypeInfo
+import org.usvm.machine.types.TvmTypeSystem
 import org.usvm.memory.UMemory
 import org.usvm.model.UModelBase
 import org.usvm.targets.UTargetsSet
@@ -44,6 +46,8 @@ class TvmState(
     forkPoints: PathNode<PathNode<TvmInst>> = PathNode.root(),
     var methodResult: TvmMethodResult = TvmMethodResult.NoCall,
     targets: UTargetsSet<TvmTarget, TvmInst> = UTargetsSet.empty(),
+    val cellDataTypeInfo: CellDataTypeInfo = CellDataTypeInfo.empty(),
+    val typeSystem: TvmTypeSystem
 ) : UState<TvmType, TvmCodeBlock, TvmInst, TvmContext, TvmTarget, TvmState>(
     ctx,
     callStack,
@@ -77,6 +81,8 @@ class TvmState(
             forkPoints = forkPoints,
             methodResult = methodResult,
             targets = targets.clone(),
+            cellDataTypeInfo = cellDataTypeInfo.clone(),
+            typeSystem = typeSystem
         )
     }
 
@@ -86,12 +92,12 @@ class TvmState(
         appendLine(callStack)
     }
 
-    fun generateSymbolicRef(referenceType: TvmReferenceType): UConcreteHeapRef =
+    fun generateSymbolicRef(referenceType: TvmRealReferenceType): UConcreteHeapRef =
         memory.allocStatic(referenceType).also { symbolicRefs = symbolicRefs.add(it.address) }
 
     fun ensureSymbolicRefInitialized(
         ref: UHeapRef,
-        referenceType: TvmReferenceType,
+        referenceType: TvmRealReferenceType,
         initializer: TvmState.(UConcreteHeapRef) -> Unit = {}
     ) {
         if (!isStaticHeapRef(ref)) return

@@ -3,12 +3,13 @@ package org.usvm.machine.interpreter
 import org.ton.bytecode.TvmAppCurrencyInst
 import org.ton.bytecode.TvmAppCurrencyLdgramsInst
 import org.ton.bytecode.TvmAppCurrencyStgramsInst
-import org.ton.bytecode.TvmBuilderType
-import org.ton.bytecode.TvmIntegerType
-import org.ton.bytecode.TvmSliceType
+import org.usvm.machine.types.TvmBuilderType
+import org.usvm.machine.types.TvmIntegerType
+import org.usvm.machine.types.TvmSliceType
 import org.usvm.api.makeSymbolicPrimitive
 import org.usvm.machine.TvmContext
 import org.usvm.machine.TvmStepScope
+import org.usvm.machine.state.addOnStack
 import org.usvm.machine.state.builderCopy
 import org.usvm.machine.state.consumeDefaultGas
 import org.usvm.machine.state.doWithStateCtx
@@ -61,8 +62,8 @@ class TvmCurrencyInterpreter(private val ctx: TvmContext) {
 
             sliceMoveDataPtr(updatedSlice, extendedLength)
 
-            stack.add(grams, TvmIntegerType)
-            stack.add(updatedSlice, TvmSliceType)
+            addOnStack(grams, TvmIntegerType)
+            addOnStack(updatedSlice, TvmSliceType)
 
             newStmt(stmt.nextStmt())
         }
@@ -79,7 +80,7 @@ class TvmCurrencyInterpreter(private val ctx: TvmContext) {
             val updatedBuilder = memory.allocConcrete(TvmBuilderType).also { builderCopy(builder, it) }
 
             // TODO make a real implementation
-            stack.add(updatedBuilder, TvmBuilderType)
+            addOnStack(updatedBuilder, TvmBuilderType)
             newStmt(stmt.nextStmt())
         }
     }

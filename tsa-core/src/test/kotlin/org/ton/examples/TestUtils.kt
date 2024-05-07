@@ -1,7 +1,7 @@
 package org.ton.examples
 
 import org.ton.bytecode.TvmContractCode
-import org.ton.bytecode.TvmIntegerType
+import org.usvm.machine.types.TvmIntegerType
 import org.usvm.machine.BocAnalyzer
 import org.usvm.machine.FiftAnalyzer
 import org.usvm.machine.FiftInterpreterResult
@@ -13,6 +13,7 @@ import org.usvm.test.resolver.TvmContractSymbolicTestResult
 import org.usvm.test.resolver.TvmMethodFailure
 import org.usvm.test.resolver.TvmSuccessfulExecution
 import org.usvm.test.resolver.TvmSymbolicTest
+import org.usvm.test.resolver.TvmSymbolicTestSuite
 import org.usvm.test.resolver.TvmTestIntegerValue
 import org.usvm.test.resolver.TvmTestNullValue
 import org.usvm.test.resolver.TvmTestTupleValue
@@ -180,3 +181,19 @@ internal fun checkAtLeastOneStateForAllMethods(methodsNumber: Int, symbolicResul
 
 internal const val runHardTestsVar = "TSA_RUN_HARD_TESTS"
 internal const val runHardTestsRegex = ".+"
+
+internal fun propertiesFound(
+    testSuite: TvmSymbolicTestSuite,
+    properties: List<(TvmSymbolicTest) -> Boolean>
+) {
+    val failedProperties = mutableListOf<Int>()
+    properties.forEachIndexed outer@{ index, property ->
+        testSuite.tests.forEach { test ->
+            if (property(test)) {
+                return@outer
+            }
+        }
+        failedProperties.add(index)
+    }
+    assertTrue(failedProperties.isEmpty(), "Properties $failedProperties were not found")
+}

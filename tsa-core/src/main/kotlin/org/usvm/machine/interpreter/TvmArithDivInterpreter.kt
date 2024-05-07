@@ -92,7 +92,7 @@ import org.ton.bytecode.TvmArithmDivRshiftmodrVarInst
 import org.ton.bytecode.TvmArithmDivRshiftrInst
 import org.ton.bytecode.TvmArithmDivRshiftrVarInst
 import org.ton.bytecode.TvmArithmDivRshiftrmodInst
-import org.ton.bytecode.TvmIntegerType
+import org.usvm.machine.types.TvmIntegerType
 import org.usvm.UBoolExpr
 import org.usvm.UBvSort
 import org.usvm.UExpr
@@ -101,6 +101,7 @@ import org.usvm.machine.TvmContext.TvmInt257Ext1Sort
 import org.usvm.machine.TvmContext.TvmInt257Ext256Sort
 import org.usvm.machine.TvmContext.TvmInt257Sort
 import org.usvm.machine.TvmStepScope
+import org.usvm.machine.state.addInt
 import org.usvm.machine.state.consumeDefaultGas
 import org.usvm.machine.state.newStmt
 import org.usvm.machine.state.nextStmt
@@ -122,14 +123,14 @@ class TvmArithDivInterpreter(private val ctx: TvmContext) {
                     checkOverflow(noOverflow, scope)
                         ?: return
                     scope.calcOnState {
-                        stack.add(div, TvmIntegerType)
+                        stack.addInt(div)
                     }
                 }
                 is TvmArithmDivModInst -> {
                     val (x, y) = takeOperandsAndCheckForZero(scope)
                         ?: return
                     scope.calcOnState {
-                        stack.add(makeMod(x, y), TvmIntegerType)
+                        stack.addInt(makeMod(x, y))
                     }
                 }
                 is TvmArithmDivDivcInst -> {
@@ -139,7 +140,7 @@ class TvmArithDivInterpreter(private val ctx: TvmContext) {
                     checkOverflow(noOverflow, scope)
                         ?: return
                     scope.calcOnState {
-                        stack.add(divc, TvmIntegerType)
+                        stack.addInt(divc)
                     }
                 }
                 is TvmArithmDivDivrInst -> {
@@ -148,7 +149,7 @@ class TvmArithDivInterpreter(private val ctx: TvmContext) {
                     val (divr, noOverflow) = makeDivr(x, y)
                     checkOverflow(noOverflow, scope) ?: return
                     scope.calcOnState {
-                        stack.add(divr, TvmIntegerType)
+                        stack.addInt(divr)
                     }
                 }
                 is TvmArithmDivDivmodInst -> {
@@ -157,8 +158,8 @@ class TvmArithDivInterpreter(private val ctx: TvmContext) {
                     val (div, mod) = makeDivMod(x, y)
                     checkOverflow(div.noOverflow, scope) ?: return
                     scope.calcOnState {
-                        stack.add(div.value, TvmIntegerType)
-                        stack.add(mod, TvmIntegerType)
+                        stack.addInt(div.value)
+                        stack.addInt(mod)
                     }
                 }
                 is TvmArithmDivDivmodcInst -> {
@@ -168,8 +169,8 @@ class TvmArithDivInterpreter(private val ctx: TvmContext) {
                     checkOverflow(divc.noOverflow, scope)
                         ?: return
                     scope.calcOnState {
-                        stack.add(divc.value, TvmIntegerType)
-                        stack.add(modc, TvmIntegerType)
+                        stack.addInt(divc.value)
+                        stack.addInt(modc)
                     }
                 }
                 is TvmArithmDivDivmodrInst -> {
@@ -179,22 +180,22 @@ class TvmArithDivInterpreter(private val ctx: TvmContext) {
                     checkOverflow(divr.noOverflow, scope)
                         ?: return
                     scope.calcOnState {
-                        stack.add(divr.value, TvmIntegerType)
-                        stack.add(modr, TvmIntegerType)
+                        stack.addInt(divr.value)
+                        stack.addInt(modr)
                     }
                 }
                 is TvmArithmDivModcInst -> {
                     val (x, y) = takeOperandsAndCheckForZero(scope)
                         ?: return
                     scope.calcOnState {
-                        stack.add(makeModc(x, y), TvmIntegerType)
+                        stack.addInt(makeModc(x, y))
                     }
                 }
                 is TvmArithmDivModrInst -> {
                     val (x, y) = takeOperandsAndCheckForZero(scope)
                         ?: return
                     scope.calcOnState {
-                        stack.add(makeModr(x, y), TvmIntegerType)
+                        stack.addInt(makeModr(x, y))
                     }
                 }
                 is TvmArithmDivAdddivmodInst -> {
@@ -843,9 +844,8 @@ class TvmArithDivInterpreter(private val ctx: TvmContext) {
     }
 
     private fun takeOperandsAndCheckForZero(scope: TvmStepScope): Pair<UExpr<TvmInt257Sort>, UExpr<TvmInt257Sort>>? {
-        val (secondOperand, firstOperand) = scope.calcOnState {
-            stack.takeLastInt() to stack.takeLastInt()
-        }
+        val secondOperand = scope.takeLastInt()
+        val firstOperand = scope.takeLastInt()
         checkDivisionByZero(secondOperand, scope)
             ?: return null
         return firstOperand to secondOperand
@@ -855,9 +855,9 @@ class TvmArithDivInterpreter(private val ctx: TvmContext) {
         scope: TvmStepScope,
         makeDivmodX: (UExpr<TvmInt257Ext1Sort>, UExpr<TvmInt257Ext1Sort>) -> Pair<DivResult<TvmInt257Ext1Sort>, UExpr<TvmInt257Ext1Sort>>
     ): Unit? = with(ctx) {
-        val z = scope.calcOnState { stack.takeLastInt() }
-        val w = scope.calcOnState { stack.takeLastInt() }
-        val x = scope.calcOnState { stack.takeLastInt() }
+        val z = scope.takeLastInt()
+        val w = scope.takeLastInt()
+        val x = scope.takeLastInt()
         checkDivisionByZero(z, scope)
             ?: return null
 
@@ -875,8 +875,8 @@ class TvmArithDivInterpreter(private val ctx: TvmContext) {
         val div = divExtended.value.extractToInt257Sort()
         val mod = modExtended.extractToInt257Sort()
         scope.calcOnState {
-            stack.add(div, TvmIntegerType)
-            stack.add(mod, TvmIntegerType)
+            stack.addInt(div)
+            stack.addInt(mod)
         }
     }
 
@@ -886,7 +886,7 @@ class TvmArithDivInterpreter(private val ctx: TvmContext) {
         makeModOrDivX: (UExpr<TvmInt257Ext1Sort>, UExpr<TvmInt257Ext1Sort>) -> List<UExpr<TvmInt257Ext1Sort>>
     ): Unit = with(ctx) {
         val t = (stmtT + 1).toBv257()
-        val x = scope.calcOnState { stack.takeLastInt() }
+        val x = scope.takeLastInt()
         doRshiftX(x, t, scope, makeModOrDivX)
     }
 
@@ -894,12 +894,12 @@ class TvmArithDivInterpreter(private val ctx: TvmContext) {
         scope: TvmStepScope,
         makeModOrDivX: (UExpr<TvmInt257Ext1Sort>, UExpr<TvmInt257Ext1Sort>) -> List<UExpr<TvmInt257Ext1Sort>>
     ): Unit? = with(ctx) {
-        val t = scope.calcOnState { stack.takeLastInt() }
+        val t = scope.takeLastInt()
 
         checkInRange(t, scope, min = 0, max = 256)
             ?: return null
 
-        val x = scope.calcOnState { stack.takeLastInt() }
+        val x = scope.takeLastInt()
         doRshiftX(x, t, scope, makeModOrDivX)
     }
 
@@ -918,7 +918,7 @@ class TvmArithDivInterpreter(private val ctx: TvmContext) {
         resultExtended.forEach {
             val result = it.extractToInt257Sort()
             scope.doWithState {
-                stack.add(result, TvmIntegerType)
+                stack.addInt(result)
             }
         }
     }
@@ -928,7 +928,7 @@ class TvmArithDivInterpreter(private val ctx: TvmContext) {
         stmtT: Int,
         makeModX: (UExpr<TvmInt257Ext1Sort>, UExpr<TvmInt257Ext1Sort>) -> UExpr<TvmInt257Ext1Sort>
     ) = with(ctx) {
-        val x = scope.calcOnState { stack.takeLastInt() }
+        val x = scope.takeLastInt()
         doModpow2X(scope, x, (stmtT + 1).toBv257(), makeModX)
     }
 
@@ -936,10 +936,10 @@ class TvmArithDivInterpreter(private val ctx: TvmContext) {
         scope: TvmStepScope,
         makeModX: (UExpr<TvmInt257Ext1Sort>, UExpr<TvmInt257Ext1Sort>) -> UExpr<TvmInt257Ext1Sort>
     ): Unit? = with(ctx) {
-        val t = scope.calcOnState { stack.takeLastInt() }
+        val t = scope.takeLastInt()
         checkInRange(t, scope, min = 0, max = 256)
             ?: return null
-        val x = scope.calcOnState { stack.takeLastInt() }
+        val x = scope.takeLastInt()
         doModpow2X(scope, x, t, makeModX)
     }
 
@@ -955,7 +955,7 @@ class TvmArithDivInterpreter(private val ctx: TvmContext) {
 
         // no need for checkInBounds: overflow cannot happen
         val result = resultExtended.extractToInt257Sort()
-        scope.calcOnState { stack.add(result, TvmIntegerType) }
+        scope.calcOnState { stack.addInt(result) }
     }
 
     private fun doLShiftXNoVar(
@@ -963,8 +963,8 @@ class TvmArithDivInterpreter(private val ctx: TvmContext) {
         stmtT: Int,
         makeDivOrMod: (UExpr<TvmInt257Ext256Sort>, UExpr<TvmInt257Ext256Sort>) -> List<UExpr<TvmInt257Ext256Sort>>?
     ) = with(ctx) {
-        val y = scope.calcOnState { stack.takeLastInt() }
-        val x = scope.calcOnState { stack.takeLastInt() }
+        val y = scope.takeLastInt()
+        val x = scope.takeLastInt()
         val t = (stmtT + 1).toBv257()
         doLshiftX(scope, x, y, t, makeDivOrMod)
     }
@@ -973,11 +973,11 @@ class TvmArithDivInterpreter(private val ctx: TvmContext) {
         scope: TvmStepScope,
         makeDivOrMod: (UExpr<TvmInt257Ext256Sort>, UExpr<TvmInt257Ext256Sort>) -> List<UExpr<TvmInt257Ext256Sort>>?
     ) = with(ctx) {
-        val t = scope.calcOnState { stack.takeLastInt() }
+        val t = scope.takeLastInt()
         checkInRange(t, scope, min = 0, max = 256)
             ?: return null
-        val y = scope.calcOnState { stack.takeLastInt() }
-        val x = scope.calcOnState { stack.takeLastInt() }
+        val y = scope.takeLastInt()
+        val x = scope.takeLastInt()
         doLshiftX(scope, x, y, t, makeDivOrMod)
     }
 
@@ -996,7 +996,7 @@ class TvmArithDivInterpreter(private val ctx: TvmContext) {
         val resultsExtended = makeDivOrMod(xShifted, yExtended) ?: return null
 
         val results = resultsExtended.map { it.extractToInt257Sort() }
-        results.forEach { result -> scope.calcOnState { stack.add(result, TvmIntegerType) } }
+        results.forEach { result -> scope.calcOnState { stack.addInt(result) } }
     }
 
     private fun doAddrshiftmodXNoVar(
@@ -1004,8 +1004,8 @@ class TvmArithDivInterpreter(private val ctx: TvmContext) {
         stmtT: Int,
         makeDivModX: (UExpr<TvmInt257Ext1Sort>, UExpr<TvmInt257Ext1Sort>) -> Pair<DivResult<TvmInt257Ext1Sort>, UExpr<TvmInt257Ext1Sort>>
     ) = with(ctx) {
-        val w = scope.calcOnState { stack.takeLastInt() }
-        val x = scope.calcOnState { stack.takeLastInt() }
+        val w = scope.takeLastInt()
+        val x = scope.takeLastInt()
         doAddrshiftmodX(scope, x, w, (stmtT + 1).toBv257(), makeDivModX)
     }
 
@@ -1013,11 +1013,11 @@ class TvmArithDivInterpreter(private val ctx: TvmContext) {
         scope: TvmStepScope,
         makeDivModX: (UExpr<TvmInt257Ext1Sort>, UExpr<TvmInt257Ext1Sort>) -> Pair<DivResult<TvmInt257Ext1Sort>, UExpr<TvmInt257Ext1Sort>>
     ) = with(ctx) {
-        val t = scope.calcOnState { stack.takeLastInt() }
+        val t = scope.takeLastInt()
         checkInRange(t, scope, min = 0, max = 256)
             ?: return null
-        val w = scope.calcOnState { stack.takeLastInt() }
-        val x = scope.calcOnState { stack.takeLastInt() }
+        val w = scope.takeLastInt()
+        val x = scope.takeLastInt()
         doAddrshiftmodX(scope, x, w, t, makeDivModX)
     }
 
@@ -1041,8 +1041,8 @@ class TvmArithDivInterpreter(private val ctx: TvmContext) {
         val div = divExtended.value.extractToInt257Sort()
         val mod = modExtended.extractToInt257Sort()
         scope.doWithState {
-            stack.add(div, TvmIntegerType)
-            stack.add(mod, TvmIntegerType)
+            stack.addInt(div)
+            stack.addInt(mod)
         }
     }
 
@@ -1051,9 +1051,9 @@ class TvmArithDivInterpreter(private val ctx: TvmContext) {
         stmtT: Int,
         makeDivModX: (UExpr<TvmInt257Ext256Sort>, UExpr<TvmInt257Ext256Sort>) -> Pair<DivResult<TvmInt257Ext256Sort>, UExpr<TvmInt257Ext256Sort>>
     ) = with(ctx) {
-        val z = scope.calcOnState { stack.takeLastInt() }
-        val w = scope.calcOnState { stack.takeLastInt() }
-        val x = scope.calcOnState { stack.takeLastInt() }
+        val z = scope.takeLastInt()
+        val w = scope.takeLastInt()
+        val x = scope.takeLastInt()
         doLshiftadddivmod(scope, x, w, z, (stmtT + 1).toBv257(), makeDivModX)
     }
 
@@ -1061,12 +1061,12 @@ class TvmArithDivInterpreter(private val ctx: TvmContext) {
         scope: TvmStepScope,
         makeDivModX: (UExpr<TvmInt257Ext256Sort>, UExpr<TvmInt257Ext256Sort>) -> Pair<DivResult<TvmInt257Ext256Sort>, UExpr<TvmInt257Ext256Sort>>
     ) = with(ctx) {
-        val t = scope.calcOnState { stack.takeLastInt() }
+        val t = scope.takeLastInt()
         checkInRange(t, scope, min = 0, max = 256)
             ?: return null
-        val z = scope.calcOnState { stack.takeLastInt() }
-        val w = scope.calcOnState { stack.takeLastInt() }
-        val x = scope.calcOnState { stack.takeLastInt() }
+        val z = scope.takeLastInt()
+        val w = scope.takeLastInt()
+        val x = scope.takeLastInt()
         doLshiftadddivmod(scope, x, w, z, t, makeDivModX)
     }
 
@@ -1096,8 +1096,8 @@ class TvmArithDivInterpreter(private val ctx: TvmContext) {
         val div = divExtended.value.extractToInt257Sort()
         val mod = modExtended.extractToInt257Sort()
         scope.doWithState {
-            stack.add(div, TvmIntegerType)
-            stack.add(mod, TvmIntegerType)
+            stack.addInt(div)
+            stack.addInt(mod)
         }
     }
 
@@ -1105,9 +1105,9 @@ class TvmArithDivInterpreter(private val ctx: TvmContext) {
         scope: TvmStepScope,
         makeDivOrMod: (UExpr<TvmInt257Ext256Sort>, UExpr<TvmInt257Ext256Sort>) -> List<UExpr<TvmInt257Ext256Sort>>?
     ): Unit? = with(ctx) {
-        val z = scope.calcOnState { stack.takeLastInt() }
-        val y = scope.calcOnState { stack.takeLastInt() }
-        val x = scope.calcOnState { stack.takeLastInt() }
+        val z = scope.takeLastInt()
+        val y = scope.takeLastInt()
+        val x = scope.takeLastInt()
         checkDivisionByZero(z, scope)
             ?: return null
 
@@ -1120,7 +1120,7 @@ class TvmArithDivInterpreter(private val ctx: TvmContext) {
 
         val results = resultsExtended.map { it.extractToInt257Sort() }
         scope.doWithState {
-            results.forEach { stack.add(it, TvmIntegerType) }
+            results.forEach { stack.addInt(it) }
         }
     }
 
@@ -1129,8 +1129,8 @@ class TvmArithDivInterpreter(private val ctx: TvmContext) {
         stmtT: Int,
         makeDivX: (UExpr<TvmInt257Ext256Sort>, UExpr<TvmInt257Ext256Sort>) -> List<UExpr<TvmInt257Ext256Sort>>?
     ) = with(ctx) {
-        val y = scope.calcOnState { stack.takeLastInt() }
-        val x = scope.calcOnState { stack.takeLastInt() }
+        val y = scope.takeLastInt()
+        val x = scope.takeLastInt()
         val t = mkBvShiftLeftExpr(oneValue, (stmtT + 1).toBv257())
         doMulrshiftX(scope, x, y, t, makeDivX)
     }
@@ -1139,11 +1139,11 @@ class TvmArithDivInterpreter(private val ctx: TvmContext) {
         scope: TvmStepScope,
         makeDivX: (UExpr<TvmInt257Ext256Sort>, UExpr<TvmInt257Ext256Sort>) -> List<UExpr<TvmInt257Ext256Sort>>?
     ) = with(ctx) {
-        val z = scope.calcOnState { stack.takeLastInt() }
+        val z = scope.takeLastInt()
         checkInRange(z, scope, min = 0, max = 256)
             ?: return null
-        val y = scope.calcOnState { stack.takeLastInt() }
-        val x = scope.calcOnState { stack.takeLastInt() }
+        val y = scope.takeLastInt()
+        val x = scope.takeLastInt()
         val t = mkBvShiftLeftExpr(oneValue, z)
         doMulrshiftX(scope, x, y, t, makeDivX)
     }
@@ -1164,7 +1164,7 @@ class TvmArithDivInterpreter(private val ctx: TvmContext) {
         val results = resultsExtended.map { it.extractToInt257Sort() }
         scope.doWithState {
             results.forEach {
-                stack.add(it, TvmIntegerType)
+                stack.addInt(it)
             }
         }
     }

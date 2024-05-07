@@ -78,7 +78,7 @@ class TvmExceptionsInterpreter(private val ctx: TvmContext) {
         invertCondition: Boolean
     ) {
         with(ctx) {
-            val flag = scope.calcOnState { stack.takeLastInt() }
+            val flag = scope.takeLastInt()
             val throwCondition = (flag eq zeroValue).let {
                 if (invertCondition) it.not() else it
             }
@@ -104,7 +104,7 @@ class TvmExceptionsInterpreter(private val ctx: TvmContext) {
         override fun code(state: TvmState): Int = code
     }
     private data object StackCodeExtractor : ExceptionCodeExtractor {
-        override fun code(state: TvmState): Int = (state.stack.takeLastInt() as? KBitVecValue<*>)?.bigIntValue()?.toInt()
+        override fun code(state: TvmState): Int = (state.takeLastInt() as? KBitVecValue<*>)?.bigIntValue()?.toInt()
             ?: error("Cannot extract concrete code exception from the stack")
     }
 }

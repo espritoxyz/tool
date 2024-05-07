@@ -47,10 +47,10 @@ import org.ton.bytecode.TvmArithmLogicalUfitsInst
 import org.ton.bytecode.TvmArithmLogicalUfitsxInst
 import org.ton.bytecode.TvmArithmLogicalXorInst
 import org.ton.bytecode.TvmArtificialImplicitRetInst
-import org.ton.bytecode.TvmBuilderType
+import org.usvm.machine.types.TvmBuilderType
 import org.ton.bytecode.TvmCellBuildInst
 import org.ton.bytecode.TvmCellParseInst
-import org.ton.bytecode.TvmCellType
+import org.usvm.machine.types.TvmCellType
 import org.ton.bytecode.TvmCellValue
 import org.ton.bytecode.TvmCodeBlock
 import org.ton.bytecode.TvmCodepageInst
@@ -115,9 +115,9 @@ import org.ton.bytecode.TvmDictSpecialDictpushconstInst
 import org.ton.bytecode.TvmDictSpecialInst
 import org.ton.bytecode.TvmExceptionsInst
 import org.ton.bytecode.TvmInst
-import org.ton.bytecode.TvmIntegerType
+import org.usvm.machine.types.TvmIntegerType
 import org.ton.bytecode.TvmLambda
-import org.ton.bytecode.TvmSliceType
+import org.usvm.machine.types.TvmSliceType
 import org.ton.bytecode.TvmStackBasicInst
 import org.ton.bytecode.TvmStackBasicNopInst
 import org.ton.bytecode.TvmStackBasicPopInst
@@ -170,7 +170,7 @@ import org.ton.bytecode.TvmStackComplexXcpuInst
 import org.ton.bytecode.TvmStackComplexXcpuxcInst
 import org.ton.bytecode.TvmSubSliceSerializedLoader
 import org.ton.bytecode.TvmTupleInst
-import org.ton.bytecode.TvmType
+import org.usvm.machine.types.TvmType
 import org.ton.cell.Cell
 import org.ton.targets.TvmTarget
 import org.usvm.StepResult
@@ -246,14 +246,19 @@ import org.ton.bytecode.TvmContConditionalIfrefelserefInst
 import org.ton.bytecode.TvmInstList
 import org.usvm.machine.TvmStepScope
 import org.usvm.machine.bigIntValue
+import org.usvm.machine.state.addInt
+import org.usvm.machine.state.addContinuation
+import org.usvm.machine.state.addOnStack
 import org.usvm.machine.state.getSliceRemainingBitsCount
 import org.usvm.machine.state.slicePreloadDataBits
+import org.usvm.machine.types.TvmTypeSystem
 
 
 // TODO there are a lot of `scope.calcOnState` and `scope.doWithState` invocations that are not inline - optimize it
 class TvmInterpreter(
     private val ctx: TvmContext,
     private val contractCode: TvmContractCode,
+    val typeSystem: TvmTypeSystem,
     var forkBlackList: UForkBlackList<TvmState, TvmInst> = UForkBlackList.createDefault(),
 ) : UInterpreter<TvmState>() {
     companion object {
@@ -323,7 +328,8 @@ class TvmInterpreter(
             pathConstraints = pathConstraints,
             emptyRefValue = refEmptyValue,
             gasUsage = persistentListOf(),
-            targets = UTargetsSet.from(targets)
+            targets = UTargetsSet.from(targets),
+            typeSystem = typeSystem
         )
         val solver = ctx.solver<TvmType>()
 
@@ -601,7 +607,7 @@ class TvmInterpreter(
         scope.consumeDefaultGas(stmt)
         scope.doWithState {
             val value = stmt.bv257value(ctx)
-            stack.add(value, TvmIntegerType)
+            stack.addInt(value)
             newStmt(stmt.nextStmt())
         }
     }
@@ -657,7 +663,7 @@ class TvmInterpreter(
 
                     val slice = scope.calcOnState { makeSliceFromData(sliceData) }
 
-                    stack.add(slice, TvmSliceType)
+                    scope.addOnStack(slice, TvmSliceType)
                     newStmt(stmt.nextStmt())
                 }
             }
@@ -687,9 +693,8 @@ class TvmInterpreter(
         with(ctx) {
             val result = when (stmt) {
                 is TvmArithmBasicAddInst -> {
-                    val (secondOperand, firstOperand) = scope.calcOnState {
-                        stack.takeLastInt() to stack.takeLastInt()
-                    }
+                    val secondOperand = scope.takeLastInt()
+                    val firstOperand = scope.takeLastInt()
                     // TODO optimize using ksmt implementation?
                     val resNoOverflow = mkBvAddNoOverflowExpr(firstOperand, secondOperand, isSigned = true)
                     checkOverflow(resNoOverflow, scope) ?: return
@@ -700,9 +705,8 @@ class TvmInterpreter(
                 }
 
                 is TvmArithmBasicSubInst -> {
-                    val (secondOperand, firstOperand) = scope.calcOnState {
-                        stack.takeLastInt() to stack.takeLastInt()
-                    }
+                    val secondOperand = scope.takeLastInt()
+                    val firstOperand = scope.takeLastInt()
                     // TODO optimize using ksmt implementation?
                     val resNoOverflow = mkBvSubNoOverflowExpr(firstOperand, secondOperand)
                     checkOverflow(resNoOverflow, scope) ?: return
@@ -713,9 +717,8 @@ class TvmInterpreter(
                 }
 
                 is TvmArithmBasicMulInst -> {
-                    val (secondOperand, firstOperand) = scope.calcOnState {
-                        stack.takeLastInt() to stack.takeLastInt()
-                    }
+                    val secondOperand = scope.takeLastInt()
+                    val firstOperand = scope.takeLastInt()
                     // TODO optimize using ksmt implementation?
                     val resNoOverflow = mkBvMulNoOverflowExpr(firstOperand, secondOperand, isSigned = true)
                     checkOverflow(resNoOverflow, scope) ?: return
@@ -726,7 +729,7 @@ class TvmInterpreter(
                 }
 //            else -> error("Unknown stmt: $stmt")
                 is TvmArithmBasicAddconstInst -> {
-                    val firstOperand = scope.calcOnState { stack.takeLastInt() }
+                    val firstOperand = scope.takeLastInt()
                     val secondOperand = stmt.c.toBv257()
 
                     // TODO optimize using ksmt implementation?
@@ -738,7 +741,7 @@ class TvmInterpreter(
                     mkBvAddExpr(firstOperand, secondOperand)
                 }
                 is TvmArithmBasicMulconstInst -> {
-                    val firstOperand = scope.calcOnState { stack.takeLastInt() }
+                    val firstOperand = scope.takeLastInt()
                     val secondOperand = stmt.c.toBv257()
 
                     // TODO optimize using ksmt implementation?
@@ -751,7 +754,7 @@ class TvmInterpreter(
                 }
 
                 is TvmArithmBasicIncInst -> {
-                    val firstOperand = scope.calcOnState { stack.takeLastInt() }
+                    val firstOperand = scope.takeLastInt()
                     val secondOperand = oneValue
 
                     // TODO optimize using ksmt implementation?
@@ -763,7 +766,7 @@ class TvmInterpreter(
                     mkBvAddExpr(firstOperand, secondOperand)
                 }
                 is TvmArithmBasicDecInst -> {
-                    val firstOperand = scope.calcOnState { stack.takeLastInt() }
+                    val firstOperand = scope.takeLastInt()
                     val secondOperand = oneValue
 
                     // TODO optimize using ksmt implementation?
@@ -775,7 +778,7 @@ class TvmInterpreter(
                     mkBvSubExpr(firstOperand, secondOperand)
                 }
                 is TvmArithmBasicNegateInst -> {
-                    val operand = scope.calcOnState { stack.takeLastInt() }
+                    val operand = scope.takeLastInt()
 
                     scope.fork(
                         operand eq min257BitValue,
@@ -788,7 +791,7 @@ class TvmInterpreter(
             }
 
             scope.doWithState {
-                stack.add(result, TvmIntegerType)
+                stack.addInt(result)
                 newStmt(stmt.nextStmt())
             }
         }
@@ -814,31 +817,34 @@ class TvmInterpreter(
             is TvmArithmLogicalOrInst -> {
                 scope.consumeDefaultGas(stmt)
 
-                val (secondOperand, firstOperand) = scope.calcOnState { stack.takeLastInt() to stack.takeLastInt() }
+                val secondOperand = scope.takeLastInt()
+                val firstOperand = scope.takeLastInt()
                 mkBvOrExpr(firstOperand, secondOperand)
             }
             is TvmArithmLogicalXorInst -> {
                 scope.consumeDefaultGas(stmt)
 
-                val (secondOperand, firstOperand) = scope.calcOnState { stack.takeLastInt() to stack.takeLastInt() }
+                val secondOperand = scope.takeLastInt()
+                val firstOperand = scope.takeLastInt()
                 mkBvXorExpr(firstOperand, secondOperand)
             }
             is TvmArithmLogicalAndInst -> {
                 scope.consumeDefaultGas(stmt)
 
-                val (secondOperand, firstOperand) = scope.calcOnState { stack.takeLastInt() to stack.takeLastInt() }
+                val secondOperand = scope.takeLastInt()
+                val firstOperand = scope.takeLastInt()
                 mkBvAndExpr(firstOperand, secondOperand)
             }
             is TvmArithmLogicalNotInst -> {
                 scope.doWithState { consumeGas(18) } // todo: 26 in docs, but 18 in concrete execution
 
-                val value = scope.calcOnState { stack.takeLastInt() }
+                val value = scope.takeLastInt()
                 mkBvNotExpr(value)
             }
             is TvmArithmLogicalAbsInst -> {
                 scope.consumeDefaultGas(stmt)
 
-                val value = scope.calcOnState { stack.takeLastInt() }
+                val value = scope.takeLastInt()
                 checkOverflow(mkBvNegationNoOverflowExpr(value), scope) ?: return
 
                 mkIte(
@@ -850,7 +856,8 @@ class TvmInterpreter(
             is TvmArithmLogicalMaxInst -> {
                 scope.consumeDefaultGas(stmt)
 
-                val (secondOperand, firstOperand) = scope.calcOnState { stack.takeLastInt() to stack.takeLastInt() }
+                val secondOperand = scope.takeLastInt()
+                val firstOperand = scope.takeLastInt()
 
                 mkIte(
                     condition = mkBvSignedGreaterOrEqualExpr(firstOperand, secondOperand),
@@ -861,7 +868,8 @@ class TvmInterpreter(
             is TvmArithmLogicalMinInst -> {
                 scope.consumeDefaultGas(stmt)
 
-                val (secondOperand, firstOperand) = scope.calcOnState { stack.takeLastInt() to stack.takeLastInt() }
+                val secondOperand = scope.takeLastInt()
+                val firstOperand = scope.takeLastInt()
 
                 mkIte(
                     condition = mkBvSignedGreaterOrEqualExpr(firstOperand, secondOperand),
@@ -872,7 +880,8 @@ class TvmInterpreter(
             is TvmArithmLogicalMinmaxInst -> {
                 scope.consumeDefaultGas(stmt)
 
-                val (secondOperand, firstOperand) = scope.calcOnState { stack.takeLastInt() to stack.takeLastInt() }
+                val secondOperand = scope.takeLastInt()
+                val firstOperand = scope.takeLastInt()
 
                 val min = mkIte(
                     condition = mkBvSignedGreaterOrEqualExpr(firstOperand, secondOperand),
@@ -886,8 +895,8 @@ class TvmInterpreter(
                 )
 
                 scope.doWithState {
-                    stack.add(min, TvmIntegerType)
-                    stack.add(max, TvmIntegerType)
+                    stack.addInt(min)
+                    stack.addInt(max)
                     newStmt(stmt.nextStmt())
                 }
 
@@ -896,7 +905,7 @@ class TvmInterpreter(
             is TvmArithmLogicalPow2Inst -> {
                 scope.consumeDefaultGas(stmt)
 
-                val exp = scope.calcOnState { stack.takeLastInt() }
+                val exp = scope.takeLastInt()
                 val notOutOfRangeExpr = unsignedIntegerFitsBits(exp, 10u)
                 checkOutOfRange(notOutOfRangeExpr, scope) ?: return
 
@@ -908,7 +917,7 @@ class TvmInterpreter(
             is TvmArithmLogicalLshiftInst -> {
                 scope.consumeDefaultGas(stmt)
 
-                val value = scope.calcOnState { stack.takeLastInt() }
+                val value = scope.takeLastInt()
                 val shift = stmt.c + 1
                 val shiftValue = shift.toBv257()
                 check(shift in 1..256) { "Unexpected shift $shift" }
@@ -926,7 +935,8 @@ class TvmInterpreter(
             is TvmArithmLogicalLshiftVarInst -> {
                 scope.consumeDefaultGas(stmt)
 
-                val (shift, value) = scope.calcOnState { stack.takeLastInt() to stack.takeLastInt() }
+                val shift = scope.takeLastInt()
+                val value = scope.takeLastInt()
                 val notOutOfRangeExpr = unsignedIntegerFitsBits(shift, 10u)
                 checkOutOfRange(notOutOfRangeExpr, scope) ?: return
 
@@ -945,7 +955,7 @@ class TvmInterpreter(
             is TvmArithmLogicalRshiftInst -> {
                 scope.doWithState { consumeGas(26) } // todo: 18 in docs, but 26 in concrete execution
 
-                val value = scope.calcOnState { stack.takeLastInt() }
+                val value = scope.takeLastInt()
                 val shift = stmt.c + 1
                 check(shift in 1..256) { "Unexpected shift $shift" }
 
@@ -954,7 +964,8 @@ class TvmInterpreter(
             is TvmArithmLogicalRshiftVarInst -> {
                 scope.consumeDefaultGas(stmt)
 
-                val (shift, value) = scope.calcOnState { stack.takeLastInt() to stack.takeLastInt() }
+                val shift = scope.takeLastInt()
+                val value = scope.takeLastInt()
                 val notOutOfRangeExpr = unsignedIntegerFitsBits(shift, 10u)
                 checkOutOfRange(notOutOfRangeExpr, scope) ?: return
 
@@ -963,7 +974,7 @@ class TvmInterpreter(
             is TvmArithmLogicalFitsInst -> {
                 scope.doWithState { consumeGas(26) }
 
-                val value = scope.calcOnState { stack.takeLastInt() }
+                val value = scope.takeLastInt()
                 val sizeBits = stmt.c + 1
                 check(sizeBits in 1..256) { "Unexpected sizeBits $sizeBits" }
 
@@ -975,7 +986,8 @@ class TvmInterpreter(
             is TvmArithmLogicalFitsxInst -> {
                 scope.doWithState { consumeGas(26) }
 
-                val (sizeBits, value) = scope.calcOnState { stack.takeLastInt() to stack.takeLastInt() }
+                val sizeBits = scope.takeLastInt()
+                val value = scope.takeLastInt()
                 val notOutOfRangeExpr = unsignedIntegerFitsBits(sizeBits, 10u)
                 checkOutOfRange(notOutOfRangeExpr, scope) ?: return
 
@@ -993,7 +1005,7 @@ class TvmInterpreter(
             is TvmArithmLogicalUfitsInst -> {
                 scope.doWithState { consumeGas(26) }
 
-                val value = scope.calcOnState { stack.takeLastInt() }
+                val value = scope.takeLastInt()
                 val sizeBits = stmt.c + 1
                 check(sizeBits in 1..256) { "Unexpected sizeBits $sizeBits" }
 
@@ -1005,7 +1017,8 @@ class TvmInterpreter(
             is TvmArithmLogicalUfitsxInst -> {
                 scope.doWithState { consumeGas(26) }
 
-                val (sizeBits, value) = scope.calcOnState { stack.takeLastInt() to stack.takeLastInt() }
+                val sizeBits = scope.takeLastInt()
+                val value = scope.takeLastInt()
                 val notOutOfRangeExpr = unsignedIntegerFitsBits(sizeBits, 10u)
                 checkOutOfRange(notOutOfRangeExpr, scope) ?: return
                 
@@ -1026,7 +1039,7 @@ class TvmInterpreter(
             is TvmArithmLogicalBitsizeInst -> {
                 scope.consumeDefaultGas(stmt)
 
-                val value = scope.calcOnState { stack.takeLastInt() }
+                val value = scope.takeLastInt()
                 val symbolicSizeBits = scope.calcOnState { makeSymbolicPrimitive(int257sort) }
 
                 val disjArgs = mutableListOf(
@@ -1063,7 +1076,7 @@ class TvmInterpreter(
             is TvmArithmLogicalUbitsizeInst -> {
                 scope.consumeDefaultGas(stmt)
 
-                val value = scope.calcOnState { stack.takeLastInt() }
+                val value = scope.takeLastInt()
                 val notOutOfRangeExpr = mkBvSignedGreaterOrEqualExpr(value, zeroValue)
                 checkOutOfRange(notOutOfRangeExpr, scope) ?: return
 
@@ -1100,7 +1113,7 @@ class TvmInterpreter(
         }
 
         scope.doWithState {
-            stack.add(result, TvmIntegerType)
+            stack.addInt(result)
             newStmt(stmt.nextStmt())
         }
     }
@@ -1188,13 +1201,13 @@ class TvmInterpreter(
         val value = with(ctx) {
             mkIte(x eq y, zeroValue, mkIte(mkBvSignedLessExpr(x, y), minusOneValue, oneValue))
         }
-        stack.add(value, TvmIntegerType)
+        stack.addInt(value)
         newStmt(stmt.nextStmt())
     }
 
     private fun TvmState.putBooleanAndToNewStmt(stmt: TvmInst, expr: UBoolExpr) {
         val value = ctx.mkIte(expr, ctx.trueValue, ctx.falseValue)
-        stack.add(value, TvmIntegerType)
+        stack.addInt(value)
         newStmt(stmt.nextStmt())
     }
 
@@ -1222,7 +1235,7 @@ class TvmInterpreter(
                     val result = mkAnd(isRemainingDataEmptyConstraint, areRemainingRefsEmpty).toBv257Bool()
 
                     scope.doWithState {
-                        stack.add(result, TvmIntegerType)
+                        stack.addInt(result)
                         newStmt(stmt.nextStmt())
                     }
                 }
@@ -1254,7 +1267,7 @@ class TvmInterpreter(
         val result = mkAnd(dataLeft1 eq dataLeft2, shiftedData1 eq shiftedData2).toBv257Bool()
 
         scope.doWithState {
-            stack.add(result, TvmIntegerType)
+            stack.addInt(result)
             newStmt(stmt.nextStmt())
         }
     }
@@ -1301,7 +1314,7 @@ class TvmInterpreter(
                         registers.c4 = C4Register(TvmCellValue(symbolicCell))
                         symbolicCell
                     }
-                    stack.add(data, TvmCellType)
+                    scope.addOnStack(data, TvmCellType)
                     newStmt(stmt.nextStmt())
                 }
                 3 -> {
@@ -1359,8 +1372,8 @@ class TvmInterpreter(
             is TvmContConditionalIfretInst -> {
                 scope.consumeDefaultGas(stmt)
 
+                val operand = scope.takeLastInt()
                 scope.doWithState {
-                    val operand = stack.takeLastInt()
                     with(ctx) {
                         val neqZero = mkEq(operand, zeroValue).not()
                         scope.fork(
@@ -1457,7 +1470,7 @@ class TvmInterpreter(
         invertCondition: Boolean,
         isJmp: Boolean,
     ) = with(ctx) {
-        val flag = calcOnState { stack.takeLastInt() }
+        val flag = takeLastInt()
         val cond = (flag eq zeroValue).let {
             if (invertCondition) it.not() else it
         }
@@ -1477,8 +1490,8 @@ class TvmInterpreter(
         secondContinuation: TvmContinuationValue,
         stmt: TvmInst
     ) {
+        val flag = takeLastInt()
         doWithStateCtx {
-            val flag = stack.takeLastInt()
             val ifConstraint = mkEq(flag, zeroValue).not()
 
             fork(
@@ -1561,7 +1574,7 @@ class TvmInterpreter(
 
         when (stmt) {
             is TvmDictSpecialDictigetjmpzInst -> {
-                val methodId = scope.calcOnState { stack.takeLastInt() }.bigIntValue()
+                val methodId = scope.takeLastInt().bigIntValue()
                 val method = contractCode.methods[methodId]!!
 
                 scope.doWithState {

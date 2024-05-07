@@ -30,7 +30,7 @@ class TvmMachine(private val options: UMachineOptions = defaultOptions) : UMachi
     private val ctx = TvmContext(components)
 
     fun analyze(contractCode: TvmContractCode, contractData: Cell, methodId: BigInteger): List<TvmState> {
-        val interpreter = TvmInterpreter(ctx, contractCode)
+        val interpreter = TvmInterpreter(ctx, contractCode, typeSystem = components.typeSystem)
         logger.debug("{}.analyze({})", this, contractCode)
         val initialState = interpreter.getInitialState(contractCode, contractData, methodId)
 

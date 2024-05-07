@@ -3,9 +3,8 @@ package org.usvm.machine.interpreter
 import kotlinx.collections.immutable.persistentListOf
 import org.ton.bytecode.TvmAppConfigGetparamInst
 import org.ton.bytecode.TvmAppConfigInst
-import org.ton.bytecode.TvmIntegerType
-import org.ton.bytecode.TvmNullType
-import org.ton.bytecode.TvmSliceType
+import org.usvm.machine.types.TvmNullType
+import org.usvm.machine.types.TvmSliceType
 import org.usvm.api.makeSymbolicPrimitive
 import org.usvm.api.writeField
 import org.usvm.machine.TvmContext
@@ -13,6 +12,8 @@ import org.usvm.machine.TvmContext.Companion.cellDataLengthField
 import org.usvm.machine.TvmStepScope
 import org.usvm.machine.state.TvmStack
 import org.usvm.machine.state.TvmStack.TvmStackTupleValueConcreteNew
+import org.usvm.machine.state.addInt
+import org.usvm.machine.state.addOnStack
 import org.usvm.machine.state.allocSliceFromCell
 import org.usvm.machine.state.consumeDefaultGas
 import org.usvm.machine.state.doWithStateCtx
@@ -51,7 +52,7 @@ class TvmConfigInterpreter(private val ctx: TvmContext) {
                     ) ?: return@doWithStateCtx
 
                     c7.now = now
-                    stack.add(now, TvmIntegerType)
+                    stack.addInt(now)
                 }
                 5 -> { // LTIME
                     val logicalTime = scope.calcOnState { makeSymbolicPrimitive(int257sort) }
@@ -60,7 +61,7 @@ class TvmConfigInterpreter(private val ctx: TvmContext) {
                         unsatBlock = { error("Cannot make positive LTIME") }
                     ) ?: return@doWithStateCtx
 
-                    stack.add(logicalTime, TvmIntegerType)
+                    stack.addInt(logicalTime)
                 }
                 7 -> { // BALANCE
                     val c7 = scope.calcOnState { registers.c7 }
@@ -91,8 +92,8 @@ class TvmConfigInterpreter(private val ctx: TvmContext) {
                         balance to ctx.nullValue
                     }
 
-                    stack.add(balance, TvmIntegerType)
-                    stack.add(maybeCell, TvmNullType)
+                    stack.addInt(balance)
+                    addOnStack(maybeCell, TvmNullType)
                 }
                 8 -> { // MYADDR
                     // TODO really make a slice with MsgAddressInt from the real contract address?
@@ -105,7 +106,7 @@ class TvmConfigInterpreter(private val ctx: TvmContext) {
                     // TODO write 10 for constructor and 0 for Nothing Anycast to the cell data?
 
                     val slice = scope.calcOnState { scope.allocSliceFromCell(cell) }
-                    scope.doWithState { stack.add(slice, TvmSliceType) }
+                    addOnStack(slice, TvmSliceType)
                 }
                 else -> TODO("$i GETPARAM")
             }

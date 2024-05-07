@@ -1,10 +1,9 @@
 package org.usvm.machine.interpreter
 
 import io.ksmt.expr.KBitVecValue
-import io.ksmt.utils.BvUtils.toBigIntegerSigned
 import io.ksmt.utils.asExpr
-import org.ton.bytecode.TvmBuilderType
-import org.ton.bytecode.TvmCellType
+import org.usvm.machine.types.TvmBuilderType
+import org.usvm.machine.types.TvmCellType
 import org.ton.bytecode.TvmDictDeleteDictdelInst
 import org.ton.bytecode.TvmDictDeleteDictdelgetInst
 import org.ton.bytecode.TvmDictDeleteDictdelgetrefInst
@@ -130,9 +129,9 @@ import org.ton.bytecode.TvmDictSetDictusetrefInst
 import org.ton.bytecode.TvmDictSetInst
 import org.ton.bytecode.TvmDictSpecialInst
 import org.ton.bytecode.TvmDictSubInst
-import org.ton.bytecode.TvmIntegerType
-import org.ton.bytecode.TvmNullType
-import org.ton.bytecode.TvmSliceType
+import org.usvm.machine.types.TvmIntegerType
+import org.usvm.machine.types.TvmNullType
+import org.usvm.machine.types.TvmSliceType
 import org.usvm.UBoolExpr
 import org.usvm.UBvSort
 import org.usvm.UConcreteHeapRef
@@ -149,10 +148,14 @@ import org.usvm.machine.TvmContext
 import org.usvm.machine.TvmStepScope
 import org.usvm.machine.intValue
 import org.usvm.machine.setUnion
+import org.usvm.machine.types.TvmSymbolicCellDataDictConstructorBit
 import org.usvm.machine.state.TvmRefsMemoryRegion
 import org.usvm.machine.state.TvmState
+import org.usvm.machine.state.addInt
+import org.usvm.machine.state.addOnStack
 import org.usvm.machine.state.allocSliceFromCell
 import org.usvm.machine.state.assertIfSat
+import org.usvm.machine.state.assertType
 import org.usvm.machine.state.builderCopy
 import org.usvm.machine.state.builderStoreDataBits
 import org.usvm.machine.state.builderStoreNextRef
@@ -164,6 +167,7 @@ import org.usvm.machine.state.ensureSymbolicSliceInitialized
 import org.usvm.machine.state.generateSymbolicCell
 import org.usvm.machine.state.generateSymbolicSlice
 import org.usvm.machine.state.makeSliceFromData
+import org.usvm.machine.types.makeSliceTypeLoad
 import org.usvm.machine.state.newStmt
 import org.usvm.machine.state.nextStmt
 import org.usvm.machine.state.sliceCopy
@@ -176,6 +180,7 @@ import org.usvm.machine.state.takeLastCell
 import org.usvm.machine.state.takeLastInt
 import org.usvm.machine.state.takeLastSlice
 import org.usvm.machine.state.throwTypeCheckError
+import org.usvm.machine.types.TvmDictCellType
 import org.usvm.memory.ULValue
 import org.usvm.memory.UMemoryRegion
 import org.usvm.memory.UMemoryRegionId
@@ -363,17 +368,19 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
         }
 
         val dictConstructorTypeBit = scope.slicePreloadDataBits(slice, bits = 1) ?: return
+        scope.doWithState { makeSliceTypeLoad(slice, TvmSymbolicCellDataDictConstructorBit(ctx)) }
+
         val dictIsNotEmpty = scope.calcOnStateCtx { mkEq(dictConstructorTypeBit, mkBv(value = 1, sizeBits = 1u)) }
 
         scope.fork(
             dictIsNotEmpty,
             blockOnFalseState = {
-                stack.add(ctx.nullValue, TvmNullType)
+                addOnStack(ctx.nullValue, TvmNullType)
 
                 if (returnUpdatedSlice) {
                     val updatedSlice = memory.allocConcrete(TvmSliceType).also { sliceCopy(slice, it) }
                     sliceMoveDataPtr(updatedSlice, bits = 1)
-                    stack.add(updatedSlice, TvmSliceType)
+                    addOnStack(updatedSlice, TvmSliceType)
                 }
 
                 newStmt(inst.nextStmt())
@@ -382,13 +389,14 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
 
         scope.doWithStateCtx {
             val dictCellRef = scope.slicePreloadNextRef(slice) ?: return@doWithStateCtx
-            stack.add(dictCellRef, TvmCellType)
+            addOnStack(dictCellRef, TvmCellType)
+            assertType(dictCellRef, TvmDictCellType)
 
             if (returnUpdatedSlice) {
                 val updatedSlice = memory.allocConcrete(TvmSliceType).also { sliceCopy(slice, it) }
                 sliceMoveDataPtr(updatedSlice, bits = 1)
                 sliceMoveRefPtr(updatedSlice)
-                stack.add(updatedSlice, TvmSliceType)
+                addOnStack(updatedSlice, TvmSliceType)
             }
 
             newStmt(inst.nextStmt())
@@ -417,7 +425,7 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
         }
 
         scope.doWithStateCtx {
-            stack.add(resultBuilder, TvmBuilderType)
+            addOnStack(resultBuilder, TvmBuilderType)
             newStmt(inst.nextStmt())
         }
     }
@@ -441,7 +449,7 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
         }
 
         val dictId = DictId(keyLength)
-        val resultDict = scope.calcOnState { memory.allocConcrete(TvmCellType) }
+        val resultDict = scope.calcOnState { memory.allocConcrete(TvmDictCellType) }
 
         val dictContainsKey = dictCellRef?.let {
             val keyContainsLValue = USetEntryLValue(key.sort, dictCellRef, key, dictId, DictKeyInfo)
@@ -483,18 +491,18 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
         val returnOldDict = keyContains && mode == DictSetMode.ADD || !keyContains && mode == DictSetMode.REPLACE
         if (returnOldDict) {
             if (initialDictRef == null) {
-                stack.add(ctx.nullValue, TvmNullType)
+                addOnStack(ctx.nullValue, TvmNullType)
             } else {
-                stack.add(initialDictRef, TvmCellType)
+                addOnStack(initialDictRef, TvmCellType)
             }
         } else {
-            stack.add(result, TvmCellType)
+            addOnStack(result, TvmCellType)
         }
 
         if (keyContains && getOldValue) {
             when (oldValueType) {
-                DictValueType.SLICE -> stack.add(oldValue!!, TvmSliceType)
-                DictValueType.CELL -> stack.add(oldValue!!, TvmCellType)
+                DictValueType.SLICE -> addOnStack(oldValue!!, TvmSliceType)
+                DictValueType.CELL -> addOnStack(oldValue!!, TvmCellType)
             }
         }
 
@@ -506,7 +514,7 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
 
         if (status != null) {
             val statusValue = if (status) ctx.trueValue else ctx.falseValue
-            stack.add(statusValue, TvmIntegerType)
+            stack.addInt(statusValue)
         }
     }
 
@@ -522,7 +530,7 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
 
         if (dictCellRef == null) {
             scope.doWithStateCtx {
-                stack.add(falseValue, TvmIntegerType)
+                addOnStack(falseValue, TvmIntegerType)
                 newStmt(inst.nextStmt())
             }
             return
@@ -541,11 +549,11 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
             dictContainsKey,
             blockOnTrueState = {
                 storeValue(valueType, value)
-                stack.add(ctx.trueValue, TvmIntegerType)
+                addOnStack(ctx.trueValue, TvmIntegerType)
                 newStmt(inst.nextStmt())
             },
             blockOnFalseState = {
-                stack.add(ctx.falseValue, TvmIntegerType)
+                addOnStack(ctx.falseValue, TvmIntegerType)
                 newStmt(inst.nextStmt())
             }
         )
@@ -564,8 +572,8 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
 
         if (dictCellRef == null) {
             scope.doWithStateCtx {
-                stack.add(nullValue, TvmNullType)
-                stack.add(falseValue, TvmIntegerType)
+                addOnStack(nullValue, TvmNullType)
+                addOnStack(falseValue, TvmIntegerType)
                 newStmt(inst.nextStmt())
             }
             return
@@ -582,28 +590,28 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
 
         handleDictRemoveKey(scope, dictCellRef, dictId, key, valueType, dictContainsKey,
             originalDictNotContainsKey = {
-                stack.add(dictCellRef, TvmCellType)
-                stack.add(ctx.falseValue, TvmIntegerType)
+                addOnStack(dictCellRef, TvmCellType)
+                addOnStack(ctx.falseValue, TvmIntegerType)
                 newStmt(inst.nextStmt())
             },
             originalDictContainsKeyEmptyResult = {
-                stack.add(ctx.nullValue, TvmNullType)
+                addOnStack(ctx.nullValue, TvmNullType)
 
                 if (getOldValue) {
                     storeValue(valueType, value)
                 }
 
-                stack.add(ctx.trueValue, TvmIntegerType)
+                addOnStack(ctx.trueValue, TvmIntegerType)
                 newStmt(inst.nextStmt())
             },
             originalDictContainsKeyNonEmptyResult = { resultDict ->
-                stack.add(resultDict, TvmCellType)
+                addOnStack(resultDict, TvmCellType)
 
                 if (getOldValue) {
                     storeValue(valueType, value)
                 }
 
-                stack.add(ctx.trueValue, TvmIntegerType)
+                addOnStack(ctx.trueValue, TvmIntegerType)
                 newStmt(inst.nextStmt())
             }
         )
@@ -623,10 +631,10 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
         if (dictCellRef == null) {
             scope.doWithStateCtx {
                 if (removeKey) {
-                    stack.add(nullValue, TvmNullType)
+                    addOnStack(nullValue, TvmNullType)
                 }
 
-                stack.add(falseValue, TvmIntegerType)
+                addOnStack(falseValue, TvmIntegerType)
                 newStmt(inst.nextStmt())
             }
             return
@@ -674,7 +682,7 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
             scope.doWithStateCtx {
                 storeValue(valueType, value)
                 storeKey(keyType, resultElement)
-                stack.add(trueValue, TvmIntegerType)
+                addOnStack(trueValue, TvmIntegerType)
                 newStmt(inst.nextStmt())
             }
             return
@@ -686,19 +694,19 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
                 error("Unreachable")
             },
             originalDictContainsKeyEmptyResult = {
-                stack.add(ctx.nullValue, TvmNullType)
+                addOnStack(ctx.nullValue, TvmNullType)
 
                 storeValue(valueType, value)
                 storeKey(keyType, resultElement)
-                stack.add(ctx.trueValue, TvmIntegerType)
+                addOnStack(ctx.trueValue, TvmIntegerType)
                 newStmt(inst.nextStmt())
             },
             originalDictContainsKeyNonEmptyResult = { resultDict ->
-                stack.add(resultDict, TvmCellType)
+                addOnStack(resultDict, TvmCellType)
 
                 storeValue(valueType, value)
                 storeKey(keyType, resultElement)
-                stack.add(ctx.trueValue, TvmIntegerType)
+                addOnStack(ctx.trueValue, TvmIntegerType)
                 newStmt(inst.nextStmt())
             }
         )
@@ -718,7 +726,7 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
 
         if (dictCellRef == null) {
             scope.doWithStateCtx {
-                stack.add(falseValue, TvmIntegerType)
+                addOnStack(falseValue, TvmIntegerType)
                 newStmt(inst.nextStmt())
             }
             return
@@ -779,7 +787,7 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
         if (!scope.assertIfSat(dictHasNextKeyConstraint)) {
             // There is no next key in the dict
             scope.doWithStateCtx {
-                stack.add(falseValue, TvmIntegerType)
+                addOnStack(falseValue, TvmIntegerType)
                 newStmt(inst.nextStmt())
             }
             return
@@ -796,7 +804,7 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
         scope.doWithStateCtx {
             storeValue(valueType, value)
             storeKey(keyType, resultElement)
-            stack.add(trueValue, TvmIntegerType)
+            addOnStack(trueValue, TvmIntegerType)
             newStmt(inst.nextStmt())
         }
     }
@@ -824,7 +832,7 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
     }
 
     private fun loadKeyLength(scope: TvmStepScope): Int {
-        val keyLengthExpr = scope.calcOnState { stack.takeLastInt() }
+        val keyLengthExpr = scope.takeLastInt()
 
         if (keyLengthExpr !is KBitVecValue<*>) {
             TODO("Non-concrete key length: $keyLengthExpr")
@@ -846,7 +854,7 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
                 stack.pop(0)
                 null
             } else {
-                stack.takeLastCell()
+                takeLastCell()?.also { assertType(it, TvmDictCellType) }
             }
         }
 
@@ -857,8 +865,8 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
     ): UExpr<UBvSort>? = scope.calcOnStateCtx {
         // todo: handle keyLength errors
         when (keyType) {
-            DictKeyType.SIGNED_INT -> stack.takeLastInt().let { mkBvExtractExpr(high = keyLength - 1, low = 0, it) }
-            DictKeyType.UNSIGNED_INT -> stack.takeLastInt().let { mkBvExtractExpr(high = keyLength - 1, low = 0, it) }
+            DictKeyType.SIGNED_INT -> takeLastInt().let { mkBvExtractExpr(high = keyLength - 1, low = 0, it) }
+            DictKeyType.UNSIGNED_INT -> takeLastInt().let { mkBvExtractExpr(high = keyLength - 1, low = 0, it) }
             DictKeyType.SLICE -> {
                 val slice = stack.takeLastSlice()
                 if (slice == null) {
@@ -875,24 +883,24 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
         when (keyType) {
             DictKeyType.SIGNED_INT -> {
                 val keyValue = key.signedExtendToInteger()
-                stack.add(keyValue, TvmIntegerType)
+                addOnStack(keyValue, TvmIntegerType)
             }
 
             DictKeyType.UNSIGNED_INT -> {
                 val keyValue = key.unsignedExtendToInteger()
-                stack.add(keyValue, TvmIntegerType)
+                addOnStack(keyValue, TvmIntegerType)
             }
 
             DictKeyType.SLICE -> {
                 val resultSlice = makeSliceFromData(key)
-                stack.add(resultSlice, TvmSliceType)
+                addOnStack(resultSlice, TvmSliceType)
             }
         }
     }
 
     private fun loadValue(scope: TvmStepScope, valueType: DictValueType, isSetBuilder: Boolean) = scope.calcOnState {
         when (valueType) {
-            DictValueType.CELL -> stack.takeLastCell()
+            DictValueType.CELL -> takeLastCell()
             DictValueType.SLICE -> {
                 if (isSetBuilder) {
                     val builder = stack.takeLastBuilder() ?: return@calcOnState null
@@ -906,8 +914,8 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
 
     private fun TvmState.storeValue(valueType: DictValueType, value: UExpr<*>) {
         when (valueType) {
-            DictValueType.SLICE -> stack.add(value, TvmSliceType) // todo: data?
-            DictValueType.CELL -> stack.add(value, TvmCellType)
+            DictValueType.SLICE -> addOnStack(value, TvmSliceType) // todo: data?
+            DictValueType.CELL -> addOnStack(value, TvmCellType)
         }
     }
 

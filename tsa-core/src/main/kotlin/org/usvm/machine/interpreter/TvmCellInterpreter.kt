@@ -1,7 +1,7 @@
 package org.usvm.machine.interpreter
 
 import org.ton.bytecode.TvmAliasInst
-import org.ton.bytecode.TvmBuilderType
+import org.usvm.machine.types.TvmBuilderType
 import org.ton.bytecode.TvmCellBuildEndcInst
 import org.ton.bytecode.TvmCellBuildInst
 import org.ton.bytecode.TvmCellBuildNewcInst
@@ -72,10 +72,10 @@ import org.ton.bytecode.TvmCellParseSbitsInst
 import org.ton.bytecode.TvmCellParseSdcutfirstInst
 import org.ton.bytecode.TvmCellParseSdskipfirstInst
 import org.ton.bytecode.TvmCellParseSrefsInst
-import org.ton.bytecode.TvmCellType
+import org.usvm.machine.types.TvmCellType
 import org.ton.bytecode.TvmInst
-import org.ton.bytecode.TvmIntegerType
-import org.ton.bytecode.TvmSliceType
+import org.usvm.machine.types.TvmIntegerType
+import org.usvm.machine.types.TvmSliceType
 import org.usvm.UBoolExpr
 import org.usvm.UExpr
 import org.usvm.UHeapRef
@@ -89,6 +89,9 @@ import org.usvm.machine.TvmContext.Companion.sliceRefPosField
 import org.usvm.machine.TvmSizeSort
 import org.usvm.machine.TvmStepScope
 import org.usvm.machine.state.TvmState
+import org.usvm.machine.types.TvmSymbolicCellDataBitArray
+import org.usvm.machine.state.addInt
+import org.usvm.machine.state.addOnStack
 import org.usvm.machine.state.allocEmptyCell
 import org.usvm.machine.state.allocSliceFromCell
 import org.usvm.machine.state.builderCopy
@@ -96,7 +99,6 @@ import org.usvm.machine.state.builderStoreDataBits
 import org.usvm.machine.state.builderStoreInt
 import org.usvm.machine.state.builderStoreNextRef
 import org.usvm.machine.state.builderStoreSlice
-import org.usvm.machine.state.calcOnStateCtx
 import org.usvm.machine.state.checkCellOverflow
 import org.usvm.machine.state.checkCellUnderflow
 import org.usvm.machine.state.consumeDefaultGas
@@ -106,6 +108,7 @@ import org.usvm.machine.state.doSwap
 import org.usvm.machine.state.doWithStateCtx
 import org.usvm.machine.state.getSliceRemainingBitsCount
 import org.usvm.machine.state.getSliceRemainingRefsCount
+import org.usvm.machine.types.makeSliceTypeLoad
 import org.usvm.machine.state.newStmt
 import org.usvm.machine.state.nextStmt
 import org.usvm.machine.state.signedIntegerFitsBits
@@ -122,6 +125,8 @@ import org.usvm.machine.state.takeLastSlice
 import org.usvm.machine.state.throwIntegerOutOfRangeError
 import org.usvm.machine.state.throwTypeCheckError
 import org.usvm.machine.state.unsignedIntegerFitsBits
+import org.usvm.machine.types.TvmSymbolicCellDataInteger
+import org.usvm.machine.types.Endian
 import org.usvm.mkSizeExpr
 import org.usvm.mkSizeGeExpr
 import org.usvm.mkSizeLtExpr
@@ -286,8 +291,8 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
             val ref = scope.slicePreloadNextRef(slice) ?: return@doWithState
             sliceMoveRefPtr(updatedSlice)
 
-            stack.add(ref, TvmCellType)
-            stack.add(updatedSlice, TvmSliceType)
+            scope.addOnStack(ref, TvmCellType)
+            scope.addOnStack(updatedSlice, TvmSliceType)
 
             newStmt(stmt.nextStmt())
         }
@@ -331,11 +336,11 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
         if (!preload) {
             val updatedSlice = memory.allocConcrete(TvmSliceType).also { sliceCopy(slice, it) }
             sliceMoveDataPtr(updatedSlice, sizeBits)
-            stack.add(updatedSlice, TvmSliceType)
+            addOnStack(updatedSlice, TvmSliceType)
         }
 
         if (quiet) {
-            stack.add(ctx.oneValue, TvmIntegerType)
+            addOnStack(ctx.oneValue, TvmIntegerType)
         }
 
         newStmt(stmt.nextStmt())
@@ -360,6 +365,9 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
         }
 
         val value = scope.slicePreloadDataBits(slice, sizeBits) ?: return
+
+        scope.doWithState { makeSliceTypeLoad(slice, TvmSymbolicCellDataInteger(mkBv(sizeBits), isSigned, Endian.BigEndian)) }
+
         val extendedValue = if (isSigned) {
             value.signedExtendToInteger()
         } else {
@@ -367,7 +375,7 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
         }
 
         scope.doWithState {
-            stack.add(extendedValue, TvmIntegerType)
+            addOnStack(extendedValue, TvmIntegerType)
             visitLoadInstEnd(stmt, slice, mkSizeExpr(sizeBits), preload, quiet)
         }
     }
@@ -396,8 +404,10 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
 
         val value = scope.slicePreloadInt(slice, sizeBits, isSigned) ?: return
 
+        scope.doWithState { makeSliceTypeLoad(slice, TvmSymbolicCellDataInteger(sizeBits.extractToSizeSort(), isSigned, Endian.BigEndian)) }
+
         scope.doWithState {
-            stack.add(value, TvmIntegerType)
+            addOnStack(value, TvmIntegerType)
             visitLoadInstEnd(stmt, slice, sizeBits.extractToSizeSort(), preload, quiet)
         }
     }
@@ -421,6 +431,9 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
         val sizeBits = sizeBytes * Byte.SIZE_BITS
 
         val value = scope.slicePreloadDataBits(slice, sizeBits) ?: return
+
+        scope.doWithState { makeSliceTypeLoad(slice, TvmSymbolicCellDataInteger(mkBv(sizeBits), isSigned, Endian.LittleEndian)) }
+
         val bytes = List(sizeBytes) { byteIdx ->
             val high = sizeBits - 1 - byteIdx * Byte.SIZE_BITS
             val low = sizeBits - (byteIdx + 1) * Byte.SIZE_BITS
@@ -438,7 +451,7 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
         }
 
         scope.doWithState {
-            stack.add(extendedRes, TvmIntegerType)
+            addOnStack(extendedRes, TvmIntegerType)
             visitLoadInstEnd(stmt, slice, mkSizeExpr(sizeBits), preload, quiet)
         }
     }
@@ -467,8 +480,10 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
 
         val resultSlice = scope.allocSliceFromCell(cell)
 
+        scope.doWithState { makeSliceTypeLoad(slice, TvmSymbolicCellDataBitArray(mkBv(sizeBits))) }
+
         scope.doWithState {
-            stack.add(resultSlice, TvmSliceType)
+            addOnStack(resultSlice, TvmSliceType)
             visitLoadInstEnd(stmt, slice, mkSizeExpr(sizeBits), preload, quiet)
         }
     }
@@ -492,8 +507,8 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
             ?: return null
 
         val quietBlock: (TvmState.() -> Unit)? = if (!quiet) null else fun TvmState.() {
-            stack.add(slice, TvmSliceType)
-            stack.add(zeroValue, TvmIntegerType)
+            addOnStack(slice, TvmSliceType)
+            stack.addInt(zeroValue)
             newStmt(stmt.nextStmt())
         }
         val bits = scope.slicePreloadDataBits(
@@ -507,8 +522,10 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
             ?: error("Cannot write $sizeBits bits to the empty builder")
         val resultSlice = scope.allocSliceFromCell(cell)
 
+        scope.doWithState { makeSliceTypeLoad(slice, TvmSymbolicCellDataBitArray(sizeBits.extractToSizeSort())) }
+
         scope.doWithState {
-            stack.add(resultSlice, TvmSliceType)
+            addOnStack(resultSlice, TvmSliceType)
             visitLoadInstEnd(stmt, slice, sizeBits.extractToSizeSort(), preload, quiet)
         }
     }
@@ -523,7 +540,7 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
          * */
         scope.doWithState { consumeGas(118) }
 
-        val cell = scope.calcOnStateCtx { stack.takeLastCell() }
+        val cell = scope.takeLastCell()
         if (cell == null) {
             scope.doWithState(throwTypeCheckError)
             return
@@ -532,7 +549,7 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
         val slice = scope.allocSliceFromCell(cell)
 
         scope.doWithState {
-            stack.add(slice, TvmSliceType)
+            addOnStack(slice, TvmSliceType)
             newStmt(stmt.nextStmt())
         }
     }
@@ -551,7 +568,7 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
             }
             val result = getSliceRemainingRefsCount(slice)
 
-            stack.add(result.signedExtendToInteger(), TvmIntegerType)
+            stack.addInt(result.signedExtendToInteger())
             newStmt(stmt.nextStmt())
         }
     }
@@ -568,7 +585,7 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
 
             val result = getSliceRemainingBitsCount(slice)
 
-            stack.add(result.signedExtendToInteger(), TvmIntegerType)
+            stack.addInt(result.signedExtendToInteger())
             newStmt(stmt.nextStmt())
         }
     }
@@ -585,8 +602,8 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
             val sizeBits = getSliceRemainingBitsCount(slice)
             val sizeRefs = getSliceRemainingRefsCount(slice)
 
-            stack.add(sizeBits.signedExtendToInteger(), TvmIntegerType)
-            stack.add(sizeRefs.signedExtendToInteger(), TvmIntegerType)
+            stack.addInt(sizeBits.signedExtendToInteger())
+            stack.addInt(sizeRefs.signedExtendToInteger())
             newStmt(stmt.nextStmt())
         }
     }
@@ -600,7 +617,7 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
             return
         }
 
-        val intValue = scope.calcOnState { stack.takeLastInt() }
+        val intValue = scope.takeLastInt()
 
         val updatedBuilder = scope.calcOnState {
             memory.allocConcrete(TvmBuilderType).also { builderCopy(builder, it) }
@@ -616,7 +633,7 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
         scope.builderStoreInt(updatedBuilder, intValue, bits.toBv257(), isSigned) ?: return@with
 
         scope.doWithState {
-            stack.add(updatedBuilder, TvmBuilderType)
+            addOnStack(updatedBuilder, TvmBuilderType)
             newStmt(stmt.nextStmt())
         }
     }
@@ -641,7 +658,7 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
 
         checkOutOfRange(bitsNotOutOfRangeExpr, scope) ?: return
 
-        val intValue = scope.calcOnState { stack.takeLastInt() }
+        val intValue = scope.takeLastInt()
 
         val valueNotOutOfRangeExpr = if (isSigned) {
             signedIntegerFitsBits(intValue, bits)
@@ -653,7 +670,7 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
         scope.builderStoreInt(updatedBuilder, intValue, bits, isSigned) ?: return@with
 
         scope.doWithState {
-            stack.add(updatedBuilder, TvmBuilderType)
+            addOnStack(updatedBuilder, TvmBuilderType)
             newStmt(stmt.nextStmt())
         }
     }
@@ -664,7 +681,7 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
         scope.doWithStateCtx {
             val builder = emptyRefValue.emptyBuilder
 
-            stack.add(builder, TvmBuilderType)
+            scope.addOnStack(builder, TvmBuilderType)
             newStmt(stmt.nextStmt())
         }
     }
@@ -684,7 +701,7 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
         }
 
         scope.doWithState {
-            stack.add(cell, TvmCellType)
+            addOnStack(cell, TvmCellType)
             newStmt(stmt.nextStmt())
         }
     }
@@ -698,7 +715,7 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
             return
         }
 
-        val cell = scope.calcOnState { stack.takeLastCell() }
+        val cell = scope.takeLastCell()
         if (cell == null) {
             scope.doWithState(throwTypeCheckError)
             return
@@ -708,9 +725,9 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
             val builderRefsLength = scope.calcOnState { memory.readField(builder, cellRefsLengthField, ctx.sizeSort) }
             val canWriteRefConstraint = mkSizeLtExpr(builderRefsLength, maxRefsLengthSizeExpr)
             val quietBlock: (TvmState.() -> Unit)? = if (!quiet) null else fun TvmState.() {
-                stack.add(cell, TvmCellType)
-                stack.add(builder, TvmBuilderType)
-                stack.add(minusOneValue, TvmIntegerType)
+                addOnStack(cell, TvmCellType)
+                addOnStack(builder, TvmBuilderType)
+                stack.addInt(minusOneValue)
 
                 newStmt(stmt.nextStmt())
             }
@@ -721,9 +738,9 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
                 val updatedBuilder = memory.allocConcrete(TvmBuilderType).also { builderCopy(builder, it) }
                 builderStoreNextRef(updatedBuilder, cell)
 
-                stack.add(updatedBuilder, TvmBuilderType)
+                addOnStack(updatedBuilder, TvmBuilderType)
                 if (quiet) {
-                    stack.add(zeroValue, TvmIntegerType)
+                    addOnStack(zeroValue, TvmIntegerType)
                 }
 
                 newStmt(stmt.nextStmt())
@@ -747,9 +764,9 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
         val resultBuilder = calcOnState { memory.allocConcrete(TvmBuilderType).also { builderCopy(builder, it) } }
 
         val quietBlock: (TvmState.() -> Unit)? = if (!quiet) null else fun TvmState.() {
-            stack.add(slice, TvmSliceType)
-            stack.add(builder, TvmBuilderType)
-            stack.add(minusOneValue, TvmIntegerType)
+            addOnStack(slice, TvmSliceType)
+            addOnStack(builder, TvmBuilderType)
+            stack.addInt(minusOneValue)
 
             newStmt(stmt.nextStmt())
         }
@@ -757,9 +774,9 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
         builderStoreSlice(resultBuilder, slice, quietBlock) ?: return
 
         doWithState {
-            stack.add(resultBuilder, TvmBuilderType)
+            addOnStack(resultBuilder, TvmBuilderType)
             if (quiet) {
-                stack.add(zeroValue, TvmIntegerType)
+                addOnStack(zeroValue, TvmIntegerType)
             }
 
             newStmt(stmt.nextStmt())
@@ -776,9 +793,9 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
         val resultBuilder = calcOnState { memory.allocConcrete(TvmBuilderType).also { builderCopy(toBuilder, it) } }
 
         val quietBlock: (TvmState.() -> Unit)? = if (!quiet) null else fun TvmState.() {
-            stack.add(fromBuilder, TvmBuilderType)
-            stack.add(toBuilder, TvmBuilderType)
-            stack.add(minusOneValue, TvmIntegerType)
+            addOnStack(fromBuilder, TvmBuilderType)
+            addOnStack(toBuilder, TvmBuilderType)
+            stack.addInt(minusOneValue)
 
             newStmt(stmt.nextStmt())
         }
@@ -786,9 +803,9 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
         builderStoreSlice(resultBuilder, allocSliceFromCell(fromBuilder), quietBlock) ?: return
 
         doWithState {
-            stack.add(resultBuilder, TvmBuilderType)
+            addOnStack(resultBuilder, TvmBuilderType)
             if (quiet) {
-                stack.add(zeroValue, TvmIntegerType)
+                addOnStack(zeroValue, TvmIntegerType)
             }
 
             newStmt(stmt.nextStmt())

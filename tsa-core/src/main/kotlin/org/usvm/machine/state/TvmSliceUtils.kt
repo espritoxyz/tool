@@ -1,9 +1,9 @@
 package org.usvm.machine.state
 
 import io.ksmt.expr.KBitVecValue
-import org.ton.bytecode.TvmBuilderType
-import org.ton.bytecode.TvmCellType
-import org.ton.bytecode.TvmSliceType
+import org.usvm.machine.types.TvmBuilderType
+import org.usvm.machine.types.TvmCellType
+import org.usvm.machine.types.TvmSliceType
 import org.usvm.UBoolExpr
 import org.usvm.UBvSort
 import org.usvm.UConcreteHeapRef

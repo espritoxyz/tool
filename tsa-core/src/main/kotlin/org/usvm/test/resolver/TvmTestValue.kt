@@ -2,6 +2,7 @@ package org.usvm.test.resolver
 
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
+import org.usvm.machine.types.Endian
 import java.math.BigInteger
 
 @Serializable
@@ -13,10 +14,17 @@ data class TvmTestIntegerValue(
 ): TvmTestValue
 
 @Serializable
-data class TvmTestCellValue(
+sealed interface TvmTestCellValue: TvmTestValue
+
+@Serializable
+data object TvmTestDictCellValue: TvmTestCellValue  // TODO: contents
+
+@Serializable
+data class TvmTestDataCellValue(
     val data: String = "",
     val refs: List<TvmTestCellValue> = listOf(),
-): TvmTestValue
+    val knownTypes: List<TvmCellDataTypeLoad> = listOf()
+): TvmTestCellValue
 
 @Serializable
 data class TvmTestBuilderValue(
@@ -26,7 +34,7 @@ data class TvmTestBuilderValue(
 
 @Serializable
 data class TvmTestSliceValue(
-    val cell: TvmTestCellValue,
+    val cell: TvmTestDataCellValue,
     val dataPos: Int,
     val refPos: Int,
 ): TvmTestValue
@@ -38,3 +46,30 @@ data object TvmTestNullValue: TvmTestValue
 data class TvmTestTupleValue(
     val elements: List<TvmTestValue>
 ) : TvmTestValue
+
+@Serializable
+sealed interface TvmCellDataType {
+    val bitSize: Int
+}
+
+@Serializable
+data class TvmCellDataInteger(override val bitSize: Int, val isSigned: Boolean, val endian: Endian): TvmCellDataType
+
+@Serializable
+data object TvmCellDataDictConstructorBit: TvmCellDataType {
+    override val bitSize: Int = 1
+}
+
+@Serializable
+data object TvmCellDataMsgAddr: TvmCellDataType {
+    override val bitSize: Int = 2
+}
+
+@Serializable
+data class TvmCellDataBitArray(override val bitSize: Int): TvmCellDataType
+
+@Serializable
+data class TvmCellDataTypeLoad(
+    val type: TvmCellDataType,
+    val offset: Int
+)

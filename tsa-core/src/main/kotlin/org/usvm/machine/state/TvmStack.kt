@@ -5,15 +5,15 @@ import kotlinx.collections.immutable.PersistentMap
 import kotlinx.collections.immutable.mutate
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toPersistentMap
-import org.ton.bytecode.TvmBuilderType
-import org.ton.bytecode.TvmCellType
-import org.ton.bytecode.TvmContinuationType
+import org.usvm.machine.types.TvmBuilderType
+import org.usvm.machine.types.TvmCellType
+import org.usvm.machine.types.TvmRealType
+import org.usvm.machine.types.TvmContinuationType
 import org.ton.bytecode.TvmContinuationValue
-import org.ton.bytecode.TvmIntegerType
-import org.ton.bytecode.TvmNullType
-import org.ton.bytecode.TvmSliceType
-import org.ton.bytecode.TvmTupleType
-import org.ton.bytecode.TvmType
+import org.usvm.machine.types.TvmIntegerType
+import org.usvm.machine.types.TvmNullType
+import org.usvm.machine.types.TvmSliceType
+import org.usvm.machine.types.TvmTupleType
 import org.usvm.UExpr
 import org.usvm.UHeapRef
 import org.usvm.USort
@@ -31,7 +31,7 @@ class TvmStack(
     val results: PersistentList<TvmStackEntry>
         get() = stack
 
-    fun takeLast(expectedType: TvmType, createEntry: (Int) -> UExpr<out USort>): TvmStackValue {
+    fun takeLast(expectedType: TvmRealType, createEntry: (Int) -> UExpr<out USort>): TvmStackValue {
         val lastEntry = takeLastEntry()
 
         return getStackValue(lastEntry, expectedType, createEntry)
@@ -50,19 +50,6 @@ class TvmStack(
 
     fun lastIsNull(): Boolean = stack.lastOrNull().let {
         it is TvmConcreteStackEntry && it.cell is TvmStackNullValue
-    }
-
-    fun add(value: UExpr<out USort>, type: TvmType) {
-        // TODO check size 256?
-        stack = stack.add(value.toStackValue(type).toStackEntry())
-    }
-
-    fun addContinuation(value: TvmContinuationValue) {
-        stack = stack.add(TvmStackContinuationValue(value).toStackEntry())
-    }
-
-    fun addTuple(value: TvmStackTupleValue) {
-        stack = stack.add(value.toStackEntry())
     }
 
     fun swap(first: Int, second: Int) {
@@ -258,7 +245,7 @@ class TvmStack(
 
     private fun getStackValue(
         entry: TvmStackEntry,
-        expectedType: TvmType,
+        expectedType: TvmRealType,
         createEntry: (Int) -> UExpr<out USort>
     ): TvmStackValue {
         require(expectedType !is TvmNullType) {
@@ -279,7 +266,7 @@ class TvmStack(
     }
 
     @Suppress("UNCHECKED_CAST")
-    private fun UExpr<*>.toStackValue(expectedType: TvmType): TvmStackValue = when (expectedType) {
+    fun UExpr<*>.toStackValue(expectedType: TvmRealType): TvmStackValue = when (expectedType) {
         is TvmIntegerType -> TvmStackIntValue(this as UExpr<TvmInt257Sort>)
         TvmBuilderType -> TvmStackBuilderValue(this as UHeapRef)
         TvmCellType -> TvmStackCellValue(this as UHeapRef)

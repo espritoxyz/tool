@@ -1,0 +1,50 @@
+#include "../imports/stdlib.fc";
+
+
+() recv_internal(int msg_value, cell in_msg_cell, slice in_msg) impure {
+    var names = in_msg~load_dict();  ;; input dict (from slice)
+
+    cell d = new_dict();  ;; allocated dict
+    d~udict_set(256, 10, "hello");
+
+    ;; all these cells should have dicts as references
+    cell a = in_msg~load_ref();  ;; input cell
+    cell b = in_msg~load_ref();  ;; input cell
+    cell c = begin_cell()  ;; allocated cell
+             .store_dict(d)
+             .end_cell();
+
+    ;; slices for defined cells
+    slice slice1 = a.begin_parse();
+    slice slice2 = b.begin_parse();
+    slice slice3 = c.begin_parse();
+
+    ;; put these slices into input dict
+    names~udict_set(256, 27, slice1);
+    names~udict_set(256, 26, slice2);
+    names~udict_set(256, 25, slice3);
+
+    int index = in_msg~load_int(8);  ;; input integer
+
+    ;; val is a resulting slice. In symbolic machine it is represented as ITE with static and allocated leaves
+    (slice val, int status) = names.udict_get?(256, index);
+
+    ;; no value at index
+    if (~ status) {
+        return ();
+    }
+
+    ;; extract dict from resulting slice
+    var param_dict = val~load_dict();
+
+    ;; exclude variant when `val` is not `slice1` or `slice2`
+    if ((index != 27) & (index != 26)) {
+        return ();
+    }
+
+    var msg = begin_cell()
+        .store_dict(param_dict)
+        .end_cell();
+
+    msg~impure_touch();
+}

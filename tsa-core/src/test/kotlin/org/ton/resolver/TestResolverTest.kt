@@ -8,7 +8,7 @@ import org.usvm.test.resolver.TvmContractSymbolicTestResult
 import org.usvm.test.resolver.TvmMethodFailure
 import org.usvm.test.resolver.TvmSymbolicTest
 import org.usvm.test.resolver.TvmTestBuilderValue
-import org.usvm.test.resolver.TvmTestCellValue
+import org.usvm.test.resolver.TvmTestDataCellValue
 import org.usvm.test.resolver.TvmTestIntegerValue
 import org.usvm.test.resolver.TvmTestSliceValue
 import java.math.BigInteger
@@ -53,7 +53,7 @@ class TestResolverTest {
         val usedParameters = test.usedParameters
         assertTrue(usedParameters.size == 1)
 
-        val arg = (usedParameters.first() as TvmTestCellValue).refs.first()
+        val arg = (usedParameters.first() as TvmTestDataCellValue).refs.first() as TvmTestDataCellValue
         val extractedInt = arg.data.drop(3).take(8)
 
         assertEquals("00000011", extractedInt)
@@ -71,7 +71,7 @@ class TestResolverTest {
         val usedParameters = test.usedParameters
         assertTrue(usedParameters.size == 1)
 
-        val arg = (usedParameters.first() as TvmTestSliceValue).cell.refs.first()
+        val arg = (usedParameters.first() as TvmTestSliceValue).cell.refs.first() as TvmTestDataCellValue
         val extractedInt = arg.data.drop(3).take(8)
 
         assertEquals("00000011", extractedInt)
@@ -89,7 +89,7 @@ class TestResolverTest {
         val usedParameters = test.usedParameters
         assertTrue(usedParameters.size == 1)
 
-        val arg = (usedParameters.first() as TvmTestBuilderValue).refs.first()
+        val arg = (usedParameters.first() as TvmTestBuilderValue).refs.first() as TvmTestDataCellValue
         val extractedInt = arg.data.drop(3).take(8)
 
         assertEquals("00000011", extractedInt)

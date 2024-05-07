@@ -1,7 +1,6 @@
 package org.usvm.machine
 
 import org.ton.bytecode.TvmInst
-import org.ton.bytecode.TvmType
 import org.usvm.ForkCase
 import org.usvm.StepResult
 import org.usvm.UBoolExpr
@@ -12,6 +11,7 @@ import org.usvm.machine.TvmStepScope.StepScopeState.CANNOT_BE_PROCESSED
 import org.usvm.machine.TvmStepScope.StepScopeState.CAN_BE_PROCESSED
 import org.usvm.machine.TvmStepScope.StepScopeState.DEAD
 import org.usvm.machine.state.TvmState
+import org.usvm.machine.types.TvmType
 import org.usvm.solver.USatResult
 import org.usvm.solver.UUnknownResult
 import org.usvm.solver.UUnsatResult

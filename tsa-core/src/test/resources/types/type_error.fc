@@ -1,0 +1,18 @@
+#include "../imports/stdlib.fc";
+
+
+() recv_internal(int msg_value, cell in_msg_cell, slice in_msg) impure {
+    var names = in_msg~load_dict();
+    names~udict_set(256, 27, "Alice");
+    names~udict_set(256, 25, "Bob");
+
+    int index = in_msg~load_int(8);
+
+    (slice val, int key) = names.udict_get?(256, index);
+
+    var msg = begin_cell()
+        .store_slice(val)
+        .end_cell();
+
+    msg~impure_touch();
+}

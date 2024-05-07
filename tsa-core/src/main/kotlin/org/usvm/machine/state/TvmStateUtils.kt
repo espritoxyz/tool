@@ -1,23 +1,30 @@
 package org.usvm.machine.state
 
 import io.ksmt.utils.powerOfTwo
-import org.ton.bytecode.TvmBuilderType
-import org.ton.bytecode.TvmCellType
+import org.usvm.machine.types.TvmBuilderType
+import org.usvm.machine.types.TvmCellType
 import org.ton.bytecode.TvmContinuationValue
 import org.ton.bytecode.TvmInst
-import org.ton.bytecode.TvmIntegerType
-import org.ton.bytecode.TvmSliceType
+import org.usvm.NULL_ADDRESS
+import org.usvm.machine.types.TvmIntegerType
+import org.usvm.machine.types.TvmSliceType
 import org.usvm.UBoolExpr
 import org.usvm.UConcreteHeapRef
 import org.usvm.UExpr
 import org.usvm.UHeapRef
+import org.usvm.USymbolicHeapRef
 import org.usvm.api.writeField
 import org.usvm.machine.TvmContext
 import org.usvm.machine.TvmContext.TvmInt257Sort
 import org.usvm.machine.TvmSizeSort
+import org.usvm.machine.types.TvmNullType
+import org.usvm.machine.types.TvmType
+import org.usvm.memory.GuardedExpr
+import org.usvm.memory.foldHeapRef
 import org.usvm.mkSizeAddExpr
 import org.usvm.mkSizeExpr
 import org.usvm.sizeSort
+import org.usvm.types.USingleTypeStream
 import java.math.BigInteger
 import org.usvm.machine.TvmStepScope
 
@@ -36,9 +43,9 @@ fun setFailure(failure: TvmMethodResult.TvmFailure): (TvmState) -> Unit = { stat
     // Throwing exception clears the current stack and pushes its parameter and exit code
     state.stack.clear()
     // TODO push the real parameter, not always 0
-    state.stack.add(state.ctx.zeroValue, TvmIntegerType)
+    state.stack.addInt(state.ctx.zeroValue)
     with(state.ctx) {
-        state.stack.add(failure.exitCode.toInt().toBv257(), TvmIntegerType)
+        state.stack.addInt(failure.exitCode.toInt().toBv257())
     }
 }
 
@@ -192,3 +199,33 @@ fun TvmContext.bvMaxValueUnsignedExtended(sizeBits: UExpr<TvmInt257Sort>): UExpr
 
 fun TvmState.calcConsumedGas(): UExpr<TvmSizeSort> =
     gasUsage.fold(ctx.zeroSizeExpr) { acc, value -> ctx.mkSizeAddExpr(acc, value) }
+
+
+fun TvmState.assertType(value: UHeapRef, type: TvmType) {
+    if (value is UConcreteHeapRef && value.address == NULL_ADDRESS) {
+        require(type is TvmNullType)
+        return
+    }
+    val refHandler = { acc: MutableList<Pair<TvmType, UConcreteHeapRef>>, ref: GuardedExpr<UConcreteHeapRef> ->
+        val cur = memory.types.getTypeStream(ref.expr)
+        require(cur is USingleTypeStream)
+        acc += (cur.commonSuperType to ref.expr)
+        acc
+    }
+    val refOldTypes = foldHeapRef(
+        ref = value,
+        initial = mutableListOf(),
+        initialGuard = ctx.trueExpr,
+        collapseHeapRefs = false,
+        staticIsConcrete = true,
+        blockOnConcrete = refHandler,
+        blockOnSymbolic =  { _, ref -> error("Unexpected symbolic ref ${ref.expr}") }
+    )
+    refOldTypes.forEach { (oldType, ref) ->
+        if (typeSystem.isSupertype(oldType, type)) {
+            memory.types.allocate(ref.address, type)
+        } else if (!typeSystem.isSupertype(type, oldType)) {
+            throw TypeCastException(oldType, type)
+        }
+    }
+}

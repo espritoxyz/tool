@@ -74,7 +74,7 @@ class TvmLoopsInterpreter(private val ctx: TvmContext) {
     ) {
         with(ctx) {
             val continuation = with(scope) { stmt.extractContinuation(continuationExtractor) }
-            val loopRepeatTimes = scope.calcOnState { stack.takeLastInt() }
+            val loopRepeatTimes = scope.takeLastInt()
             val inRangeConstraint = signedIntegerFitsBits(loopRepeatTimes, bits = 32u)
 
             scope.fork(
@@ -170,7 +170,7 @@ class TvmLoopsInterpreter(private val ctx: TvmContext) {
     }
 
     private fun visitArtificialUntilInst(scope: TvmStepScope, stmt: TvmArtificialUntilInst) {
-        val x = scope.calcOnState { stack.takeLastInt() }
+        val x = scope.takeLastInt()
         val continueLoopCondition = ctx.mkEq(x, ctx.zeroValue)
 
         scope.fork(
@@ -206,7 +206,7 @@ class TvmLoopsInterpreter(private val ctx: TvmContext) {
     }
 
     private fun visitArtificialWhileEndInst(scope: TvmStepScope, stmt: TvmArtificialWhileEndInst) {
-        val x = scope.calcOnState { stack.takeLastInt() }
+        val x = scope.takeLastInt()
         val continueLoopCondition = with(ctx) {
             mkEq(x, zeroValue).not()
         }

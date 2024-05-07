@@ -4,17 +4,17 @@ import org.ton.bytecode.TvmAppCryptoChksignuInst
 import org.ton.bytecode.TvmAppCryptoHashcuInst
 import org.ton.bytecode.TvmAppCryptoHashsuInst
 import org.ton.bytecode.TvmAppCryptoInst
-import org.ton.bytecode.TvmBuilderType
-import org.ton.bytecode.TvmCellType
-import org.ton.bytecode.TvmIntegerType
-import org.ton.bytecode.TvmReferenceType
-import org.ton.bytecode.TvmSliceType
+import org.usvm.machine.types.TvmBuilderType
+import org.usvm.machine.types.TvmCellType
+import org.usvm.machine.types.TvmRealReferenceType
+import org.usvm.machine.types.TvmSliceType
 import org.usvm.UHeapRef
 import org.usvm.api.makeSymbolicPrimitive
 import org.usvm.machine.TvmContext
 import org.usvm.machine.TvmStepScope
 import org.usvm.machine.state.TvmStack
 import org.usvm.machine.state.TvmState
+import org.usvm.machine.state.addInt
 import org.usvm.machine.state.consumeDefaultGas
 import org.usvm.machine.state.newStmt
 import org.usvm.machine.state.nextStmt
@@ -36,7 +36,7 @@ class TvmCryptoInterpreter(private val ctx: TvmContext) {
         }
     }
 
-    private fun visitSingleHashInst(scope: TvmStepScope, stmt: TvmAppCryptoInst, operandType: TvmReferenceType) {
+    private fun visitSingleHashInst(scope: TvmStepScope, stmt: TvmAppCryptoInst, operandType: TvmRealReferenceType) {
         require(operandType != TvmBuilderType) {
             "A single hash function for builders does not exist"
         }
@@ -49,7 +49,7 @@ class TvmCryptoInterpreter(private val ctx: TvmContext) {
             // TODO hash must be deterministic - make a region for representation hashes?
             val hash = makeSymbolicPrimitive(ctx.int257sort)
 
-            stack.add(hash, TvmIntegerType)
+            stack.addInt(hash)
             newStmt(stmt.nextStmt())
         }
     }
@@ -57,14 +57,14 @@ class TvmCryptoInterpreter(private val ctx: TvmContext) {
     private fun visitCheckSignatureInst(scope: TvmStepScope, stmt: TvmAppCryptoChksignuInst) {
         scope.consumeDefaultGas(stmt)
 
-        val key = scope.calcOnState { stack.takeLastInt() }
+        val key = scope.takeLastInt()
         val signature = scope.calcOnState { stack.takeLastSlice() }
         if (signature == null) {
             scope.doWithState(throwTypeCheckError)
             return
         }
 
-        val hash = scope.calcOnState { stack.takeLastInt() }
+        val hash = scope.takeLastInt()
 
         // Check that signature is correct - it contains at least 512 bits
         val bits = scope.slicePreloadDataBits(signature, bits = 512)
@@ -82,11 +82,11 @@ class TvmCryptoInterpreter(private val ctx: TvmContext) {
             scope.fork(
                 condition,
                 blockOnTrueState = {
-                    stack.add(zeroValue, TvmIntegerType)
+                    stack.addInt(zeroValue)
                     newStmt(stmt.nextStmt())
                 },
                 blockOnFalseState =  {
-                    stack.add(minusOneValue, TvmIntegerType)
+                    stack.addInt(minusOneValue)
                     newStmt(stmt.nextStmt())
                 }
             )
@@ -94,7 +94,7 @@ class TvmCryptoInterpreter(private val ctx: TvmContext) {
     }
 
     context(TvmState)
-    private fun TvmStack.popHashableStackValue(referenceType: TvmReferenceType): UHeapRef? =
+    private fun TvmStack.popHashableStackValue(referenceType: TvmRealReferenceType): UHeapRef? =
         when (referenceType) {
             TvmBuilderType -> takeLastBuilder()
             TvmCellType -> takeLastCell()

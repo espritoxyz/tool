@@ -1,20 +1,59 @@
 package org.usvm.machine.state
 
-import org.ton.bytecode.TvmBuilderType
-import org.ton.bytecode.TvmCellType
-import org.ton.bytecode.TvmContinuationType
+import org.usvm.machine.types.TvmBuilderType
+import org.usvm.machine.types.TvmCellType
+import org.usvm.machine.types.TvmContinuationType
 import org.ton.bytecode.TvmContinuationValue
-import org.ton.bytecode.TvmIntegerType
-import org.ton.bytecode.TvmReferenceType
-import org.ton.bytecode.TvmSliceType
+import org.usvm.NULL_ADDRESS
+import org.usvm.UAddressSort
+import org.usvm.UConcreteHeapRef
+import org.usvm.machine.types.TvmIntegerType
+import org.usvm.machine.types.TvmRealReferenceType
+import org.usvm.machine.types.TvmSliceType
 import org.usvm.UExpr
 import org.usvm.UHeapRef
+import org.usvm.USort
 import org.usvm.machine.TvmContext.TvmInt257Sort
 import org.usvm.machine.TvmStepScope
 import org.usvm.machine.state.TvmStack.TvmConcreteStackEntry
 import org.usvm.machine.state.TvmStack.TvmInputStackEntry
 import org.usvm.machine.state.TvmStack.TvmStackTupleValue
 import org.usvm.machine.state.TvmStack.TvmStackValue
+import org.usvm.machine.types.TvmRealType
+import org.usvm.machine.types.TvmType
+
+data class TypeCastException(
+    val oldType: TvmType,
+    val newType: TvmType
+): RuntimeException()
+
+private fun TvmStack.add(value: UExpr<out USort>, type: TvmRealType) {
+    // TODO check size 256?
+    addStackEntry(value.toStackValue(type).toStackEntry())
+}
+
+fun TvmState.addOnStack(value: UExpr<out USort>, type: TvmRealType) {
+    stack.add(value, type)
+    if (value.sort is UAddressSort) {
+        @Suppress("UNCHECKED_CAST")
+        assertType(value as UHeapRef, type)
+    }
+}
+
+fun TvmStepScope.addOnStack(value: UExpr<out USort>, type: TvmRealType) =
+    calcOnState { addOnStack(value, type) }
+
+fun TvmStack.addInt(value: UExpr<TvmInt257Sort>) {
+    add(value, TvmIntegerType)
+}
+
+fun TvmStack.addContinuation(value: TvmContinuationValue) {
+    addStackEntry(TvmStack.TvmStackContinuationValue(value).toStackEntry())
+}
+
+fun TvmStack.addTuple(value: TvmStackTupleValue) {
+    addStackEntry(value.toStackEntry())
+}
 
 fun TvmStackValue.toStackEntry(): TvmConcreteStackEntry = TvmConcreteStackEntry(this)
 
@@ -26,11 +65,22 @@ fun TvmStack.takeLastInt(): UExpr<TvmInt257Sort> {
     return intStackValue.intValue
 }
 
+fun TvmState.takeLastInt(): UExpr<TvmInt257Sort> =
+    stack.takeLastInt()
+
+fun TvmStepScope.takeLastInt(): UExpr<TvmInt257Sort> =
+    calcOnState { stack.takeLastInt() }
+
 context(TvmState)
 fun TvmStack.takeLastCell(): UHeapRef? =
     takeLastRef(this, TvmCellType, TvmStackValue::cellValue) {
         generateSymbolicCell()
     }?.also { ensureSymbolicCellInitialized(it) }
+
+fun TvmState.takeLastCell(): UHeapRef? = stack.takeLastCell()
+
+fun TvmStepScope.takeLastCell(): UHeapRef? =
+    calcOnState { takeLastCell() }
 
 context(TvmState)
 fun TvmStack.takeLastSlice(): UHeapRef? =
@@ -80,12 +130,12 @@ fun TvmStack.takeLastContinuation(): TvmContinuationValue {
 context(TvmState)
 private fun takeLastRef(
     stack: TvmStack,
-    referenceType: TvmReferenceType,
+    referenceType: TvmRealReferenceType,
     extractValue: TvmStackValue.() -> UHeapRef?,
     generateSymbolicRef: (Int) -> UHeapRef
 ): UHeapRef? {
     val lastRefValue = stack.takeLast(referenceType, generateSymbolicRef)
-    return lastRefValue.extractValue()
+    return lastRefValue.extractValue()?.also { assertType(it, referenceType) }
 }
 
 fun doXchg(scope: TvmStepScope, first: Int, second: Int) {

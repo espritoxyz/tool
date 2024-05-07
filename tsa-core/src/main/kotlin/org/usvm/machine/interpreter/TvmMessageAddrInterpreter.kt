@@ -8,9 +8,6 @@ import org.ton.bytecode.TvmArtificialLoadAddrInst
 import org.ton.bytecode.TvmArtificialLoadAddrNoneInst
 import org.ton.bytecode.TvmArtificialLoadAddrStdInst
 import org.ton.bytecode.TvmArtificialLoadAddrVarInst
-import org.ton.bytecode.TvmCellType
-import org.ton.bytecode.TvmIntegerType
-import org.ton.bytecode.TvmSliceType
 import org.usvm.UExpr
 import org.usvm.UHeapRef
 import org.usvm.api.readField
@@ -19,6 +16,8 @@ import org.usvm.logger
 import org.usvm.machine.TvmContext
 import org.usvm.machine.TvmSizeSort
 import org.usvm.machine.TvmStepScope
+import org.usvm.machine.state.addInt
+import org.usvm.machine.state.addOnStack
 import org.usvm.machine.state.allocSliceFromCell
 import org.usvm.machine.state.builderCopy
 import org.usvm.machine.state.calcOnStateCtx
@@ -31,6 +30,10 @@ import org.usvm.machine.state.sliceMoveDataPtr
 import org.usvm.machine.state.slicePreloadDataBits
 import org.usvm.machine.state.takeLastSlice
 import org.usvm.machine.state.throwTypeCheckError
+import org.usvm.machine.types.TvmCellType
+import org.usvm.machine.types.TvmSliceType
+import org.usvm.machine.types.TvmSymbolicCellDataMsgAddr
+import org.usvm.machine.types.makeSliceTypeLoad
 import org.usvm.mkSizeAddExpr
 import org.usvm.mkSizeExpr
 import org.usvm.sizeSort
@@ -57,8 +60,8 @@ class TvmMessageAddrInterpreter(private val ctx: TvmContext) {
 
             val updatedSlice = memory.allocConcrete(TvmSliceType).also { sliceCopy(slice, it) }
 
-            stack.add(slice, TvmSliceType)
-            stack.add(updatedSlice, TvmSliceType)
+            addOnStack(slice, TvmSliceType)
+            addOnStack(updatedSlice, TvmSliceType)
 
             scope.loadMessageAddr(updatedSlice, inst)
         }
@@ -88,8 +91,8 @@ class TvmMessageAddrInterpreter(private val ctx: TvmContext) {
                 containsAnyCast = false
             ) ?: return@doWithStateCtx
 
-            stack.add(prefixSlice, TvmSliceType)
-            stack.add(updatedSlice, TvmSliceType)
+            addOnStack(prefixSlice, TvmSliceType)
+            addOnStack(updatedSlice, TvmSliceType)
 
             newStmt(inst.nextStmt())
         }
@@ -108,8 +111,8 @@ class TvmMessageAddrInterpreter(private val ctx: TvmContext) {
             val prefixSlice = scope.readMessageTail(originalSlice, updatedSlice, addrLen, addrLengthBits = 9, containsAnyCast = false)
                 ?: return@doWithStateCtx
 
-            stack.add(prefixSlice, TvmSliceType)
-            stack.add(updatedSlice, TvmSliceType)
+            addOnStack(prefixSlice, TvmSliceType)
+            addOnStack(updatedSlice, TvmSliceType)
 
             newStmt(inst.nextStmt())
         }
@@ -128,8 +131,8 @@ class TvmMessageAddrInterpreter(private val ctx: TvmContext) {
             val prefixSlice = scope.readMessageTail(originalSlice, updatedSlice, addrLen, addrLengthBits = 0, containsAnyCast = true)
                 ?: return@doWithStateCtx
 
-            stack.add(prefixSlice, TvmSliceType)
-            stack.add(updatedSlice, TvmSliceType)
+            addOnStack(prefixSlice, TvmSliceType)
+            addOnStack(updatedSlice, TvmSliceType)
 
             newStmt(inst.nextStmt())
         }
@@ -151,8 +154,8 @@ class TvmMessageAddrInterpreter(private val ctx: TvmContext) {
             val prefixSlice = scope.readMessageTail(originalSlice, updatedSlice, addrLen, addrLengthBits = 9, containsAnyCast = true)
                 ?: return@doWithStateCtx
 
-            stack.add(prefixSlice, TvmSliceType)
-            stack.add(updatedSlice, TvmSliceType)
+            addOnStack(prefixSlice, TvmSliceType)
+            addOnStack(updatedSlice, TvmSliceType)
 
             newStmt(inst.nextStmt())
         }
@@ -186,8 +189,8 @@ class TvmMessageAddrInterpreter(private val ctx: TvmContext) {
             val address = scope.slicePreloadDataBits(copySlice, bits = 256)
                 ?: TODO("Deal with incorrect address")
 
-            stack.add(workchain.signedExtendToInteger(), TvmIntegerType)
-            stack.add(address.unsignedExtendToInteger(), TvmIntegerType)
+            stack.addInt(workchain.signedExtendToInteger())
+            stack.addInt(address.unsignedExtendToInteger())
 
             newStmt(inst.nextStmt())
         }
@@ -249,6 +252,7 @@ class TvmMessageAddrInterpreter(private val ctx: TvmContext) {
         val addrStd = mkBv(value = 2, sizeBits = 2u)
         val addrVar = mkBv(value = 3, sizeBits = 2u)
 
+        makeSliceTypeLoad(updatedSlice, TvmSymbolicCellDataMsgAddr(ctx))
         sliceMoveDataPtr(updatedSlice, bits = 2)
 
         // TODO hack! assume that the address is std, since it is the only one we can handle
