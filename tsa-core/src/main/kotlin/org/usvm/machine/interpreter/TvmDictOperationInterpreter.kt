@@ -673,8 +673,10 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
             }.let { mkAnd(it) }
         }
 
-        scope.assert(ctx.mkAnd(dictContainsResultElement, resultIsMinMax))
-            ?: error("Dict min/max element is not in the dict")
+        scope.assert(
+            ctx.mkAnd(dictContainsResultElement, resultIsMinMax),
+            unsatBlock = { error("Dict min/max element is not in the dict") }
+        ) ?: return
 
         val value = scope.calcOnState { dictGetValue(dictCellRef, dictId, resultElement, valueType) }
 

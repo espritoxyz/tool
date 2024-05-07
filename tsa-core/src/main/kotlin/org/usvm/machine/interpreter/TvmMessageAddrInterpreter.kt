@@ -173,12 +173,13 @@ class TvmMessageAddrInterpreter(private val ctx: TvmContext) {
             val addrConstructor = scope.slicePreloadDataBits(copySlice, bits = 2)
                 ?: TODO("Deal with incorrect address")
 
-            scope.assert(addrConstructor eq mkBv(value = 2, sizeBits = 2u))
-                ?: run {
+            scope.assert(
+                addrConstructor eq mkBv(value = 2, sizeBits = 2u),
+                unsatBlock = {
                     // TODO Deal with non addr_std
                     logger.debug { "Non-std addr found, dropping the state" }
-                    return@doWithStateCtx
                 }
+            ) ?: return@doWithStateCtx
 
             sliceMoveDataPtr(copySlice, bits = 2)
 
@@ -200,8 +201,10 @@ class TvmMessageAddrInterpreter(private val ctx: TvmContext) {
         doWithStateCtx {
             val maybeAnycast = slicePreloadDataBits(slice, bits = 1)
                 ?: return@doWithStateCtx
-            assert(maybeAnycast eq mkBv(value = 0, sizeBits = 1u))
-                ?: TODO("Support presented anycast")
+            assert(
+                maybeAnycast eq mkBv(value = 0, sizeBits = 1u),
+                unsatBlock = { TODO("Support presented anycast") }
+            ) ?: return@doWithStateCtx
             sliceMoveDataPtr(slice, bits = 1)
         }
     }
@@ -256,7 +259,10 @@ class TvmMessageAddrInterpreter(private val ctx: TvmContext) {
         sliceMoveDataPtr(updatedSlice, bits = 2)
 
         // TODO hack! assume that the address is std, since it is the only one we can handle
-        assert(prefix eq addrStd) ?: error("Cannot make address std")
+        assert(
+            prefix eq addrStd,
+            unsatBlock = { error("Cannot make address std") }
+        ) ?: return@calcOnStateCtx
 
         // TODO go back to the correct implementation
         newStmt(TvmArtificialLoadAddrStdInst(inst))

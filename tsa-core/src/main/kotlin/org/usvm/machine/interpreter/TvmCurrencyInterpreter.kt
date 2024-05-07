@@ -57,8 +57,10 @@ class TvmCurrencyInterpreter(private val ctx: TvmContext) {
 
             // TODO read the real value
             val grams = makeSymbolicPrimitive(int257sort)
-            scope.assert(mkBvSignedGreaterOrEqualExpr(grams, zeroValue))
-                ?: error("Cannot make grams >= 0")
+            scope.assert(
+                mkBvSignedGreaterOrEqualExpr(grams, zeroValue),
+                unsatBlock = { error("Cannot make grams >= 0") }
+            ) ?: return@doWithStateCtx
 
             sliceMoveDataPtr(updatedSlice, extendedLength)
 

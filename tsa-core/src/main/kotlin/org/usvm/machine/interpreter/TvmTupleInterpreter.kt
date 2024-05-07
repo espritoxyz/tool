@@ -166,8 +166,10 @@ class TvmTupleInterpreter(private val ctx: TvmContext) {
 
             is TvmStack.TvmStackTupleValueInputValue -> {
                 with(ctx) {
-                    scope.assert(tuple.size eq size.toBv257())
-                        ?: error("Cannot make $tuple size equal to $size")
+                    scope.assert(
+                        tuple.size eq size.toBv257(),
+                        unsatBlock = { error("Cannot make $tuple size equal to $size") }
+                    ) ?: return
                 }
 
                 scope.doWithStateCtx {
