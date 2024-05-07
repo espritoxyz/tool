@@ -12,6 +12,7 @@ import org.ton.bytecode.TvmExceptionsThrowifShortInst
 import org.ton.bytecode.TvmExceptionsThrowifnotInst
 import org.ton.bytecode.TvmExceptionsThrowifnotShortInst
 import org.usvm.machine.TvmContext
+import org.usvm.machine.TvmStepScope
 import org.usvm.machine.state.TvmState
 import org.usvm.machine.state.TvmUnknownFailure
 import org.usvm.machine.state.consumeDefaultGas

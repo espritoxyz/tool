@@ -174,7 +174,6 @@ import org.ton.bytecode.TvmType
 import org.ton.cell.Cell
 import org.ton.targets.TvmTarget
 import org.usvm.StepResult
-import org.usvm.StepScope
 import org.usvm.UBoolExpr
 import org.usvm.UBvSort
 import org.usvm.UExpr
@@ -245,11 +244,11 @@ import org.ton.bytecode.TvmContConditionalIfnotjmprefInst
 import org.ton.bytecode.TvmContConditionalIfnotrefInst
 import org.ton.bytecode.TvmContConditionalIfrefelserefInst
 import org.ton.bytecode.TvmInstList
+import org.usvm.machine.TvmStepScope
 import org.usvm.machine.bigIntValue
 import org.usvm.machine.state.getSliceRemainingBitsCount
 import org.usvm.machine.state.slicePreloadDataBits
 
-typealias TvmStepScope = StepScope<TvmState, TvmType, TvmInst, TvmContext>
 
 // TODO there are a lot of `scope.calcOnState` and `scope.doWithState` invocations that are not inline - optimize it
 class TvmInterpreter(
@@ -363,7 +362,7 @@ class TvmInterpreter(
 
         val initialGasUsage = state.gasUsage
 
-        val scope = StepScope(state, forkBlackList)
+        val scope = TvmStepScope(state, forkBlackList)
 
         // handle exception firstly
 //        val result = state.methodResult
@@ -1054,7 +1053,11 @@ class TvmInterpreter(
                     prevMaxValue = maxValue
                 }
 
-                scope.assert(mkOr(disjArgs))
+                scope.assert(
+                    mkOr(disjArgs),
+                    unsatBlock = { error("Statement: $stmt; cannot assert disjunction: $disjArgs") }
+                ) ?: return
+
                 symbolicSizeBits
             }
             is TvmArithmLogicalUbitsizeInst -> {
@@ -1084,7 +1087,11 @@ class TvmInterpreter(
                     prevMaxValue = maxValue
                 }
 
-                scope.assert(mkOr(disjArgs))
+                scope.assert(
+                    mkOr(disjArgs),
+                    unsatBlock = { error("Statement: $stmt; cannot assert disjunction: $disjArgs") }
+                ) ?: return
+
                 symbolicSizeBits
             }
 

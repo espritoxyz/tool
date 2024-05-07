@@ -7,6 +7,7 @@ import org.ton.bytecode.TvmAppGasInst
 import org.ton.bytecode.TvmAppGasSetgaslimitInst
 import org.ton.bytecode.TvmIntegerType
 import org.usvm.machine.TvmContext
+import org.usvm.machine.TvmStepScope
 import org.usvm.machine.state.TvmOutOfGas
 import org.usvm.machine.state.calcConsumedGas
 import org.usvm.machine.state.consumeDefaultGas

@@ -24,6 +24,7 @@ import org.ton.bytecode.TvmContLoopsWhileendInst
 import org.ton.bytecode.TvmContLoopsWhileendbrkInst
 import org.ton.bytecode.TvmInst
 import org.usvm.machine.TvmContext
+import org.usvm.machine.TvmStepScope
 import org.usvm.machine.interpreter.TvmLoopsInterpreter.ContinuationExtractor.CC
 import org.usvm.machine.interpreter.TvmLoopsInterpreter.ContinuationExtractor.STACK
 import org.usvm.machine.state.TvmState

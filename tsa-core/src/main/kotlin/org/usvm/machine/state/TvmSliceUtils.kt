@@ -1,7 +1,6 @@
 package org.usvm.machine.state
 
 import io.ksmt.expr.KBitVecValue
-import io.ksmt.utils.BvUtils.toBigIntegerSigned
 import org.ton.bytecode.TvmBuilderType
 import org.ton.bytecode.TvmCellType
 import org.ton.bytecode.TvmSliceType
@@ -24,8 +23,8 @@ import org.usvm.machine.TvmContext.Companion.sliceRefPosField
 import org.usvm.machine.TvmContext.TvmCellDataSort
 import org.usvm.machine.TvmContext.TvmInt257Sort
 import org.usvm.machine.TvmSizeSort
+import org.usvm.machine.TvmStepScope
 import org.usvm.machine.intValue
-import org.usvm.machine.interpreter.TvmStepScope
 import org.usvm.memory.UWritableMemory
 import org.usvm.mkSizeAddExpr
 import org.usvm.mkSizeExpr
@@ -58,20 +57,26 @@ fun checkCellOverflow(
     }
 )
 
-fun TvmStepScope.assertDataLengthConstraint(cellDataLength: UExpr<TvmSizeSort>): Unit? = calcOnStateCtx {
+fun TvmStepScope.assertDataLengthConstraint(
+    cellDataLength: UExpr<TvmSizeSort>,
+    unsatBlock: TvmState.() -> Unit,
+): Unit? = calcOnStateCtx {
     val correctnessConstraint = mkAnd(
         mkSizeLeExpr(zeroSizeExpr, cellDataLength),
         mkSizeLeExpr(cellDataLength, maxDataLengthSizeExpr),
     )
-    assert(correctnessConstraint)
+    assert(correctnessConstraint, unsatBlock = unsatBlock)
 }
 
-fun TvmStepScope.assertRefsLengthConstraint(cellRefsLength: UExpr<TvmSizeSort>): Unit? = calcOnStateCtx {
+fun TvmStepScope.assertRefsLengthConstraint(
+    cellRefsLength: UExpr<TvmSizeSort>,
+    unsatBlock: TvmState.() -> Unit,
+): Unit? = calcOnStateCtx {
     val correctnessConstraint = mkAnd(
         mkSizeLeExpr(zeroSizeExpr, cellRefsLength),
         mkSizeLeExpr(cellRefsLength, maxRefsLengthSizeExpr),
     )
-    assert(correctnessConstraint)
+    assert(correctnessConstraint, unsatBlock = unsatBlock)
 }
 
 /**
@@ -85,8 +90,10 @@ fun TvmStepScope.slicePreloadDataBits(
     val cell = memory.readField(slice, sliceCellField, addressSort)
     val cellDataLength = memory.readField(cell, cellDataLengthField, sizeSort)
 
-    assertDataLengthConstraint(cellDataLength)
-        ?: error("Cannot ensure correctness for data length in cell $cell")
+    assertDataLengthConstraint(
+        cellDataLength,
+        unsatBlock = { error("Cannot ensure correctness for data length in cell $cell") }
+    ) ?: return@calcOnStateCtx  null
 
     val cellData = memory.readField(cell, cellDataField, cellDataSort)
     val dataPosition = memory.readField(slice, sliceDataPosField, sizeSort)
@@ -144,8 +151,10 @@ fun TvmStepScope.slicePreloadNextRef(
     val cell = memory.readField(slice, sliceCellField, addressSort)
     val refsLength = memory.readField(cell, cellRefsLengthField, sizeSort)
 
-    assertRefsLengthConstraint(refsLength)
-        ?: error("Cannot ensure correctness for number of refs in cell $cell")
+    assertRefsLengthConstraint(
+        refsLength,
+        unsatBlock = { error("Cannot ensure correctness for number of refs in cell $cell") }
+    ) ?: return@calcOnStateCtx null
 
     val sliceRefPos = memory.readField(slice, sliceRefPosField, sizeSort)
     val readingConstraint = mkSizeLtExpr(sliceRefPos, refsLength)
@@ -289,8 +298,10 @@ fun TvmStepScope.builderStoreSlice(builder: UHeapRef, slice: UHeapRef, quietBloc
     val cell = calcOnState { memory.readField(slice, sliceCellField, addressSort) }
     val cellDataLength = calcOnState { memory.readField(cell, cellDataLengthField, sizeSort) }
 
-    assertDataLengthConstraint(cellDataLength)
-        ?: error("Cannot ensure correctness for data length in cell $cell")
+    assertDataLengthConstraint(
+        cellDataLength,
+        unsatBlock = { error("Cannot ensure correctness for data length in cell $cell") }
+    ) ?: return null
 
     val cellData = calcOnState { memory.readField(cell, cellDataField, cellDataSort) }
     val dataPosition = calcOnState { memory.readField(slice, sliceDataPosField, sizeSort) }

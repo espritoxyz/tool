@@ -87,6 +87,7 @@ import org.usvm.machine.TvmContext.Companion.sliceCellField
 import org.usvm.machine.TvmContext.Companion.sliceDataPosField
 import org.usvm.machine.TvmContext.Companion.sliceRefPosField
 import org.usvm.machine.TvmSizeSort
+import org.usvm.machine.TvmStepScope
 import org.usvm.machine.state.TvmState
 import org.usvm.machine.state.allocEmptyCell
 import org.usvm.machine.state.allocSliceFromCell

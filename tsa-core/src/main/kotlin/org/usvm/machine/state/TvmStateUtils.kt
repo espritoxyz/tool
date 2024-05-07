@@ -15,11 +15,11 @@ import org.usvm.api.writeField
 import org.usvm.machine.TvmContext
 import org.usvm.machine.TvmContext.TvmInt257Sort
 import org.usvm.machine.TvmSizeSort
-import org.usvm.machine.interpreter.TvmStepScope
 import org.usvm.mkSizeAddExpr
 import org.usvm.mkSizeExpr
 import org.usvm.sizeSort
 import java.math.BigInteger
+import org.usvm.machine.TvmStepScope
 
 val TvmState.lastStmt get() = pathNode.statement
 fun TvmState.newStmt(stmt: TvmInst) {

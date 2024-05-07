@@ -10,7 +10,7 @@ import org.ton.bytecode.TvmSliceType
 import org.usvm.UExpr
 import org.usvm.UHeapRef
 import org.usvm.machine.TvmContext.TvmInt257Sort
-import org.usvm.machine.interpreter.TvmStepScope
+import org.usvm.machine.TvmStepScope
 import org.usvm.machine.state.TvmStack.TvmConcreteStackEntry
 import org.usvm.machine.state.TvmStack.TvmInputStackEntry
 import org.usvm.machine.state.TvmStack.TvmStackTupleValue

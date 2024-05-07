@@ -146,6 +146,7 @@ import org.usvm.apply
 import org.usvm.collection.set.primitive.USetEntryLValue
 import org.usvm.collection.set.primitive.setEntries
 import org.usvm.machine.TvmContext
+import org.usvm.machine.TvmStepScope
 import org.usvm.machine.intValue
 import org.usvm.machine.setUnion
 import org.usvm.machine.state.TvmRefsMemoryRegion

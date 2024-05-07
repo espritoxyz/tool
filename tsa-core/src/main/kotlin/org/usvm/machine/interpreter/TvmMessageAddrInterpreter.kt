@@ -18,6 +18,7 @@ import org.usvm.api.writeField
 import org.usvm.logger
 import org.usvm.machine.TvmContext
 import org.usvm.machine.TvmSizeSort
+import org.usvm.machine.TvmStepScope
 import org.usvm.machine.state.allocSliceFromCell
 import org.usvm.machine.state.builderCopy
 import org.usvm.machine.state.calcOnStateCtx

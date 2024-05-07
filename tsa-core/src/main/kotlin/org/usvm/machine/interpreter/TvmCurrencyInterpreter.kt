@@ -8,6 +8,7 @@ import org.ton.bytecode.TvmIntegerType
 import org.ton.bytecode.TvmSliceType
 import org.usvm.api.makeSymbolicPrimitive
 import org.usvm.machine.TvmContext
+import org.usvm.machine.TvmStepScope
 import org.usvm.machine.state.builderCopy
 import org.usvm.machine.state.consumeDefaultGas
 import org.usvm.machine.state.doWithStateCtx

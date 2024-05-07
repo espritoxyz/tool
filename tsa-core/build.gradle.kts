@@ -19,6 +19,7 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:${Versions.kotlinx_serialization}")
 
     implementation(group = "org.slf4j", name = "slf4j-simple", version = Versions.slf4j)
+    testImplementation("ch.qos.logback:logback-classic:${Versions.logback}")
 
     // todo: remove ksmt-core exclude after upgrading ksmt version in USVM
     implementation("io.ksmt:ksmt-core:${Versions.ksmt}")

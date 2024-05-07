@@ -8,6 +8,7 @@ import org.ton.bytecode.TvmAppGlobalInst
 import org.ton.bytecode.TvmAppGlobalSetglobInst
 import org.ton.bytecode.TvmAppGlobalSetglobvarInst
 import org.usvm.machine.TvmContext
+import org.usvm.machine.TvmStepScope
 import org.usvm.machine.state.consumeDefaultGas
 import org.usvm.machine.state.consumeGas
 import org.usvm.machine.state.newStmt

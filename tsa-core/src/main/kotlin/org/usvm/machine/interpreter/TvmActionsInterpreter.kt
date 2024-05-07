@@ -4,6 +4,7 @@ import org.ton.bytecode.TvmAppActionsInst
 import org.ton.bytecode.TvmAppActionsRawreserveInst
 import org.ton.bytecode.TvmAppActionsSendrawmsgInst
 import org.usvm.machine.TvmContext
+import org.usvm.machine.TvmStepScope
 import org.usvm.machine.state.consumeDefaultGas
 import org.usvm.machine.state.doWithStateCtx
 import org.usvm.machine.state.newStmt

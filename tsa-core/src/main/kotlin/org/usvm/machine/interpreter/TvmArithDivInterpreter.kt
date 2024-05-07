@@ -100,6 +100,7 @@ import org.usvm.machine.TvmContext
 import org.usvm.machine.TvmContext.TvmInt257Ext1Sort
 import org.usvm.machine.TvmContext.TvmInt257Ext256Sort
 import org.usvm.machine.TvmContext.TvmInt257Sort
+import org.usvm.machine.TvmStepScope
 import org.usvm.machine.state.consumeDefaultGas
 import org.usvm.machine.state.newStmt
 import org.usvm.machine.state.nextStmt

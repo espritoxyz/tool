@@ -43,6 +43,7 @@ import org.ton.bytecode.TvmTupleUnpackfirstvarInst
 import org.ton.bytecode.TvmTupleUntupleInst
 import org.ton.bytecode.TvmTupleUntuplevarInst
 import org.usvm.machine.TvmContext
+import org.usvm.machine.TvmStepScope
 import org.usvm.machine.state.SIMPLE_GAS_USAGE
 import org.usvm.machine.state.TvmStack
 import org.usvm.machine.state.TvmStack.TvmStackTupleValueConcreteNew

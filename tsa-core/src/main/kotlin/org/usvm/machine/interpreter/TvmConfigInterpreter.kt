@@ -10,6 +10,7 @@ import org.usvm.api.makeSymbolicPrimitive
 import org.usvm.api.writeField
 import org.usvm.machine.TvmContext
 import org.usvm.machine.TvmContext.Companion.cellDataLengthField
+import org.usvm.machine.TvmStepScope
 import org.usvm.machine.state.TvmStack
 import org.usvm.machine.state.TvmStack.TvmStackTupleValueConcreteNew
 import org.usvm.machine.state.allocSliceFromCell
@@ -44,16 +45,20 @@ class TvmConfigInterpreter(private val ctx: TvmContext) {
                     val c7 = scope.calcOnState { registers.c7 }
                     val previousValue = c7.now ?: unitTimeMinValue
 
-                    scope.assert(mkBvSignedGreaterExpr(now, previousValue))
-                        ?: error("Cannot make NOW > $previousValue")
+                    scope.assert(
+                        mkBvSignedGreaterExpr(now, previousValue),
+                        unsatBlock = { error("Cannot make NOW > $previousValue") }
+                    ) ?: return@doWithStateCtx
 
                     c7.now = now
                     stack.add(now, TvmIntegerType)
                 }
                 5 -> { // LTIME
                     val logicalTime = scope.calcOnState { makeSymbolicPrimitive(int257sort) }
-                    scope.assert(mkBvSignedGreaterExpr(logicalTime, zeroValue))
-                        ?: error("Cannot make positive LTIME")
+                    scope.assert(
+                        mkBvSignedGreaterExpr(logicalTime, zeroValue),
+                        unsatBlock = { error("Cannot make positive LTIME") }
+                    ) ?: return@doWithStateCtx
 
                     stack.add(logicalTime, TvmIntegerType)
                 }
@@ -71,8 +76,10 @@ class TvmConfigInterpreter(private val ctx: TvmContext) {
                         balanceCell.intValue to (extraCurrencies.sliceValue ?: ctx.nullValue)
                     } else {
                         val balance = makeSymbolicPrimitive(int257sort)
-                        scope.assert(mkBvSignedGreaterOrEqualExpr(balance, zeroValue))
-                            ?: error("Cannot make balance >= 0")
+                        scope.assert(
+                            mkBvSignedGreaterOrEqualExpr(balance, zeroValue),
+                            unsatBlock = { error("Cannot make balance >= 0") }
+                        ) ?: return@doWithStateCtx
 
                         c7.balance = TvmStackTupleValueConcreteNew(
                             ctx,

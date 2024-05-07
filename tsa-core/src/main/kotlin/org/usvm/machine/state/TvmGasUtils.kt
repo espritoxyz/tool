@@ -6,7 +6,7 @@ import org.ton.bytecode.TvmInst
 import org.ton.bytecode.TvmSimpleGas
 import org.usvm.UBv32Sort
 import org.usvm.UExpr
-import org.usvm.machine.interpreter.TvmStepScope
+import org.usvm.machine.TvmStepScope
 
 const val IMPLICIT_EXCEPTION_THROW_GAS = 50
 const val SIMPLE_INSTRUCTION_BASE_GAS = 10

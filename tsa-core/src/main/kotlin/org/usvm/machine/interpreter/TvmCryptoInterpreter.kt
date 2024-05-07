@@ -12,6 +12,7 @@ import org.ton.bytecode.TvmSliceType
 import org.usvm.UHeapRef
 import org.usvm.api.makeSymbolicPrimitive
 import org.usvm.machine.TvmContext
+import org.usvm.machine.TvmStepScope
 import org.usvm.machine.state.TvmStack
 import org.usvm.machine.state.TvmState
 import org.usvm.machine.state.consumeDefaultGas

@@ -28,8 +28,7 @@ class ContractsTest {
 
     @Test
     fun testWallet() {
-        val methodsBlackList = hashSetOf(-1, Int.MAX_VALUE) // TODO exclude recv_external because of dict_add_builder (DICTADDB) instruction
-        analyzeContract(walletPath, methodsNumber = 6, methodsBlackList) // TODO methodsNumber = 7
+        analyzeContract(walletPath, methodsNumber = 7)
     }
 
     @EnabledIfEnvironmentVariable(named = runHardTestsVar, matches = runHardTestsRegex)
