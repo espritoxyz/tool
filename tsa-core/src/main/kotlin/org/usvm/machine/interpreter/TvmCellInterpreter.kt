@@ -55,6 +55,8 @@ import org.ton.bytecode.TvmCellParsePldile8qInst
 import org.ton.bytecode.TvmCellParsePldiqInst
 import org.ton.bytecode.TvmCellParsePldixInst
 import org.ton.bytecode.TvmCellParsePldixqInst
+import org.ton.bytecode.TvmCellParsePldrefidxInst
+import org.ton.bytecode.TvmCellParsePldrefvarInst
 import org.ton.bytecode.TvmCellParsePldsliceInst
 import org.ton.bytecode.TvmCellParsePldsliceqInst
 import org.ton.bytecode.TvmCellParsePldslicexInst
@@ -118,6 +120,7 @@ import org.usvm.machine.state.sliceMoveRefPtr
 import org.usvm.machine.state.slicePreloadDataBits
 import org.usvm.machine.state.slicePreloadInt
 import org.usvm.machine.state.slicePreloadNextRef
+import org.usvm.machine.state.slicePreloadRef
 import org.usvm.machine.state.takeLastBuilder
 import org.usvm.machine.state.takeLastCell
 import org.usvm.machine.state.takeLastInt
@@ -136,11 +139,16 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
     fun visitCellParseInst(
         scope: TvmStepScope,
         stmt: TvmCellParseInst
-    ) {
+    ): Unit = with(ctx) {
         when (stmt) {
             is TvmCellParseCtosInst -> visitCellToSliceInst(scope, stmt)
             is TvmCellParseEndsInst -> visitEndSliceInst(scope, stmt)
             is TvmCellParseLdrefInst -> visitLoadRefInst(scope, stmt)
+            is TvmCellParsePldrefidxInst -> doPreloadRef(scope, stmt, refIdx = mkSizeExpr(stmt.n))
+            is TvmCellParsePldrefvarInst -> {
+                val refIdx = scope.calcOnState { stack.takeLastInt() }
+                doPreloadRef(scope, stmt, refIdx = refIdx.extractToSizeSort())
+            }
             is TvmCellParseLduInst -> visitLoadIntInst(scope, stmt, stmt.c + 1, isSigned = false, preload = false, quiet = false)
             is TvmCellParseLduqInst -> visitLoadIntInst(scope, stmt, stmt.c + 1, isSigned = false, preload = false, quiet = true)
             is TvmCellParseLduAltInst -> visitLoadIntInst(scope, stmt, stmt.c + 1, isSigned = false, preload = false, quiet = false)
@@ -298,6 +306,27 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
         }
     }
 
+    private fun doPreloadRef(scope: TvmStepScope, stmt: TvmCellParseInst, refIdx: UExpr<TvmSizeSort>) = with(ctx) {
+        scope.consumeDefaultGas(stmt)
+
+        val notOutOfRangeExpr = mkAnd(
+            mkBvSignedLessOrEqualExpr(zeroSizeExpr, refIdx),
+            mkBvSignedLessOrEqualExpr(refIdx, mkSizeExpr(3)),
+        )
+        checkOutOfRange(notOutOfRangeExpr, scope) ?: return@with
+
+        val slice = scope.calcOnState { stack.takeLastSlice() }
+            ?: return scope.doWithState(throwTypeCheckError)
+
+        val ref = scope.slicePreloadRef(slice, refIdx) ?: return
+
+        scope.doWithState {
+            scope.addOnStack(ref, TvmCellType)
+
+            newStmt(stmt.nextStmt())
+        }
+    }
+
     private fun visitEndSliceInst(scope: TvmStepScope, stmt: TvmCellParseEndsInst) {
         scope.doWithState { consumeGas(18) } // complex gas
 
@@ -326,7 +355,7 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
         }
     }
 
-    private fun TvmState.visitLoadInstEnd(
+    private fun TvmState.visitLoadDataInstEnd(
         stmt: TvmCellParseInst,
         slice: UHeapRef,
         sizeBits: UExpr<TvmSizeSort>,
@@ -376,7 +405,7 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
 
         scope.doWithState {
             addOnStack(extendedValue, TvmIntegerType)
-            visitLoadInstEnd(stmt, slice, mkSizeExpr(sizeBits), preload, quiet)
+            visitLoadDataInstEnd(stmt, slice, mkSizeExpr(sizeBits), preload, quiet)
         }
     }
 
@@ -408,7 +437,7 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
 
         scope.doWithState {
             addOnStack(value, TvmIntegerType)
-            visitLoadInstEnd(stmt, slice, sizeBits.extractToSizeSort(), preload, quiet)
+            visitLoadDataInstEnd(stmt, slice, sizeBits.extractToSizeSort(), preload, quiet)
         }
     }
 
@@ -452,7 +481,7 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
 
         scope.doWithState {
             addOnStack(extendedRes, TvmIntegerType)
-            visitLoadInstEnd(stmt, slice, mkSizeExpr(sizeBits), preload, quiet)
+            visitLoadDataInstEnd(stmt, slice, mkSizeExpr(sizeBits), preload, quiet)
         }
     }
 
@@ -484,7 +513,7 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
 
         scope.doWithState {
             addOnStack(resultSlice, TvmSliceType)
-            visitLoadInstEnd(stmt, slice, mkSizeExpr(sizeBits), preload, quiet)
+            visitLoadDataInstEnd(stmt, slice, mkSizeExpr(sizeBits), preload, quiet)
         }
     }
 
@@ -526,7 +555,7 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
 
         scope.doWithState {
             addOnStack(resultSlice, TvmSliceType)
-            visitLoadInstEnd(stmt, slice, sizeBits.extractToSizeSort(), preload, quiet)
+            visitLoadDataInstEnd(stmt, slice, sizeBits.extractToSizeSort(), preload, quiet)
         }
     }
 

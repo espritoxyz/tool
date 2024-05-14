@@ -3,6 +3,7 @@ package org.usvm.machine.interpreter
 import org.ton.bytecode.TvmAppActionsInst
 import org.ton.bytecode.TvmAppActionsRawreserveInst
 import org.ton.bytecode.TvmAppActionsSendrawmsgInst
+import org.ton.bytecode.TvmAppActionsSetcodeInst
 import org.usvm.machine.TvmContext
 import org.usvm.machine.TvmStepScope
 import org.usvm.machine.state.consumeDefaultGas
@@ -19,6 +20,7 @@ class TvmActionsInterpreter(private val ctx: TvmContext) {
         when (stmt) {
             is TvmAppActionsSendrawmsgInst -> visitSendRawMsgInst(scope, stmt)
             is TvmAppActionsRawreserveInst -> visitRawReserveInst(scope, stmt)
+            is TvmAppActionsSetcodeInst -> visitSetCodeInst(scope, stmt)
             else -> TODO("$stmt")
         }
     }
@@ -35,6 +37,15 @@ class TvmActionsInterpreter(private val ctx: TvmContext) {
     private fun visitRawReserveInst(scope: TvmStepScope, stmt: TvmAppActionsRawreserveInst) {
         scope.doWithState {
             val (mode, value) = stack.takeLastInt() to stack.takeLastInt()
+
+            // TODO make a real implementation
+            newStmt(stmt.nextStmt())
+        }
+    }
+
+    private fun visitSetCodeInst(scope: TvmStepScope, stmt: TvmAppActionsSetcodeInst) {
+        scope.doWithState {
+            val cell = stack.takeLastCell()
 
             // TODO make a real implementation
             newStmt(stmt.nextStmt())

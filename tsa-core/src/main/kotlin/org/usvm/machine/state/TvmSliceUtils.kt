@@ -144,8 +144,9 @@ fun TvmStepScope.slicePreloadInt(
     }
 }
 
-fun TvmStepScope.slicePreloadNextRef(
+fun TvmStepScope.slicePreloadRef(
     slice: UHeapRef,
+    idx: UExpr<TvmSizeSort>,
     quietBlock: (TvmState.() -> Unit)? = null
 ): UHeapRef? = calcOnStateCtx {
     val cell = memory.readField(slice, sliceCellField, addressSort)
@@ -157,13 +158,19 @@ fun TvmStepScope.slicePreloadNextRef(
     ) ?: return@calcOnStateCtx null
 
     val sliceRefPos = memory.readField(slice, sliceRefPosField, sizeSort)
-    val readingConstraint = mkSizeLtExpr(sliceRefPos, refsLength)
+    val refIdx = mkSizeAddExpr(sliceRefPos, idx)
+    val readingConstraint = mkSizeLtExpr(refIdx, refsLength)
 
-    checkCellUnderflow(readingConstraint, this@slicePreloadNextRef, quietBlock)
+    checkCellUnderflow(readingConstraint, this@slicePreloadRef, quietBlock)
         ?: return@calcOnStateCtx null
 
-    readCellRef(cell, sliceRefPos)
+    readCellRef(cell, refIdx)
 }
+
+fun TvmStepScope.slicePreloadNextRef(
+    slice: UHeapRef,
+    quietBlock: (TvmState.() -> Unit)? = null
+): UHeapRef? = calcOnStateCtx { slicePreloadRef(slice, zeroSizeExpr, quietBlock) }
 
 fun TvmState.sliceCopy(original: UHeapRef, result: UHeapRef) = with(ctx) {
     memory.copyField(original, result, sliceCellField, addressSort)

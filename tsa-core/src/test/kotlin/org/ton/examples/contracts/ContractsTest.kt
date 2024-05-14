@@ -47,6 +47,11 @@ class ContractsTest {
         analyzeContract(jettonWalletPath, methodsNumber = 3)
     }
 
+    @Test
+    fun singleNominator() {
+        analyzeContract(singleNominatorPath, methodsNumber = 3)
+    }
+
     @Ignore
     @Test
     fun universalLockupWallet() {
@@ -99,12 +104,6 @@ class ContractsTest {
     @Test
     fun vesting() {
         analyzeContract(vestingPath, methodsNumber = 9)
-    }
-
-    @Ignore
-    @Test
-    fun singleNominator() {
-        analyzeContract(singleNominatorPath, methodsNumber = 3)
     }
 
     @Ignore
