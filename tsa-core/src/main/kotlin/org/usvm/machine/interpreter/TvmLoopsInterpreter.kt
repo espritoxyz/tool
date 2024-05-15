@@ -193,7 +193,7 @@ class TvmLoopsInterpreter(private val ctx: TvmContext) {
             val continuationValue = stmt.continuationValue
             val conditionContinuation = stmt.conditionContinuation
             val artificialWhileEndInst = TvmArtificialWhileEndInst(
-                originalInst = stmt,
+                originalInst = stmt.originalInst,
                 continuationValue = continuationValue,
                 conditionContinuation = conditionContinuation,
                 executeUntilEnd = stmt.executeUntilEnd
@@ -220,7 +220,7 @@ class TvmLoopsInterpreter(private val ctx: TvmContext) {
         val conditionContinuation = stmt.conditionContinuation
         scope.doWithState {
             val artificialWhileStartInst = TvmArtificialWhileStartInst(
-                originalInst = stmt,
+                originalInst = stmt.originalInst,
                 continuationValue = continuationValue,
                 conditionContinuation = conditionContinuation,
                 executeUntilEnd = stmt.executeUntilEnd

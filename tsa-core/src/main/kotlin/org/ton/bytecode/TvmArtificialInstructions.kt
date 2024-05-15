@@ -20,12 +20,14 @@ sealed interface TvmLoopArtificialInst : TvmArtificialInst, TvmContLoopsInst {
         get() = originalInst.location
 }
 
+sealed interface TvmLoopEntranceArtificialInst : TvmLoopArtificialInst
+
 data class TvmArtificialRepeatInst(
     override val originalInst: TvmContLoopsInst,
     val continuationValue: TvmContinuationValue,
     val loopRepeats: UExpr<TvmInt257Sort>,
     val executeUntilEnd: Boolean,
-) : TvmLoopArtificialInst {
+) : TvmLoopEntranceArtificialInst {
     override val mnemonic: String
         get() = "artificial_repeat_${originalInst.mnemonic}"
 }
@@ -34,7 +36,7 @@ data class TvmArtificialUntilInst(
     override val originalInst: TvmContLoopsInst,
     val continuationValue: TvmContinuationValue,
     val executeUntilEnd: Boolean,
-) : TvmLoopArtificialInst {
+) : TvmLoopEntranceArtificialInst {
     override val mnemonic: String
         get() = "artificial_until_${originalInst.mnemonic}"
 }
@@ -44,7 +46,7 @@ data class TvmArtificialWhileStartInst(
     val continuationValue: TvmContinuationValue,
     val conditionContinuation: TvmContinuationValue,
     val executeUntilEnd: Boolean,
-) : TvmLoopArtificialInst {
+) : TvmLoopEntranceArtificialInst {
     override val mnemonic: String
         get() = "artificial_while_start_${originalInst.mnemonic}"
 }
@@ -63,7 +65,7 @@ data class TvmArtificialAgainInst(
     override val originalInst: TvmContLoopsInst,
     val continuationValue: TvmContinuationValue,
     val executeUntilEnd: Boolean,
-) : TvmLoopArtificialInst {
+) : TvmLoopEntranceArtificialInst {
     override val mnemonic: String
         get() = "artificial_again_${originalInst.mnemonic}"
 }
