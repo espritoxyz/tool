@@ -7,22 +7,30 @@ import org.ton.intellij.func.psi.FuncPsiFactory
 import java.math.BigInteger
 import java.nio.file.Path
 import java.util.concurrent.atomic.AtomicInteger
+import kotlin.io.path.name
 
 fun makeMethodsMapping(
     funcSourcesPath: Path,
     project: Project,
     mapping: MutableMap<BigInteger, FuncFunction>,
-    counter: AtomicInteger
+    counter: AtomicInteger,
+    visitedSources: MutableSet<Path>
 ) {
+    if (funcSourcesPath in visitedSources) {
+        return
+    }
+    visitedSources.add(funcSourcesPath)
+
     val sourceCode = funcSourcesPath.toFile().readText()
-    val psiFile = FuncPsiFactory[project].createFile(sourceCode)
+    val psiFile = FuncPsiFactory[project].createFile(name = funcSourcesPath.name, text = sourceCode)
 
     val includes = psiFile.includeDefinitions.mapNotNull { it.stringLiteral?.rawString?.text }
     val includePaths = includes.map { funcSourcesPath.parent.resolve(it) }
 
-    includePaths.forEach { makeMethodsMapping(it, project, mapping, counter) }
+    includePaths.forEach { makeMethodsMapping(it, project, mapping, counter, visitedSources) }
 
-    val functions = psiFile.functions.filter { it.inlineKeyword == null && it.asmDefinition == null }
+    // Note that inline functions also receive ids, so we need to count them too (unlike functions with asm definitions)
+    val functions = psiFile.functions.filter { it.asmDefinition == null }
     functions.associateByTo(mapping) { getMethodId(it, counter) }
 }
 

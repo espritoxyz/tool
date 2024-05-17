@@ -95,10 +95,12 @@ data class C7Register(
             "Unexpected setting global variable with index $idx"
         }
 
-        val previousGlobalVariables = globalVariables ?: TvmStackTupleValueConcreteNew(
+        val previousGlobalVariablesEntries = globalVariables?.entries ?: persistentListOf()
+        val previousGlobalVariables = TvmStackTupleValueConcreteNew(
             ctx,
-            persistentListOf<TvmStackEntry>().extendToSize(idx + 1)
+            previousGlobalVariablesEntries.extendToSize(idx + 1)
         )
+
         globalVariables = previousGlobalVariables.set(idx, value)
     }
 

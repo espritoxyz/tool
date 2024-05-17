@@ -62,6 +62,12 @@ class TvmCurrencyInterpreter(private val ctx: TvmContext) {
                 unsatBlock = { error("Cannot make grams >= 0") }
             ) ?: return@doWithStateCtx
 
+            // Grams is any unsigned integer up to `2^((2^4-1)*8) - 1 = 2^120 - 1`
+            scope.assert(
+                mkBvSignedLessOrEqualExpr(grams, maxGramsValue),
+                unsatBlock = { error("Cannot make grams <= `2^120 - 1`") }
+            ) ?: return@doWithStateCtx
+
             sliceMoveDataPtr(updatedSlice, extendedLength)
 
             addOnStack(grams, TvmIntegerType)

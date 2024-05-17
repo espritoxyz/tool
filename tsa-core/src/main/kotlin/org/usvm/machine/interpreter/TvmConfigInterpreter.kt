@@ -3,8 +3,6 @@ package org.usvm.machine.interpreter
 import kotlinx.collections.immutable.persistentListOf
 import org.ton.bytecode.TvmAppConfigGetparamInst
 import org.ton.bytecode.TvmAppConfigInst
-import org.usvm.machine.types.TvmNullType
-import org.usvm.machine.types.TvmSliceType
 import org.usvm.api.makeSymbolicPrimitive
 import org.usvm.api.writeField
 import org.usvm.machine.TvmContext
@@ -14,6 +12,7 @@ import org.usvm.machine.state.TvmStack
 import org.usvm.machine.state.TvmStack.TvmStackTupleValueConcreteNew
 import org.usvm.machine.state.addInt
 import org.usvm.machine.state.addOnStack
+import org.usvm.machine.state.addTuple
 import org.usvm.machine.state.allocSliceFromCell
 import org.usvm.machine.state.consumeDefaultGas
 import org.usvm.machine.state.doWithStateCtx
@@ -22,6 +21,7 @@ import org.usvm.machine.state.generateSymbolicCell
 import org.usvm.machine.state.newStmt
 import org.usvm.machine.state.nextStmt
 import org.usvm.machine.state.toStackEntry
+import org.usvm.machine.types.TvmSliceType
 import org.usvm.mkSizeExpr
 import org.usvm.sizeSort
 
@@ -65,35 +65,23 @@ class TvmConfigInterpreter(private val ctx: TvmContext) {
                 }
                 7 -> { // BALANCE
                     val c7 = scope.calcOnState { registers.c7 }
-                    val balanceValue = c7.balance
-
-                    // TODO read the real value
-                    val (balance, maybeCell) = if (balanceValue != null) {
-                        val balanceCell = balanceValue.entries[0].cell
-                            ?: error("No balance value found")
-                        val extraCurrencies = balanceValue.entries[1].cell
-                            ?: error("No extra currencies value found")
-
-                        balanceCell.intValue to (extraCurrencies.sliceValue ?: ctx.nullValue)
-                    } else {
+                    val balanceValue = c7.balance ?: run {
                         val balance = makeSymbolicPrimitive(int257sort)
                         scope.assert(
                             mkBvSignedGreaterOrEqualExpr(balance, zeroValue),
                             unsatBlock = { error("Cannot make balance >= 0") }
                         ) ?: return@doWithStateCtx
 
-                        c7.balance = TvmStackTupleValueConcreteNew(
+                        TvmStackTupleValueConcreteNew(
                             ctx,
                             persistentListOf(
                                 TvmStack.TvmStackIntValue(balance).toStackEntry(),
                                 TvmStack.TvmStackSliceValue(ctx.nullValue).toStackEntry()
                             )
-                        )
-                        balance to ctx.nullValue
+                        ).also { c7.balance = it }
                     }
 
-                    stack.addInt(balance)
-                    addOnStack(maybeCell, TvmNullType)
+                    stack.addTuple(balanceValue)
                 }
                 8 -> { // MYADDR
                     // TODO really make a slice with MsgAddressInt from the real contract address?

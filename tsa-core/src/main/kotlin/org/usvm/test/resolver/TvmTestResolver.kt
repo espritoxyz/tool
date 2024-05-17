@@ -4,7 +4,6 @@ import org.ton.bytecode.TvmInst
 import org.ton.bytecode.TvmMethod
 import org.usvm.machine.state.TvmMethodResult.TvmFailure
 import org.usvm.machine.state.TvmState
-import org.usvm.machine.state.lastStmt
 import java.math.BigInteger
 
 data object TvmTestResolver {
@@ -21,7 +20,7 @@ data object TvmTestResolver {
             methodId = method.id,
             usedParameters = usedParameters,
             result = result,
-            stackTrace = listOf(state.lastStmt) + state.callStack.mapNotNull { it.returnSite },
+            stackTrace = state.continuationStack,
             gasUsage = gasUsage
         )
     }

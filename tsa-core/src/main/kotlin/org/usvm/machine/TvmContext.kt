@@ -5,6 +5,7 @@ import io.ksmt.expr.KBitVecValue
 import io.ksmt.expr.KExpr
 import io.ksmt.sort.KBvCustomSizeSort
 import io.ksmt.sort.KBvSort
+import io.ksmt.utils.BvUtils.bvMaxValueUnsigned
 import io.ksmt.utils.asExpr
 import io.ksmt.utils.toBigInteger
 import org.usvm.machine.types.TvmCellType
@@ -50,6 +51,7 @@ class TvmContext(components: UComponents<TvmType, TvmSizeSort>) : UContext<TvmSi
     val unitTimeMinValue: KBitVecValue<TvmInt257Sort> = UNIX_TIME_MIN.toBv257()
     val min257BitValue: KExpr<TvmInt257Sort> = bvMinValueSignedExtended(intBitsValue)
     val max257BitValue: KExpr<TvmInt257Sort> = bvMaxValueSignedExtended(intBitsValue)
+    val maxGramsValue: KExpr<TvmInt257Sort> = bvMaxValueUnsigned<UBvSort>(MAX_GRAMS_BITS).unsignedExtendToInteger()
 
     val zeroSizeExpr: UExpr<TvmSizeSort> = mkSizeExpr(0)
     val maxDataLengthSizeExpr: UExpr<TvmSizeSort> = mkSizeExpr(MAX_DATA_LENGTH)
@@ -118,6 +120,8 @@ class TvmContext(components: UComponents<TvmType, TvmSizeSort>) : UContext<TvmSi
         val CELL_DATA_BITS: UInt = MAX_DATA_LENGTH.toUInt()
 
         const val UNIX_TIME_MIN: Int = 1712318909
+
+        const val MAX_GRAMS_BITS: UInt = 120u
 
         // Utility bit sizes for arith operations
         val INT_EXT1_BITS: UInt = INT_BITS + 1u

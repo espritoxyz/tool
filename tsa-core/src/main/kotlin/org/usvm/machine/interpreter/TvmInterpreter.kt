@@ -115,7 +115,6 @@ import org.ton.bytecode.TvmDictSpecialDictpushconstInst
 import org.ton.bytecode.TvmDictSpecialInst
 import org.ton.bytecode.TvmExceptionsInst
 import org.ton.bytecode.TvmInst
-import org.usvm.machine.types.TvmIntegerType
 import org.ton.bytecode.TvmLambda
 import org.usvm.machine.types.TvmSliceType
 import org.ton.bytecode.TvmStackBasicInst

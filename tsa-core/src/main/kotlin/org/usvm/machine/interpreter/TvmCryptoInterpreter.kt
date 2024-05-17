@@ -25,6 +25,7 @@ import org.usvm.machine.state.takeLastInt
 import org.usvm.machine.state.takeLastSlice
 import org.usvm.machine.state.throwCellUnderflowError
 import org.usvm.machine.state.throwTypeCheckError
+import org.usvm.machine.state.unsignedIntegerFitsBits
 
 class TvmCryptoInterpreter(private val ctx: TvmContext) {
     fun visitCryptoStmt(scope: TvmStepScope, stmt: TvmAppCryptoInst) {
@@ -48,6 +49,12 @@ class TvmCryptoInterpreter(private val ctx: TvmContext) {
 
             // TODO hash must be deterministic - make a region for representation hashes?
             val hash = makeSymbolicPrimitive(ctx.int257sort)
+
+            // Hash is a 256-bit unsigned integer
+            scope.assert(
+                ctx.unsignedIntegerFitsBits(hash, 256u),
+                unsatBlock = { error("Cannot make hash fits in 256 bits") }
+            ) ?: return@calcOnState
 
             stack.addInt(hash)
             newStmt(stmt.nextStmt())

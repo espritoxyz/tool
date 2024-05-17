@@ -1,32 +1,33 @@
 package org.usvm.machine.state
 
 import io.ksmt.utils.powerOfTwo
-import org.usvm.machine.types.TvmBuilderType
-import org.usvm.machine.types.TvmCellType
 import org.ton.bytecode.TvmContinuationValue
 import org.ton.bytecode.TvmInst
 import org.usvm.NULL_ADDRESS
-import org.usvm.machine.types.TvmIntegerType
-import org.usvm.machine.types.TvmSliceType
 import org.usvm.UBoolExpr
 import org.usvm.UConcreteHeapRef
 import org.usvm.UExpr
 import org.usvm.UHeapRef
-import org.usvm.USymbolicHeapRef
+import org.usvm.api.readField
 import org.usvm.api.writeField
 import org.usvm.machine.TvmContext
 import org.usvm.machine.TvmContext.TvmInt257Sort
 import org.usvm.machine.TvmSizeSort
+import org.usvm.machine.TvmStepScope
+import org.usvm.machine.types.TvmBuilderType
+import org.usvm.machine.types.TvmCellType
 import org.usvm.machine.types.TvmNullType
+import org.usvm.machine.types.TvmSliceType
 import org.usvm.machine.types.TvmType
 import org.usvm.memory.GuardedExpr
 import org.usvm.memory.foldHeapRef
 import org.usvm.mkSizeAddExpr
 import org.usvm.mkSizeExpr
+import org.usvm.mkSizeGeExpr
+import org.usvm.mkSizeLeExpr
 import org.usvm.sizeSort
 import org.usvm.types.USingleTypeStream
 import java.math.BigInteger
-import org.usvm.machine.TvmStepScope
 
 val TvmState.lastStmt get() = pathNode.statement
 fun TvmState.newStmt(stmt: TvmInst) {
@@ -82,16 +83,30 @@ fun TvmStepScope.doWithStateCtx(block: context(TvmContext) TvmState.() -> Unit) 
     block(ctx, this)
 }
 
-fun TvmState.generateSymbolicCell(): UHeapRef = generateSymbolicRef(TvmCellType)
+fun TvmState.generateSymbolicCell(): UHeapRef = generateSymbolicRef(TvmCellType).also { initializeSymbolicCell(it) }
 
 fun TvmState.ensureSymbolicCellInitialized(ref: UHeapRef) =
-    ensureSymbolicRefInitialized(ref, TvmCellType)
+    ensureSymbolicRefInitialized(ref, TvmCellType) { initializeSymbolicCell(it) }
 
 fun TvmState.generateSymbolicSlice(): UHeapRef =
     generateSymbolicRef(TvmSliceType).also { initializeSymbolicSlice(it) }
 
 fun TvmState.ensureSymbolicSliceInitialized(ref: UHeapRef) =
     ensureSymbolicRefInitialized(ref, TvmSliceType) { initializeSymbolicSlice(it) }
+
+fun TvmState.initializeSymbolicCell(cell: UConcreteHeapRef) = with(ctx) {
+    val dataLength = memory.readField(cell, TvmContext.cellDataLengthField, sizeSort)
+    val refsLength = memory.readField(cell, TvmContext.cellRefsLengthField, sizeSort)
+
+    // We can add these constraints manually to path constraints because default values (0) in models are valid
+    // for these fields
+
+    pathConstraints += mkSizeLeExpr(dataLength, maxDataLengthSizeExpr)
+    pathConstraints += mkSizeGeExpr(dataLength, zeroSizeExpr)
+
+    pathConstraints += mkSizeLeExpr(refsLength, maxRefsLengthSizeExpr)
+    pathConstraints += mkSizeGeExpr(refsLength, zeroSizeExpr)
+}
 
 fun TvmState.initializeSymbolicSlice(ref: UConcreteHeapRef) = with(ctx) {
     // TODO hack! Assume that all input slices were not read, that means dataPos == 0 and refsPos == 0

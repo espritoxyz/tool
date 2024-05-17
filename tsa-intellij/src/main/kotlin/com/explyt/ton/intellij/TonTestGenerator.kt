@@ -44,11 +44,17 @@ class TonTestGenerator(private val project: Project) {
 
         val sourcesPath = Path.of(generateTestModel.fileUnderTest.path)
         val testFile = withBackgroundProgressOnPooledThread(project, "Generating TON tests") {
+            val methodsMapping = hashMapOf<BigInteger, FuncFunction>()
+            makeMethodsMapping(
+                funcSourcesPath = sourcesPath,
+                project = project,
+                mapping = methodsMapping,
+                counter = AtomicInteger(1),
+                visitedSources = hashSetOf()
+            )
+
             val tvmAnalyzer = createTvmAnalyzer(generateTestModel)
             val testResult = tvmAnalyzer.analyzeAllMethods(sourcesPath)
-
-            val methodsMapping = hashMapOf<BigInteger, FuncFunction>()
-            makeMethodsMapping(sourcesPath, project, methodsMapping, AtomicInteger(1))
 
             val sarifReport = testResult.toSarifReport(methodsMapping.mapValues { it.value.name!! })
 

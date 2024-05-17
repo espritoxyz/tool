@@ -7,8 +7,6 @@ import kotlinx.collections.immutable.persistentListOf
 import org.ton.bytecode.TvmCodeBlock
 import org.ton.bytecode.TvmContinuationValue
 import org.ton.bytecode.TvmInst
-import org.usvm.machine.types.TvmRealReferenceType
-import org.usvm.machine.types.TvmType
 import org.ton.targets.TvmTarget
 import org.usvm.PathNode
 import org.usvm.UBv32Sort
@@ -22,6 +20,8 @@ import org.usvm.constraints.UPathConstraints
 import org.usvm.isStaticHeapRef
 import org.usvm.machine.TvmContext
 import org.usvm.machine.types.CellDataTypeInfo
+import org.usvm.machine.types.TvmRealReferenceType
+import org.usvm.machine.types.TvmType
 import org.usvm.machine.types.TvmTypeSystem
 import org.usvm.memory.UMemory
 import org.usvm.model.UModelBase
@@ -61,6 +61,37 @@ class TvmState(
     override val isExceptional: Boolean
         get() = methodResult is TvmMethodResult.TvmFailure
 
+    /**
+     * All visited last instructions in all visited continuations in the LIFO order.
+     */
+    val continuationStack: List<TvmInst>
+        get() {
+            val instructions = mutableListOf<TvmInst>()
+            val allInstructions = pathNode.allStatements.reversed()
+
+            var prevInst: TvmInst? = null
+            for (inst in allInstructions) {
+                val curBlock = inst.location.codeBlock
+                if (prevInst == null) {
+                    prevInst = inst
+                    continue
+                }
+
+                val prevBlock = prevInst.location.codeBlock
+                if (prevBlock == curBlock) {
+                    prevInst = inst
+                    continue
+                }
+
+                instructions += prevInst
+                prevInst = inst
+            }
+
+            instructions += allInstructions.last()
+
+            return instructions.asReversed()
+        }
+
     override fun clone(newConstraints: UPathConstraints<TvmType>?): TvmState {
         val clonedConstraints = newConstraints ?: pathConstraints.clone()
 
@@ -89,7 +120,7 @@ class TvmState(
     override fun toString(): String = buildString {
         appendLine("Instruction: $lastStmt")
         if (isExceptional) appendLine("Exception: $methodResult")
-        appendLine(callStack)
+        appendLine(continuationStack)
     }
 
     fun generateSymbolicRef(referenceType: TvmRealReferenceType): UConcreteHeapRef =

@@ -234,6 +234,9 @@ class TvmMessageAddrInterpreter(private val ctx: TvmContext) {
         memory.writeField(updatedCell, TvmContext.cellDataField, cellDataSort, msgAddr, guard = trueExpr)
         memory.writeField(updatedCell, TvmContext.cellDataLengthField, sizeSort, bitsToReadLength, guard = trueExpr)
 
+        // Note that prefix slice does not contain any refs
+        memory.writeField(updatedCell, TvmContext.cellRefsLengthField, sizeSort, zeroSizeExpr, guard = trueExpr)
+
         val prefixSlice = allocSliceFromCell(updatedCell)
 
         prefixSlice
