@@ -94,7 +94,7 @@ internal fun TvmStack.loadIntegers(n: Int) = List(n) {
 }.reversed()
 
 internal fun TvmSymbolicTest.executionCode(): Int = when (val it = result) {
-    is TvmMethodFailure -> it.failure.exitCode.toInt()
+    is TvmMethodFailure -> it.failure.exit.exitCode.toInt()
     is TvmSuccessfulExecution -> 0
 }
 
@@ -196,4 +196,20 @@ internal fun propertiesFound(
         failedProperties.add(index)
     }
     assertTrue(failedProperties.isEmpty(), "Properties $failedProperties were not found")
+}
+
+internal fun checkInvariants(
+    testSuite: TvmSymbolicTestSuite,
+    properties: List<(TvmSymbolicTest) -> Boolean>
+) {
+    val failedInvariants = mutableListOf<Int>()
+    properties.forEachIndexed outer@{ index, property ->
+        testSuite.tests.forEach { test ->
+            if (!property(test)) {
+                failedInvariants.add(index)
+                return@outer
+            }
+        }
+    }
+    assertTrue(failedInvariants.isEmpty(), "Invariants $failedInvariants were violated")
 }

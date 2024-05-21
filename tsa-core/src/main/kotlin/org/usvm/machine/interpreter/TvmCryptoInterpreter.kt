@@ -23,7 +23,7 @@ import org.usvm.machine.state.takeLastBuilder
 import org.usvm.machine.state.takeLastCell
 import org.usvm.machine.state.takeLastInt
 import org.usvm.machine.state.takeLastSlice
-import org.usvm.machine.state.throwCellUnderflowError
+import org.usvm.machine.state.throwUnknownCellUnderflowError
 import org.usvm.machine.state.throwTypeCheckError
 import org.usvm.machine.state.unsignedIntegerFitsBits
 
@@ -77,7 +77,7 @@ class TvmCryptoInterpreter(private val ctx: TvmContext) {
         val bits = scope.slicePreloadDataBits(signature, bits = 512)
         if (bits == null) {
             scope.doWithState {
-                throwCellUnderflowError(this)
+                throwUnknownCellUnderflowError(this)
             }
 
             return

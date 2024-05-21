@@ -3,8 +3,13 @@
 
 PROGRAM{
   0 DECLMETHOD slice_underflow
+  1 DECLMETHOD slice_not_ended
   slice_underflow PROC:<{
       x{61} PUSHSLICE  // Supposed to be string "a" (found this by compiling FunC file)
       100 LDI
+  }>
+  slice_not_ended PROC:<{
+      x{61} PUSHSLICE  // Supposed to be string "a" (found this by compiling FunC file)
+      ENDS
   }>
 }END>c

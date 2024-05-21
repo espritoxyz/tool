@@ -13,6 +13,8 @@ import org.ton.bytecode.TvmExceptionsThrowifnotInst
 import org.ton.bytecode.TvmExceptionsThrowifnotShortInst
 import org.usvm.machine.TvmContext
 import org.usvm.machine.TvmStepScope
+import org.usvm.machine.state.TvmFailureType
+import org.usvm.machine.state.TvmMethodResult
 import org.usvm.machine.state.TvmState
 import org.usvm.machine.state.TvmUnknownFailure
 import org.usvm.machine.state.consumeDefaultGas
@@ -29,13 +31,13 @@ class TvmExceptionsInterpreter(private val ctx: TvmContext) {
                 scope.consumeDefaultGas(stmt)
 
                 // TODO push parameter to the stack
-                methodResult = TvmUnknownFailure(stmt.n.toUInt())
+                methodResult = TvmMethodResult.TvmFailure(TvmUnknownFailure(stmt.n.toUInt()), TvmFailureType.UnknownError)
             }
             is TvmExceptionsThrowShortInst -> scope.doWithState {
                 scope.consumeDefaultGas(stmt)
 
                 // TODO push parameter to the stack
-                methodResult = TvmUnknownFailure(stmt.n.toUInt())
+                methodResult = TvmMethodResult.TvmFailure(TvmUnknownFailure(stmt.n.toUInt()), TvmFailureType.UnknownError)
             }
             is TvmExceptionsThrowifInst -> {
                 scope.doWithState { consumeGas(34) }

@@ -1,0 +1,7 @@
+#include "../imports/stdlib.fc";
+
+
+() recv_internal(int msg_value, cell in_msg_cell, slice in_msg) impure {
+    var ref = in_msg~load_ref();
+    ref~impure_touch();
+}

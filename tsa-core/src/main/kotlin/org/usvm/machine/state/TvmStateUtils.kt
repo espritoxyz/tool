@@ -37,9 +37,9 @@ fun TvmState.newStmt(stmt: TvmInst) {
 fun TvmInst.nextStmt(): TvmInst = location.codeBlock.instList.getOrNull(location.index + 1)
     ?: error("Unexpected end of the code block ${location.codeBlock}")
 
-fun setFailure(failure: TvmMethodResult.TvmFailure): (TvmState) -> Unit = { state ->
+fun setFailure(failure: TvmMethodResult.TvmExit, level: TvmFailureType = TvmFailureType.UnknownError): (TvmState) -> Unit = { state ->
     state.consumeGas(IMPLICIT_EXCEPTION_THROW_GAS)
-    state.methodResult = failure
+    state.methodResult = TvmMethodResult.TvmFailure(failure, level)
 
     // Throwing exception clears the current stack and pushes its parameter and exit code
     state.stack.clear()
@@ -54,7 +54,12 @@ val throwTypeCheckError: (TvmState) -> Unit = setFailure(TvmTypeCheckError)
 val throwIntegerOverflowError: (TvmState) -> Unit = setFailure(TvmIntegerOverflowError)
 val throwIntegerOutOfRangeError: (TvmState) -> Unit = setFailure(TvmIntegerOutOfRangeError)
 val throwCellOverflowError: (TvmState) -> Unit = setFailure(TvmCellOverflowError)
-val throwCellUnderflowError: (TvmState) -> Unit = setFailure(TvmCellUnderflowError)
+val throwUnknownCellUnderflowError: (TvmState) -> Unit = setFailure(TvmCellUnderflowError, TvmFailureType.UnknownError)
+val throwStructuralCellUnderflowError: (TvmState) -> Unit =
+    setFailure(TvmCellUnderflowError, TvmFailureType.FixedStructuralError)
+val throwSymbolicStructuralCellUnderflowError: (TvmState) -> Unit =
+    setFailure(TvmCellUnderflowError, TvmFailureType.SymbolicStructuralError)
+val throwRealCellUnderflowError: (TvmState) -> Unit = setFailure(TvmCellUnderflowError, TvmFailureType.RealError)
 
 // TODO support RETALT
 fun TvmState.returnFromMethod() {

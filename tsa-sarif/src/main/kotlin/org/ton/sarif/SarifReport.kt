@@ -64,7 +64,7 @@ private fun TvmSymbolicTestSuite.toSarifResult(methodsMapping: Map<BigInteger, S
     }
 }
 
-private fun resolveRuleId(methodResult: TvmFailure): String = methodResult.ruleName
+private fun resolveRuleId(methodResult: TvmFailure): String = methodResult.exit.ruleName
 
 private fun resolveCodeFlows(stackTrace: List<TvmInst>, methodsMapping: Map<BigInteger, String>): List<CodeFlow> {
     val threadFlows = mutableListOf<ThreadFlow>()

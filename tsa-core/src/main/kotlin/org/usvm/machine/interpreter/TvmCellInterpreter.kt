@@ -83,7 +83,6 @@ import org.usvm.UExpr
 import org.usvm.UHeapRef
 import org.usvm.api.readField
 import org.usvm.machine.TvmContext
-import org.usvm.machine.TvmContext.Companion.cellDataLengthField
 import org.usvm.machine.TvmContext.Companion.cellRefsLengthField
 import org.usvm.machine.TvmContext.Companion.sliceCellField
 import org.usvm.machine.TvmContext.Companion.sliceDataPosField
@@ -101,8 +100,9 @@ import org.usvm.machine.state.builderStoreDataBits
 import org.usvm.machine.state.builderStoreInt
 import org.usvm.machine.state.builderStoreNextRef
 import org.usvm.machine.state.builderStoreSlice
+import org.usvm.machine.state.checkCellDataUnderflow
 import org.usvm.machine.state.checkCellOverflow
-import org.usvm.machine.state.checkCellUnderflow
+import org.usvm.machine.state.checkCellRefsUnderflow
 import org.usvm.machine.state.consumeDefaultGas
 import org.usvm.machine.state.consumeGas
 import org.usvm.machine.state.doPop
@@ -131,7 +131,6 @@ import org.usvm.machine.state.unsignedIntegerFitsBits
 import org.usvm.machine.types.TvmSymbolicCellDataInteger
 import org.usvm.machine.types.Endian
 import org.usvm.mkSizeExpr
-import org.usvm.mkSizeGeExpr
 import org.usvm.mkSizeLtExpr
 import org.usvm.sizeSort
 
@@ -338,16 +337,11 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
             }
 
             val cell = scope.calcOnState { memory.readField(slice, sliceCellField, addressSort) }
-
-            val dataLength = scope.calcOnState { memory.readField(cell, cellDataLengthField, sizeSort) }
-            val refsLength = scope.calcOnState { memory.readField(cell, cellRefsLengthField, sizeSort) }
             val dataPos = scope.calcOnState { memory.readField(slice, sliceDataPosField, sizeSort) }
             val refsPos = scope.calcOnState { memory.readField(slice, sliceRefPosField, sizeSort) }
 
-            val isRemainingDataEmptyConstraint = mkSizeGeExpr(dataPos, dataLength)
-            val areRemainingRefsEmpty = mkSizeGeExpr(refsPos, refsLength)
-
-            checkCellUnderflow(mkAnd(isRemainingDataEmptyConstraint, areRemainingRefsEmpty), scope) ?: return
+            checkCellDataUnderflow(scope, cell, maxSize = dataPos) ?: return
+            checkCellRefsUnderflow(scope, cell, maxSize = refsPos) ?: return
 
             scope.doWithState {
                 newStmt(stmt.nextStmt())

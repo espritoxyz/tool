@@ -43,7 +43,7 @@ class CellParseTest {
             ?: error("Cannot find resource fift $slicePushFiftPath")
 
         val symbolicResult = compileAndAnalyzeFift(fiftResourcePath)
-        val methodIds = (0..0).toSet()
+        val methodIds = (0..1).toSet()
 
         compareSymbolicAndConcreteResults(methodIds, symbolicResult) { methodId ->
             runFiftMethod(fiftResourcePath, methodId)

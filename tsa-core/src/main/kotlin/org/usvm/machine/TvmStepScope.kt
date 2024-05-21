@@ -119,6 +119,27 @@ class TvmStepScope(
         return posState?.let { }
     }
 
+    // TODO: I don't like this implementation, but that was the fastest way to do it without patching usvm
+    fun forkWithCheckerStatusKnowledge(
+        condition: UBoolExpr,
+        blockOnUnknownTrueState: TvmState.() -> Unit = {},
+        blockOnUnsatTrueState: TvmState.() -> Unit = {},
+        blockOnFalseState: TvmState.() -> Unit = {},
+    ): Unit? {
+        val clonedState = originalState.clone()
+        val clonedStepScope = TvmStepScope(clonedState, forkBlackList)
+
+        val result = assert(condition, unsatBlock = blockOnUnsatTrueState, unknownBlock = blockOnUnknownTrueState)
+
+        clonedStepScope.assert(ctx.mkNot(condition))
+        if (clonedStepScope.alive) {
+            clonedStepScope.originalState.blockOnFalseState()
+            forkedStates += clonedStepScope.originalState
+        }
+
+        return result
+    }
+
     /**
      * Forks on a few disjoint conditions using `forkMulti` in `State.kt`
      * and executes the corresponding block on each not-null state.

@@ -1,0 +1,13 @@
+#include "../imports/stdlib.fc";
+
+
+() recv_internal(int msg_value, cell in_msg_cell, slice in_msg) impure {
+    int size = in_msg~load_uint(5);
+    var bits = in_msg~load_bits(size);
+
+    ;; store value so that it won't be optimized out
+    var msg = begin_cell()
+    .store_slice(bits)
+    .end_cell();
+    msg~impure_touch();
+}

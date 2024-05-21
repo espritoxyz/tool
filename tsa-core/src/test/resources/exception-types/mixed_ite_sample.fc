@@ -1,0 +1,26 @@
+#include "../imports/stdlib.fc";
+
+
+() recv_internal(int msg_value, cell in_msg_cell, slice in_msg) impure {
+    slice s1 = in_msg~load_ref().begin_parse();
+    slice s2 = "a";
+
+    var names = new_dict();
+    names~udict_set(256, 27, s1);
+    names~udict_set(256, 25, s2);
+
+    int index = in_msg~load_int(8);
+
+    (slice val, int status) = names.udict_get?(256, index);
+
+    if (~ status) {
+        return ();
+    }
+
+    var param = val~load_bits(1000);
+    var msg = begin_cell()
+              .store_slice(param)
+              .end_cell();
+
+    msg~impure_touch();
+}
