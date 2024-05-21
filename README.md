@@ -11,4 +11,8 @@ Symbolic analyzer for TVM (The Telegram Open Network Virtual Machine) based on U
     npm run build
     ```
 3. Download `fift` and `func` for the corresponding operating system from [the last TON release ](https://github.com/ton-blockchain/ton/releases/) and add them to `$PATH`.
-4. Build the project, running `./gradlew build` from the root of the repo.
+4. Install `tact` compiler with [yarn](https://classic.yarnpkg.com/lang/en/docs/install):
+   ```bash
+   yarn global add @tact-lang/compiler
+   ```
+5. Build the project, running `./gradlew build` from the root of the repo.
