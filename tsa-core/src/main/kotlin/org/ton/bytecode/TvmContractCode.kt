@@ -12,6 +12,8 @@ import kotlinx.serialization.modules.polymorphic
 import kotlinx.serialization.modules.subclass
 import org.ton.bigint.BigIntSerializer
 import java.math.BigInteger
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.builtins.serializer
 
 interface TvmContractCode {
     val methods: Map<BigInteger, TvmMethod>
@@ -37,6 +39,7 @@ interface TvmContractCode {
 
         val json = Json {
             prettyPrint = true
+            ignoreUnknownKeys = true
             serializersModule = defaultSerializationModule
         }
 
@@ -64,5 +67,30 @@ class TvmInstListSerializer : KSerializer<TvmInstList> {
 
     override fun serialize(encoder: Encoder, value: TvmInstList) {
         listSerializer.serialize(encoder, value.list)
+    }
+}
+
+@Serializable
+data class TvmCell(
+    @SerialName("_bits")
+    val data: TvmCellData,
+
+    @SerialName("_refs")
+    val refs: List<TvmCell>,
+)
+
+@Serializable(with = TvmCellDataSerializer::class)
+data class TvmCellData(val bits: String)
+
+class TvmCellDataSerializer : KSerializer<TvmCellData> {
+    private val listSerializer = ListSerializer(Char.serializer())
+
+    override val descriptor: SerialDescriptor = listSerializer.descriptor
+
+    override fun deserialize(decoder: Decoder): TvmCellData =
+        TvmCellData(listSerializer.deserialize(decoder).joinToString(separator = ""))
+
+    override fun serialize(encoder: Encoder, value: TvmCellData) {
+        listSerializer.serialize(encoder, value.bits.toList())
     }
 }

@@ -235,6 +235,8 @@ import org.usvm.solver.USatResult
 import org.usvm.targets.UTargetsSet
 import java.math.BigInteger
 import org.ton.bytecode.TvmCompareOtherSdeqInst
+import org.ton.bytecode.TvmConstDataPushrefInst
+import org.ton.bytecode.TvmConstDataPushrefsliceInst
 import org.ton.bytecode.TvmContConditionalIfelserefInst
 import org.ton.bytecode.TvmContConditionalIfjmprefInst
 import org.ton.bytecode.TvmContConditionalIfnotInst
@@ -242,12 +244,15 @@ import org.ton.bytecode.TvmContConditionalIfnotjmpInst
 import org.ton.bytecode.TvmContConditionalIfnotjmprefInst
 import org.ton.bytecode.TvmContConditionalIfnotrefInst
 import org.ton.bytecode.TvmContConditionalIfrefelserefInst
+import org.ton.bytecode.TvmContRegistersSaveInst
 import org.ton.bytecode.TvmInstList
 import org.usvm.machine.TvmStepScope
 import org.usvm.machine.bigIntValue
 import org.usvm.machine.state.addInt
 import org.usvm.machine.state.addContinuation
 import org.usvm.machine.state.addOnStack
+import org.usvm.machine.state.allocSliceFromCell
+import org.usvm.machine.state.allocateCell
 import org.usvm.machine.state.getSliceRemainingBitsCount
 import org.usvm.machine.state.slicePreloadDataBits
 import org.usvm.machine.types.TvmTypeSystem
@@ -654,6 +659,23 @@ class TvmInterpreter(
 
         when (stmt) {
             is TvmConstDataPushcontShortInst -> visitPushContShortInst(scope, stmt)
+            is TvmConstDataPushrefInst -> {
+                val allocatedCell = scope.allocateCell(stmt.c)
+
+                scope.doWithState {
+                    addOnStack(allocatedCell, TvmCellType)
+                    newStmt(stmt.nextStmt())
+                }
+            }
+            is TvmConstDataPushrefsliceInst -> {
+                val allocatedCell = scope.allocateCell(stmt.c)
+                val allocatedSlice = scope.allocSliceFromCell(allocatedCell)
+
+                scope.doWithState {
+                    addOnStack(allocatedSlice, TvmSliceType)
+                    newStmt(stmt.nextStmt())
+                }
+            }
             is TvmConstDataPushsliceInst -> {
                 check(stmt.s.refs.isEmpty()) { "Unexpected refs in $stmt" }
 
@@ -1279,6 +1301,9 @@ class TvmInterpreter(
 
         when (stmt) {
             is TvmContRegistersPushctrInst -> visitTvmPushCtrInst(scope, stmt)
+            is TvmContRegistersSaveInst -> {
+                // TODO make a real implementation
+            }
             is TvmContRegistersPopctrInst -> {
                 scope.doWithState {
                     val registerIndex = stmt.i

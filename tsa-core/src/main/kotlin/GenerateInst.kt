@@ -23,7 +23,8 @@ private val instructionOperandType = mapOf(
     "IFBITJMPREF" to mapOf("c" to "TvmInstList"),
     "IFNBITJMPREF" to mapOf("c" to "TvmInstList"),
     "CALLREF" to mapOf("c" to "TvmInstList"),
-    "PUSHREF" to mapOf("c" to "TvmInstList"),
+    "PUSHREF" to mapOf("c" to "TvmCell"),
+    "PUSHREFSLICE" to mapOf("c" to "TvmCell"),
 )
 
 private const val ADDITIONAL_CATEGORY_DICT = "dict"

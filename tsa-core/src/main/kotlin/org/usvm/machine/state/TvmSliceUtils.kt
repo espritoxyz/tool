@@ -3,6 +3,7 @@ package org.usvm.machine.state
 import io.ksmt.KContext
 import io.ksmt.expr.KBitVecValue
 import io.ksmt.expr.KInterpretedValue
+import org.ton.bytecode.TvmCell
 import org.usvm.machine.types.TvmBuilderType
 import org.usvm.machine.types.TvmCellType
 import org.usvm.machine.types.TvmSliceType
@@ -473,6 +474,8 @@ fun TvmStepScope.builderStoreSlice(builder: UHeapRef, slice: UHeapRef, quietBloc
 }
 
 fun TvmState.makeSliceFromData(data: UExpr<UBvSort>): UHeapRef = with(ctx) {
+    check(data.sort.sizeBits <= TvmContext.CELL_DATA_BITS) { "Unexpected data: $data" }
+
     val sliceCell = memory.allocConcrete(TvmCellType)
     memory.writeField(sliceCell, cellDataField, cellDataSort, mkBv(0, cellDataSort), trueExpr)
     memory.writeField(sliceCell, cellDataLengthField, sizeSort, zeroSizeExpr, trueExpr)
@@ -486,6 +489,25 @@ fun TvmState.makeSliceFromData(data: UExpr<UBvSort>): UHeapRef = with(ctx) {
     memory.writeField(resultSlice, sliceRefPosField, sizeSort, zeroSizeExpr, trueExpr)
 
     return resultSlice
+}
+
+fun TvmStepScope.allocateCell(cellValue: TvmCell): UConcreteHeapRef {
+    val refsSizeCondition = cellValue.refs.size <= TvmContext.MAX_REFS_NUMBER
+    val cellDataSizeCondition = cellValue.data.bits.length <= MAX_DATA_LENGTH
+    check(refsSizeCondition && cellDataSizeCondition) { "Unexpected cellValue: $cellValue" }
+
+    val data = calcOnStateCtx { mkBv(cellValue.data.bits, cellValue.data.bits.length.toUInt()) }
+    val cell = allocEmptyCell()
+
+    doWithState { builderStoreDataBits(cell, data) }
+
+    cellValue.refs.forEach { refValue ->
+        val ref = allocateCell(refValue)
+
+        doWithState { builderStoreNextRef(cell, ref) }
+    }
+
+    return cell
 }
 
 fun TvmStepScope.allocEmptyCell() = calcOnStateCtx {
