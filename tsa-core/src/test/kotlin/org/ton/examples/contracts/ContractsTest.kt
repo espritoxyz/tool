@@ -12,6 +12,7 @@ import kotlin.test.Test
 class ContractsTest {
     private val nftItemPath: String = "/contracts/nft-item/nft-item.fc"
     private val walletPath: String = "/contracts/wallet-v4/wallet-v4-code.fc"
+    private val subscriptionPluginPath: String = "/contracts/wallet-v4/simple-subscription-plugin.fc"
     private val jettonMinterPath: String = "/contracts/modern-jetton/jetton-minter.func"
     private val jettonWalletPath: String = "/contracts/modern-jetton/jetton-wallet.func"
     private val universalLockupWalletPath: String = "/contracts/universal-lockup-wallet/uni-lockup-wallet.fc"
@@ -52,16 +53,25 @@ class ContractsTest {
         analyzeContract(singleNominatorPath, methodsNumber = 3)
     }
 
-    @Ignore
     @Test
-    fun universalLockupWallet() {
-        analyzeContract(universalLockupWalletPath, methodsNumber = 13)
+    fun storage() {
+        analyzeContract(storagePath, methodsNumber = 7)
+    }
+
+    @Test
+    fun vestingLockupWallet() {
+        analyzeContract(vestingLockupWalletPath, methodsNumber = 6)
+    }
+
+    @Test
+    fun testSubscriptionPlugin() {
+        analyzeContract(subscriptionPluginPath, methodsNumber = 4)
     }
 
     @Ignore
     @Test
-    fun vestingLockupWallet() {
-        analyzeContract(vestingLockupWalletPath, methodsNumber = 6)
+    fun universalLockupWallet() {
+        analyzeContract(universalLockupWalletPath, methodsNumber = 13)
     }
 
     @Ignore
@@ -86,12 +96,6 @@ class ContractsTest {
     @Test
     fun multisig() {
         analyzeContract(multisigPath, methodsNumber = 16)
-    }
-
-    @Ignore
-    @Test
-    fun storage() {
-        analyzeContract(storagePath, methodsNumber = 7)
     }
 
     @Ignore

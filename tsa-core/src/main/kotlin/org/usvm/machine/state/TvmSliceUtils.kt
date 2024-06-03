@@ -473,15 +473,16 @@ fun TvmStepScope.builderStoreSlice(builder: UHeapRef, slice: UHeapRef, quietBloc
     }
 }
 
-fun TvmState.makeSliceFromData(data: UExpr<UBvSort>): UHeapRef = with(ctx) {
+fun TvmState.allocCellFromData(data: UExpr<UBvSort>): UHeapRef = with(ctx) {
     check(data.sort.sizeBits <= TvmContext.CELL_DATA_BITS) { "Unexpected data: $data" }
 
-    val sliceCell = memory.allocConcrete(TvmCellType)
-    memory.writeField(sliceCell, cellDataField, cellDataSort, mkBv(0, cellDataSort), trueExpr)
-    memory.writeField(sliceCell, cellDataLengthField, sizeSort, zeroSizeExpr, trueExpr)
-    memory.writeField(sliceCell, cellRefsLengthField, sizeSort, zeroSizeExpr, trueExpr)
+    val cell = allocEmptyCell()
+    builderStoreDataBits(cell, data)
+    cell
+}
 
-    builderStoreDataBits(sliceCell, data)
+fun TvmState.allocSliceFromData(data: UExpr<UBvSort>): UHeapRef = with(ctx) {
+    val sliceCell = allocCellFromData(data)
 
     val resultSlice = memory.allocConcrete(TvmSliceType)
     memory.writeField(resultSlice, sliceCellField, addressSort, sliceCell, trueExpr)
@@ -491,26 +492,26 @@ fun TvmState.makeSliceFromData(data: UExpr<UBvSort>): UHeapRef = with(ctx) {
     return resultSlice
 }
 
-fun TvmStepScope.allocateCell(cellValue: TvmCell): UConcreteHeapRef {
+fun TvmState.allocateCell(cellValue: TvmCell): UConcreteHeapRef = with(ctx) {
     val refsSizeCondition = cellValue.refs.size <= TvmContext.MAX_REFS_NUMBER
     val cellDataSizeCondition = cellValue.data.bits.length <= MAX_DATA_LENGTH
     check(refsSizeCondition && cellDataSizeCondition) { "Unexpected cellValue: $cellValue" }
 
-    val data = calcOnStateCtx { mkBv(cellValue.data.bits, cellValue.data.bits.length.toUInt()) }
+    val data = mkBv(cellValue.data.bits, cellValue.data.bits.length.toUInt())
     val cell = allocEmptyCell()
 
-    doWithState { builderStoreDataBits(cell, data) }
+    builderStoreDataBits(cell, data)
 
     cellValue.refs.forEach { refValue ->
         val ref = allocateCell(refValue)
 
-        doWithState { builderStoreNextRef(cell, ref) }
+        builderStoreNextRef(cell, ref)
     }
 
-    return cell
+    cell
 }
 
-fun TvmStepScope.allocEmptyCell() = calcOnStateCtx {
+fun TvmState.allocEmptyCell() = with(ctx) {
     memory.allocConcrete(TvmCellType).also { cell ->
         memory.writeField(cell, cellDataField, cellDataSort, mkBv(0, cellDataSort), trueExpr)
         memory.writeField(cell, cellDataLengthField, sizeSort, zeroSizeExpr, trueExpr)
@@ -518,7 +519,7 @@ fun TvmStepScope.allocEmptyCell() = calcOnStateCtx {
     }
 }
 
-fun TvmStepScope.allocSliceFromCell(cell: UHeapRef) = calcOnStateCtx {
+fun TvmState.allocSliceFromCell(cell: UHeapRef) = with(ctx) {
     memory.allocConcrete(TvmSliceType).also { slice ->
         memory.writeField(slice, sliceCellField, addressSort, cell, trueExpr)
         memory.writeField(slice, sliceDataPosField, sizeSort, zeroSizeExpr, trueExpr)

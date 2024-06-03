@@ -74,6 +74,7 @@ import org.ton.bytecode.TvmCellParseSbitsInst
 import org.ton.bytecode.TvmCellParseSdcutfirstInst
 import org.ton.bytecode.TvmCellParseSdskipfirstInst
 import org.ton.bytecode.TvmCellParseSrefsInst
+import org.ton.bytecode.TvmCellParseXctosInst
 import org.usvm.machine.types.TvmCellType
 import org.ton.bytecode.TvmInst
 import org.usvm.machine.types.TvmIntegerType
@@ -141,6 +142,7 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
     ): Unit = with(ctx) {
         when (stmt) {
             is TvmCellParseCtosInst -> visitCellToSliceInst(scope, stmt)
+            is TvmCellParseXctosInst -> visitExoticCellToSliceInst(scope, stmt)
             is TvmCellParseEndsInst -> visitEndSliceInst(scope, stmt)
             is TvmCellParseLdrefInst -> visitLoadRefInst(scope, stmt)
             is TvmCellParsePldrefidxInst -> doPreloadRef(scope, stmt, refIdx = mkSizeExpr(stmt.n))
@@ -497,11 +499,11 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
         }
 
         val bits = scope.slicePreloadDataBits(slice, sizeBits) ?: return
-        val cell = scope.allocEmptyCell()
+        val cell = scope.calcOnState { allocEmptyCell() }
 
         scope.builderStoreDataBits(cell, bits, mkSizeExpr(bits.sort.sizeBits.toInt())) ?: return
 
-        val resultSlice = scope.allocSliceFromCell(cell)
+        val resultSlice = scope.calcOnState { allocSliceFromCell(cell) }
 
         scope.doWithState { makeSliceTypeLoad(slice, TvmSymbolicCellDataBitArray(mkBv(sizeBits))) }
 
@@ -540,16 +542,34 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
             quietBlock = quietBlock
         ) ?: return null
 
-        val cell = scope.allocEmptyCell()
+        val cell = scope.calcOnState { allocEmptyCell() }
         scope.builderStoreDataBits(cell, bits, sizeBits.extractToSizeSort())
             ?: error("Cannot write $sizeBits bits to the empty builder")
-        val resultSlice = scope.allocSliceFromCell(cell)
+        val resultSlice = scope.calcOnState { allocSliceFromCell(cell) }
 
         scope.doWithState { makeSliceTypeLoad(slice, TvmSymbolicCellDataBitArray(sizeBits.extractToSizeSort())) }
 
         scope.doWithState {
             addOnStack(resultSlice, TvmSliceType)
             visitLoadDataInstEnd(stmt, slice, sizeBits.extractToSizeSort(), preload, quiet)
+        }
+    }
+
+    private fun doCellToSlice(
+        scope: TvmStepScope,
+        stmt: TvmCellParseInst
+    ) {
+        val cell = scope.takeLastCell()
+        if (cell == null) {
+            scope.doWithState(throwTypeCheckError)
+            return
+        }
+
+        val slice = scope.calcOnState { allocSliceFromCell(cell) }
+
+        scope.doWithState {
+            addOnStack(slice, TvmSliceType)
+            newStmt(stmt.nextStmt())
         }
     }
 
@@ -563,17 +583,20 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
          * */
         scope.doWithState { consumeGas(118) }
 
-        val cell = scope.takeLastCell()
-        if (cell == null) {
-            scope.doWithState(throwTypeCheckError)
-            return
-        }
+        doCellToSlice(scope, stmt)
+    }
 
-        val slice = scope.allocSliceFromCell(cell)
+    private fun visitExoticCellToSliceInst(
+        scope: TvmStepScope,
+        stmt: TvmCellParseXctosInst
+    ) {
+        scope.consumeDefaultGas(stmt)
 
-        scope.doWithState {
-            addOnStack(slice, TvmSliceType)
-            newStmt(stmt.nextStmt())
+        // TODO: Exotic cells are not supported, so we handle this instruction as CTOS
+        doCellToSlice(scope, stmt)
+
+        scope.doWithStateCtx {
+            stack.addInt(falseValue)
         }
     }
 
@@ -823,7 +846,8 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
             newStmt(stmt.nextStmt())
         }
 
-        builderStoreSlice(resultBuilder, allocSliceFromCell(fromBuilder), quietBlock) ?: return
+        val fromBuilderSlice = calcOnState { allocSliceFromCell(fromBuilder) }
+        builderStoreSlice(resultBuilder, fromBuilderSlice, quietBlock) ?: return
 
         doWithState {
             addOnStack(resultBuilder, TvmBuilderType)

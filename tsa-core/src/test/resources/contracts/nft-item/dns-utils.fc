@@ -1,3 +1,4 @@
+#include "stdlib.fc";
 ;; dns-utils.fc
 
 const int one_month = 2592000; ;; 1 month in seconds = 60 * 60 * 24 * 30

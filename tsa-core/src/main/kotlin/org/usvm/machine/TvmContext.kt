@@ -123,6 +123,10 @@ class TvmContext(components: UComponents<TvmType, TvmSizeSort>) : UContext<TvmSi
 
         const val MAX_GRAMS_BITS: UInt = 120u
 
+        const val CONFIG_KEY_LENGTH: Int = 32
+
+        const val ADDRESS_BITS: UInt = 256u
+
         // Utility bit sizes for arith operations
         val INT_EXT1_BITS: UInt = INT_BITS + 1u
         val INT_EXT256_BITS: UInt = INT_BITS + 256u

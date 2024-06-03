@@ -1,7 +1,6 @@
 package org.usvm.machine.interpreter
 
 import io.ksmt.expr.KBitVecValue
-import io.ksmt.utils.asExpr
 import org.usvm.machine.types.TvmBuilderType
 import org.usvm.machine.types.TvmCellType
 import org.ton.bytecode.TvmDictDeleteDictdelInst
@@ -134,22 +133,18 @@ import org.usvm.machine.types.TvmNullType
 import org.usvm.machine.types.TvmSliceType
 import org.usvm.UBoolExpr
 import org.usvm.UBvSort
-import org.usvm.UConcreteHeapRef
-import org.usvm.UContext
 import org.usvm.UExpr
 import org.usvm.UHeapRef
-import org.usvm.USort
-import org.usvm.UTransformer
 import org.usvm.api.makeSymbolicPrimitive
-import org.usvm.apply
 import org.usvm.collection.set.primitive.USetEntryLValue
 import org.usvm.collection.set.primitive.setEntries
 import org.usvm.machine.TvmContext
 import org.usvm.machine.TvmStepScope
 import org.usvm.machine.intValue
-import org.usvm.machine.setUnion
+import org.usvm.machine.state.DictId
+import org.usvm.machine.state.DictKeyInfo
+import org.usvm.machine.state.DictValueType
 import org.usvm.machine.types.TvmSymbolicCellDataDictConstructorBit
-import org.usvm.machine.state.TvmRefsMemoryRegion
 import org.usvm.machine.state.TvmState
 import org.usvm.machine.state.addInt
 import org.usvm.machine.state.addOnStack
@@ -161,12 +156,13 @@ import org.usvm.machine.state.builderStoreDataBits
 import org.usvm.machine.state.builderStoreNextRef
 import org.usvm.machine.state.calcOnStateCtx
 import org.usvm.machine.state.consumeDefaultGas
+import org.usvm.machine.state.copyDict
+import org.usvm.machine.state.dictAddKeyValue
+import org.usvm.machine.state.dictGetValue
+import org.usvm.machine.state.dictRemoveKey
 import org.usvm.machine.state.doWithStateCtx
-import org.usvm.machine.state.ensureSymbolicCellInitialized
-import org.usvm.machine.state.ensureSymbolicSliceInitialized
-import org.usvm.machine.state.generateSymbolicCell
-import org.usvm.machine.state.generateSymbolicSlice
-import org.usvm.machine.state.makeSliceFromData
+import org.usvm.machine.state.allocSliceFromData
+import org.usvm.machine.state.dictContainsKey
 import org.usvm.machine.types.makeSliceTypeLoad
 import org.usvm.machine.state.newStmt
 import org.usvm.machine.state.nextStmt
@@ -181,13 +177,6 @@ import org.usvm.machine.state.takeLastInt
 import org.usvm.machine.state.takeLastSlice
 import org.usvm.machine.state.throwTypeCheckError
 import org.usvm.machine.types.TvmDictCellType
-import org.usvm.memory.ULValue
-import org.usvm.memory.UMemoryRegion
-import org.usvm.memory.UMemoryRegionId
-import org.usvm.memory.UReadOnlyMemory
-import org.usvm.memory.USymbolicCollectionKeyInfo
-import org.usvm.regions.SetRegion
-import org.usvm.uctx
 
 class TvmDictOperationInterpreter(private val ctx: TvmContext) {
     fun visitTvmDictInst(scope: TvmStepScope, inst: TvmDictInst) {
@@ -452,8 +441,7 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
         val resultDict = scope.calcOnState { memory.allocConcrete(TvmDictCellType) }
 
         val dictContainsKey = dictCellRef?.let {
-            val keyContainsLValue = USetEntryLValue(key.sort, dictCellRef, key, dictId, DictKeyInfo)
-            scope.calcOnState { memory.read(keyContainsLValue) }
+            scope.calcOnState { dictContainsKey(dictCellRef, dictId, key) }
         } ?: ctx.falseExpr
 
         val oldValue = dictCellRef?.let {
@@ -539,8 +527,7 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
         val dictId = DictId(keyLength)
 
         val dictContainsKey = scope.calcOnState {
-            val keyContainsLValue = USetEntryLValue(key.sort, dictCellRef, key, dictId, DictKeyInfo)
-            memory.read(keyContainsLValue)
+            dictContainsKey(dictCellRef, dictId, key)
         }
 
         val value = scope.calcOnStateCtx { dictGetValue(dictCellRef, dictId, key, valueType) }
@@ -581,10 +568,7 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
 
         val dictId = DictId(keyLength)
 
-        val dictContainsKey = scope.calcOnState {
-            val keyContainsLValue = USetEntryLValue(key.sort, dictCellRef, key, dictId, DictKeyInfo)
-            memory.read(keyContainsLValue)
-        }
+        val dictContainsKey = scope.calcOnState { dictContainsKey(dictCellRef, dictId, key) }
 
         val value = scope.calcOnState { dictGetValue(dictCellRef, dictId, key, valueType) }
 
@@ -651,15 +635,13 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
 
         val storedKeys = scope.calcOnStateCtx {
             allSetEntries.entries.map { entry ->
-                val setContainsElemLValue = USetEntryLValue(keySort, dictCellRef, entry.setElement, dictId, DictKeyInfo)
-                val setContainsEntry = memory.read(setContainsElemLValue)
+                val setContainsEntry = dictContainsKey(dictCellRef, dictId, entry.setElement)
                 entry.setElement to setContainsEntry
             }
         }
 
         val dictContainsResultElement = scope.calcOnStateCtx {
-            val setContainsElemLValue = USetEntryLValue(keySort, dictCellRef, resultElement, dictId, DictKeyInfo)
-            memory.read(setContainsElemLValue)
+            dictContainsKey(dictCellRef, dictId, resultElement)
         }
 
         val resultIsMinMax = scope.calcOnStateCtx {
@@ -745,15 +727,13 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
 
         val storedKeys = scope.calcOnStateCtx {
             allSetEntries.entries.map { entry ->
-                val setContainsElemLValue = USetEntryLValue(keySort, dictCellRef, entry.setElement, dictId, DictKeyInfo)
-                val setContainsEntry = memory.read(setContainsElemLValue)
+                val setContainsEntry = dictContainsKey(dictCellRef, dictId, entry.setElement)
                 entry.setElement to setContainsEntry
             }
         }
 
         val dictContainsResultElement = scope.calcOnStateCtx {
-            val setContainsElemLValue = USetEntryLValue(keySort, dictCellRef, resultElement, dictId, DictKeyInfo)
-            memory.read(setContainsElemLValue)
+            dictContainsKey(dictCellRef, dictId, resultElement)
         }
 
         val resultIsNextPrev = scope.calcOnStateCtx {
@@ -894,7 +874,7 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
             }
 
             DictKeyType.SLICE -> {
-                val resultSlice = makeSliceFromData(key)
+                val resultSlice = allocSliceFromData(key)
                 addOnStack(resultSlice, TvmSliceType)
             }
         }
@@ -906,7 +886,7 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
             DictValueType.SLICE -> {
                 if (isSetBuilder) {
                     val builder = stack.takeLastBuilder() ?: return@calcOnState null
-                    scope.allocSliceFromCell(builder)
+                    scope.calcOnState { allocSliceFromCell(builder) }
                 } else {
                     stack.takeLastSlice() // todo: data?
                 }
@@ -919,66 +899,6 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
             DictValueType.SLICE -> addOnStack(value, TvmSliceType) // todo: data?
             DictValueType.CELL -> addOnStack(value, TvmCellType)
         }
-    }
-
-    private fun TvmState.copyDict(
-        originalDict: UHeapRef,
-        resultDict: UConcreteHeapRef,
-        dictId: DictId,
-        keySort: UBvSort,
-        valueType: DictValueType
-    ) = with(ctx) {
-        memory.setUnion(originalDict, resultDict, dictId, keySort, DictKeyInfo, guard = trueExpr)
-
-        val dictValueRegionId = TvmDictValueRegionId(dictId, keySort, valueType.sort())
-        val dictValueRegion = memory.dictValueRegion(dictValueRegionId)
-
-        val updatedValues = dictValueRegion.copyRefValues(originalDict, resultDict)
-        memory.setRegion(dictValueRegionId, updatedValues)
-    }
-
-    private fun TvmState.dictAddKeyValue(
-        dictRef: UHeapRef,
-        dictId: DictId,
-        key: UExpr<UBvSort>,
-        value: UExpr<*>,
-        valueType: DictValueType
-    ) = with(ctx) {
-        val keyContainsLValue = USetEntryLValue(key.sort, dictRef, key, dictId, DictKeyInfo)
-        memory.write(keyContainsLValue, rvalue = trueExpr, guard = trueExpr)
-
-        val valueSort = valueType.sort()
-        val dictValueRegionId = TvmDictValueRegionId(dictId, key.sort, valueSort)
-        val dictValueRegion = memory.dictValueRegion(dictValueRegionId)
-
-        val updatedValues = dictValueRegion.writeRefValue(dictRef, key, value.asExpr(valueSort), guard = trueExpr)
-        memory.setRegion(dictValueRegionId, updatedValues)
-    }
-
-    private fun TvmState.dictRemoveKey(
-        dictRef: UHeapRef,
-        dictId: DictId,
-        key: UExpr<UBvSort>,
-        valueType: DictValueType
-    ) = with(ctx) {
-        val resultKeyContainsLValue = USetEntryLValue(key.sort, dictRef, key, dictId, DictKeyInfo)
-        memory.write(resultKeyContainsLValue, rvalue = falseExpr, guard = trueExpr)
-
-        // todo: update values?
-    }
-
-    private fun TvmState.dictGetValue(
-        dictRef: UHeapRef,
-        dictId: DictId,
-        key: UExpr<UBvSort>,
-        valueType: DictValueType
-    ): UExpr<*> = with(ctx) {
-        val valueSort = valueType.sort()
-        val dictValueRegionId = TvmDictValueRegionId(dictId, key.sort, valueSort)
-        val dictValueRegion = memory.dictValueRegion(dictValueRegionId)
-        val dictValueInfo = TvmDictValueRegionValueInfo(this@dictGetValue, valueSort, valueType)
-
-        return dictValueRegion.readRefValue(dictRef, key, dictValueInfo)
     }
 
     private fun handleDictRemoveKey(
@@ -1005,8 +925,7 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
 
         val resultSetContainsAnyStoredKey = scope.calcOnStateCtx {
             resultSetEntries.entries.map { entry ->
-                val setContainsElemLValue = USetEntryLValue(key.sort, resultDict, entry.setElement, dictId, DictKeyInfo)
-                memory.read(setContainsElemLValue)
+                dictContainsKey(resultDict, dictId, entry.setElement)
             }.let { mkOr(it) }
         }
 
@@ -1034,18 +953,8 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
         )
     }
 
-    context(TvmContext)
-    private fun DictValueType.sort(): USort = when (this) {
-        DictValueType.SLICE -> addressSort // todo: slice sort
-        DictValueType.CELL -> addressSort
-    }
-
     private enum class DictKeyType {
         SIGNED_INT, UNSIGNED_INT, SLICE
-    }
-
-    private enum class DictValueType {
-        SLICE, CELL
     }
 
     private enum class DictSetMode {
@@ -1060,96 +969,5 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
 
     private enum class DictNextPrevMode {
         NEXT, PREV
-    }
-
-    private data class DictId(val keyLength: Int)
-
-    private object DictKeyInfo: USymbolicCollectionKeyInfo<UExpr<UBvSort>, SetRegion<UExpr<UBvSort>>> {
-        override fun mapKey(key: UExpr<UBvSort>, transformer: UTransformer<*, *>?): UExpr<UBvSort> =
-            transformer.apply(key)
-
-        override fun eqSymbolic(ctx: UContext<*>, key1: UExpr<UBvSort>, key2: UExpr<UBvSort>): UBoolExpr =
-            ctx.mkEq(key1, key2)
-
-        override fun eqConcrete(key1: UExpr<UBvSort>, key2: UExpr<UBvSort>): Boolean =
-            key1 == key2
-
-        override fun cmpSymbolicLe(ctx: UContext<*>, key1: UExpr<UBvSort>, key2: UExpr<UBvSort>): UBoolExpr =
-            error("Dict keys should not be compared!")
-
-        override fun cmpConcreteLe(key1: UExpr<UBvSort>, key2: UExpr<UBvSort>): Boolean =
-            error("Dict keys should not be compared!")
-
-        override fun keyToRegion(key: UExpr<UBvSort>) =
-            if (key is KBitVecValue<UBvSort>) {
-                SetRegion.singleton(key as UExpr<UBvSort>)
-            } else {
-                SetRegion.universe()
-            }
-
-        override fun keyRangeRegion(from: UExpr<UBvSort>, to: UExpr<UBvSort>) =
-            error("This should not be called!")
-
-        override fun topRegion() = SetRegion.universe<UExpr<UBvSort>>()
-
-        override fun bottomRegion() = SetRegion.empty<UExpr<UBvSort>>()
-    }
-
-    private data class TvmDictValueRegionLValue<KeySort : USort, ValueSort: USort>(
-        val dictId: DictId,
-        val keySort: KeySort,
-        val valueSort: ValueSort
-    ) : ULValue<TvmDictValueRegionLValue<KeySort, ValueSort>, Nothing> {
-        override val key: TvmDictValueRegionLValue<KeySort, ValueSort>
-            get() = this
-
-        override val memoryRegionId: UMemoryRegionId<TvmDictValueRegionLValue<KeySort, ValueSort>, Nothing>
-            get() = TvmDictValueRegionId(dictId, keySort, valueSort)
-
-        override val sort: Nothing
-            get() = error("TvmDictValueRegion sort should not be used")
-    }
-
-    private data class TvmDictValueRegionId<KeySort : USort, ValueSort: USort>(
-        val dictId: DictId,
-        val keySort: KeySort,
-        val valueSort: ValueSort
-    ) : UMemoryRegionId<TvmDictValueRegionLValue<KeySort, ValueSort>, Nothing> {
-        override fun emptyRegion(): UMemoryRegion<TvmDictValueRegionLValue<KeySort, ValueSort>, Nothing> =
-            TvmRefsMemoryRegion<TvmDictValueRegionLValue<KeySort, ValueSort>, KeySort, ValueSort>()
-
-        override val sort: Nothing
-            get() = error("TvmDictValueRegion sort should not be used")
-    }
-
-    @Suppress("UNCHECKED_CAST")
-    private fun <KeySort : USort, ValueSort: USort> UReadOnlyMemory<*>.dictValueRegion(
-        regionId: TvmDictValueRegionId<KeySort, ValueSort>
-    ): TvmRefsMemoryRegion<TvmDictValueRegionLValue<KeySort, ValueSort>, KeySort, ValueSort> =
-        getRegion(regionId) as TvmRefsMemoryRegion<TvmDictValueRegionLValue<KeySort, ValueSort>, KeySort, ValueSort>
-
-    private class TvmDictValueRegionValueInfo<ValueSort : USort>(
-        private val state: TvmState,
-        private val valueSort: ValueSort,
-        private val valueType: DictValueType
-    ) : TvmRefsMemoryRegion.TvmRefsRegionValueInfo<ValueSort> {
-
-        override fun mkDefaultValue(): UExpr<ValueSort> = when (valueType) {
-            DictValueType.SLICE -> state.emptyRefValue.emptySlice.asExpr(valueSort)
-            DictValueType.CELL -> state.emptyRefValue.emptyCell.asExpr(valueSort)
-        }
-
-        override fun mkSymbolicValue(): UExpr<ValueSort> = when (valueType) {
-            DictValueType.SLICE -> state.generateSymbolicSlice().asExpr(valueSort)
-            DictValueType.CELL -> state.generateSymbolicCell().asExpr(valueSort)
-        }
-
-        override fun actualizeSymbolicValue(value: UExpr<ValueSort>): UExpr<ValueSort> {
-            when (valueType) {
-                DictValueType.SLICE -> state.ensureSymbolicSliceInitialized(value.asExpr(value.uctx.addressSort))
-                DictValueType.CELL -> state.ensureSymbolicCellInitialized(value.asExpr(value.uctx.addressSort))
-            }
-            return value
-        }
     }
 }

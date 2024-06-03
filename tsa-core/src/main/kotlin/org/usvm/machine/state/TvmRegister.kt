@@ -49,10 +49,6 @@ data class C7Register(
      */
     var addr: UHeapRef? = null,
     /**
-     * The Maybe Cell D with the current global configuration dictionary. 9 GETPARAM.
-     */
-    var configRoot: UHeapRef? = null,
-    /**
      * The code of the smart-contract. 10 GETPARAM.
      */
     // TODO is it just Int.MAX_VALUE method? Or all methods?
@@ -74,6 +70,11 @@ data class C7Register(
     var prevBlocksInfo: UHeapRef? = null,
     var globalVariables: TvmStackTupleValueConcreteNew? = null
 ) {
+    /**
+     * The Maybe Cell D with the current global configuration dictionary. 9 GETPARAM.
+     */
+    lateinit var configRoot: UHeapRef
+
     operator fun get(idx: Int): TvmStack.TvmStackValue {
         if (idx == 0) {
             TODO("Support getting tuple with blockchain specific data")
@@ -124,6 +125,7 @@ data class TvmRegisters(
     var c2: C2Register? = null,
     var c3: C3Register? = null,
     var c4: C4Register? = null,
-    var c5: C5Register? = null,
     var c7: C7Register = C7Register(ctx)
-)
+) {
+    lateinit var c5: C5Register
+}

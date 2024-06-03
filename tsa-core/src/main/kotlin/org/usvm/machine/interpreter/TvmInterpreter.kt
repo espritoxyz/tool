@@ -213,7 +213,7 @@ import org.usvm.machine.state.doXchg2
 import org.usvm.machine.state.doXchg3
 import org.usvm.machine.state.generateSymbolicCell
 import org.usvm.machine.state.lastStmt
-import org.usvm.machine.state.makeSliceFromData
+import org.usvm.machine.state.allocSliceFromData
 import org.usvm.machine.state.newStmt
 import org.usvm.machine.state.nextStmt
 import org.usvm.machine.state.returnFromMethod
@@ -234,6 +234,7 @@ import org.usvm.sizeSort
 import org.usvm.solver.USatResult
 import org.usvm.targets.UTargetsSet
 import java.math.BigInteger
+import org.ton.bytecode.TvmCompareOtherSdemptyInst
 import org.ton.bytecode.TvmCompareOtherSdeqInst
 import org.ton.bytecode.TvmConstDataPushrefInst
 import org.ton.bytecode.TvmConstDataPushrefsliceInst
@@ -248,12 +249,15 @@ import org.ton.bytecode.TvmContRegistersSaveInst
 import org.ton.bytecode.TvmInstList
 import org.usvm.machine.TvmStepScope
 import org.usvm.machine.bigIntValue
+import org.usvm.machine.state.C5Register
 import org.usvm.machine.state.addInt
 import org.usvm.machine.state.addContinuation
 import org.usvm.machine.state.addOnStack
+import org.usvm.machine.state.allocEmptyCell
 import org.usvm.machine.state.allocSliceFromCell
 import org.usvm.machine.state.allocateCell
 import org.usvm.machine.state.getSliceRemainingBitsCount
+import org.usvm.machine.state.initConfigRoot
 import org.usvm.machine.state.slicePreloadDataBits
 import org.usvm.machine.types.TvmTypeSystem
 
@@ -335,6 +339,10 @@ class TvmInterpreter(
             targets = UTargetsSet.from(targets),
             typeSystem = typeSystem
         )
+
+        state.registers.c5 = C5Register(TvmCellValue(state.allocEmptyCell()))
+        state.registers.c7.configRoot = state.initConfigRoot()
+
         val solver = ctx.solver<TvmType>()
 
         val model = (solver.check(state.pathConstraints) as USatResult).model
@@ -660,7 +668,7 @@ class TvmInterpreter(
         when (stmt) {
             is TvmConstDataPushcontShortInst -> visitPushContShortInst(scope, stmt)
             is TvmConstDataPushrefInst -> {
-                val allocatedCell = scope.allocateCell(stmt.c)
+                val allocatedCell = scope.calcOnState { allocateCell(stmt.c) }
 
                 scope.doWithState {
                     addOnStack(allocatedCell, TvmCellType)
@@ -668,8 +676,8 @@ class TvmInterpreter(
                 }
             }
             is TvmConstDataPushrefsliceInst -> {
-                val allocatedCell = scope.allocateCell(stmt.c)
-                val allocatedSlice = scope.allocSliceFromCell(allocatedCell)
+                val allocatedCell = scope.calcOnState { allocateCell(stmt.c) }
+                val allocatedSlice = scope.calcOnState { allocSliceFromCell(allocatedCell) }
 
                 scope.doWithState {
                     addOnStack(allocatedSlice, TvmSliceType)
@@ -682,7 +690,7 @@ class TvmInterpreter(
                 scope.doWithStateCtx {
                     val sliceData = stmt.s.bitsToBv()
 
-                    val slice = scope.calcOnState { makeSliceFromData(sliceData) }
+                    val slice = scope.calcOnState { allocSliceFromData(sliceData) }
 
                     scope.addOnStack(slice, TvmSliceType)
                     newStmt(stmt.nextStmt())
@@ -1232,33 +1240,46 @@ class TvmInterpreter(
         newStmt(stmt.nextStmt())
     }
 
-    private fun visitComparisonOtherInst(scope: TvmStepScope, stmt: TvmCompareOtherInst) {
+    private fun visitComparisonOtherInst(scope: TvmStepScope, stmt: TvmCompareOtherInst) = with(ctx) {
         when (stmt) {
             is TvmCompareOtherSdeqInst -> visitSliceDataEqInst(scope, stmt)
+            is TvmCompareOtherSdemptyInst -> {
+                scope.consumeDefaultGas(stmt)
+
+                val slice = scope.calcOnState { stack.takeLastSlice() }
+                    ?: return scope.doWithState(throwTypeCheckError)
+
+                val remainingBits = scope.calcOnState { getSliceRemainingBitsCount(slice) }
+                val isEmpty = remainingBits eq zeroSizeExpr
+                val result = isEmpty.toBv257Bool()
+
+                scope.doWithState {
+                    stack.addInt(result)
+                    newStmt(stmt.nextStmt())
+                }
+            }
             is TvmCompareOtherSemptyInst -> {
                 scope.consumeDefaultGas(stmt)
 
-                with(ctx) {
-                    val slice = scope.calcOnState { stack.takeLastSlice() }
-                    if (slice == null) {
-                        scope.doWithState(throwTypeCheckError)
-                        return
-                    }
+                val slice = scope.calcOnState { stack.takeLastSlice() }
+                if (slice == null) {
+                    scope.doWithState(throwTypeCheckError)
+                    return
+                }
 
-                    val cell = scope.calcOnState { memory.readField(slice, sliceCellField, addressSort) }
-                    val dataPos = scope.calcOnState { memory.readField(slice, sliceDataPosField, sizeSort) }
-                    val refsPos = scope.calcOnState { memory.readField(slice, sliceRefPosField, sizeSort) }
-                    val dataLength = scope.calcOnState { memory.readField(cell, cellDataLengthField, sizeSort) }
-                    val refsLength = scope.calcOnState { memory.readField(cell, cellRefsLengthField, sizeSort) }
+                val cell = scope.calcOnState { memory.readField(slice, sliceCellField, addressSort) }
+                val dataPos = scope.calcOnState { memory.readField(slice, sliceDataPosField, sizeSort) }
+                val refsPos = scope.calcOnState { memory.readField(slice, sliceRefPosField, sizeSort) }
+                val dataLength = scope.calcOnState { memory.readField(cell, cellDataLengthField, sizeSort) }
+                val refsLength = scope.calcOnState { memory.readField(cell, cellRefsLengthField, sizeSort) }
 
-                    val isRemainingDataEmptyConstraint = mkSizeGeExpr(dataPos, dataLength)
-                    val areRemainingRefsEmpty = mkSizeGeExpr(refsPos, refsLength)
-                    val result = mkAnd(isRemainingDataEmptyConstraint, areRemainingRefsEmpty).toBv257Bool()
+                val isRemainingDataEmptyConstraint = mkSizeGeExpr(dataPos, dataLength)
+                val areRemainingRefsEmpty = mkSizeGeExpr(refsPos, refsLength)
+                val result = mkAnd(isRemainingDataEmptyConstraint, areRemainingRefsEmpty).toBv257Bool()
 
-                    scope.doWithState {
-                        stack.addInt(result)
-                        newStmt(stmt.nextStmt())
-                    }
+                scope.doWithState {
+                    stack.addInt(result)
+                    newStmt(stmt.nextStmt())
                 }
             }
 
@@ -1348,7 +1369,13 @@ class TvmInterpreter(
                     stack.addContinuation(continuationValue)
                     newStmt(stmt.nextStmt())
                 }
-                else -> TODO("Not yet implemented")
+                5 -> {
+                    val cell = scope.calcOnState { registers.c5.value.value }
+
+                    scope.addOnStack(cell, TvmCellType)
+                    newStmt(stmt.nextStmt())
+                }
+                else -> TODO("Not yet implemented: $stmt")
             }
 
         }
