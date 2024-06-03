@@ -23,6 +23,7 @@ import org.usvm.machine.types.TvmSymbolicCellDataInteger
 import org.usvm.machine.types.TvmSymbolicCellDataType
 import org.usvm.machine.types.CellDataTypeInfo
 import org.usvm.machine.state.TvmCellRefsRegionValueInfo
+import org.usvm.machine.state.TvmDataCellTypesError
 import org.usvm.machine.state.TvmRefsMemoryRegion
 import org.usvm.machine.state.TvmStack
 import org.usvm.machine.state.TvmStack.TvmStackTupleValue
@@ -71,8 +72,21 @@ class TvmTestStateResolver(
             TvmMethodResult.NoCall -> error("Missed result for state $state")
             is TvmMethodResult.TvmFailure -> TvmMethodFailure(it, state.lastStmt, it.exit.exitCode, resolvedResults)
             is TvmMethodResult.TvmSuccess -> TvmSuccessfulExecution(it.exit.exitCode, resolvedResults)
+            is TvmMethodResult.TvmStructuralError -> resolveTvmStructuralError(resolvedResults, it)
         }
     }
+
+    private fun resolveTvmStructuralError(
+        stack: List<TvmTestValue>,
+        exit: TvmMethodResult.TvmStructuralError,
+    ): TvmExecutionWithStructuralError =
+        when (exit) {
+            is TvmDataCellTypesError -> TvmExecutionWithDataCellTypesError(
+                expected = resolveCellDataType(exit.expectedType),
+                actual = resolveCellDataType(exit.actualType),
+                stack = stack
+            )
+        }
 
     fun resolveGasUsage(): Int = model.eval(state.calcConsumedGas()).intValue()
 

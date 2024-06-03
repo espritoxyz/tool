@@ -10,6 +10,7 @@ import org.usvm.machine.TactAnalyzer
 import org.usvm.machine.intValue
 import org.usvm.machine.state.TvmStack
 import org.usvm.test.resolver.TvmContractSymbolicTestResult
+import org.usvm.test.resolver.TvmExecutionWithStructuralError
 import org.usvm.test.resolver.TvmMethodFailure
 import org.usvm.test.resolver.TvmSuccessfulExecution
 import org.usvm.test.resolver.TvmSymbolicTest
@@ -93,7 +94,7 @@ internal fun TvmStack.loadIntegers(n: Int) = List(n) {
     takeLast(TvmIntegerType) { error("Impossible") }.intValue.intValue()
 }.reversed()
 
-internal fun TvmSymbolicTest.executionCode(): Int = result.exitCode.toInt()
+internal fun TvmSymbolicTest.executionCode(): Int? = result.exitCode?.toInt()
 
 internal fun compareSymbolicAndConcreteResults(
     methodIds: Set<Int>,

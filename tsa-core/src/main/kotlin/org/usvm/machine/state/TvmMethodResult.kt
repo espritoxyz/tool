@@ -4,6 +4,8 @@ import kotlinx.serialization.Serializable
 import org.usvm.machine.state.TvmMethodResult.*
 import org.usvm.UBv32Sort
 import org.usvm.UExpr
+import org.usvm.machine.types.TvmSymbolicCellDataType
+import org.usvm.test.resolver.TvmCellDataType
 
 /**
  * Represents a result of a method invocation.
@@ -41,6 +43,9 @@ sealed interface TvmMethodResult {
     interface TvmErrorExit : TvmExit {
         val ruleName: String
     }
+
+    @Serializable
+    sealed interface TvmStructuralError: TvmMethodResult
 }
 
 object TvmNormalExit : TvmSuccessfulExit {
@@ -148,3 +153,8 @@ data class TvmUnknownFailure(override val exitCode: UInt): TvmErrorExit {
 }
 
 // TODO add remaining
+
+data class TvmDataCellTypesError(
+    val expectedType: TvmSymbolicCellDataType,
+    val actualType: TvmSymbolicCellDataType,
+): TvmStructuralError

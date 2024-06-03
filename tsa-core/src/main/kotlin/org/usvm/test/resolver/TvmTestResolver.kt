@@ -2,6 +2,7 @@ package org.usvm.test.resolver
 
 import org.ton.bytecode.TvmInst
 import org.ton.bytecode.TvmMethod
+import org.usvm.machine.state.TvmMethodResult
 import org.usvm.machine.state.TvmMethodResult.TvmFailure
 import org.usvm.machine.state.TvmState
 import java.math.BigInteger
@@ -50,7 +51,7 @@ data class TvmSymbolicTest(
 
 sealed interface TvmMethodSymbolicResult {
     val stack: List<TvmTestValue>
-    val exitCode: UInt
+    val exitCode: UInt?
 }
 
 data class TvmMethodFailure(
@@ -61,3 +62,13 @@ data class TvmMethodFailure(
 ) : TvmMethodSymbolicResult
 
 data class TvmSuccessfulExecution(override val exitCode: UInt, override val stack: List<TvmTestValue>) : TvmMethodSymbolicResult
+
+sealed interface TvmExecutionWithStructuralError: TvmMethodSymbolicResult
+
+data class TvmExecutionWithDataCellTypesError(
+    val expected: TvmCellDataType,
+    val actual: TvmCellDataType,
+    override val stack: List<TvmTestValue>
+): TvmExecutionWithStructuralError {
+    override val exitCode: UInt? = null
+}
