@@ -49,7 +49,7 @@ class CellDataTypeInfo(
 sealed class TvmSymbolicCellDataType(val sizeBits: UExpr<TvmSizeSort>)
 
 class TvmSymbolicCellDataInteger(sizeBits: UExpr<TvmSizeSort>, val isSigned: Boolean, val endian: Endian): TvmSymbolicCellDataType(sizeBits)
-class TvmSymbolicCellDataDictConstructorBit(ctx: TvmContext): TvmSymbolicCellDataType(ctx.mkBv(1))
+class TvmSymbolicCellMaybeDictConstructorBit(ctx: TvmContext): TvmSymbolicCellDataType(ctx.mkBv(1))
 class TvmSymbolicCellDataMsgAddr(ctx: TvmContext): TvmSymbolicCellDataType(ctx.mkBv(2))
 class TvmSymbolicCellDataBitArray(sizeBits: UExpr<TvmSizeSort>): TvmSymbolicCellDataType(sizeBits)
 

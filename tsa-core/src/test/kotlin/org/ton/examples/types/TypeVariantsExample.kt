@@ -4,7 +4,7 @@ import org.ton.examples.funcCompileAndAnalyzeAllMethods
 import org.ton.examples.propertiesFound
 import org.usvm.machine.types.Endian
 import org.usvm.test.resolver.TvmCellDataBitArray
-import org.usvm.test.resolver.TvmCellDataDictConstructorBit
+import org.usvm.test.resolver.TvmCellDataMaybeConstructorBit
 import org.usvm.test.resolver.TvmCellDataInteger
 import org.usvm.test.resolver.TvmCellDataTypeLoad
 import org.usvm.test.resolver.TvmSymbolicTest
@@ -52,7 +52,7 @@ class TypeVariantsExample {
                 generatePredicate1(
                     listOf(
                         TvmCellDataTypeLoad(TvmCellDataInteger(8, true, Endian.BigEndian), 0),
-                        TvmCellDataTypeLoad(TvmCellDataDictConstructorBit, 8)
+                        TvmCellDataTypeLoad(TvmCellDataMaybeConstructorBit, 8)
                     )
                 ),
                 generatePredicate1(

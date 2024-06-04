@@ -56,7 +56,7 @@ sealed interface TvmCellDataType {
 data class TvmCellDataInteger(override val bitSize: Int, val isSigned: Boolean, val endian: Endian): TvmCellDataType
 
 @Serializable
-data object TvmCellDataDictConstructorBit: TvmCellDataType {
+data object TvmCellDataMaybeConstructorBit: TvmCellDataType {
     override val bitSize: Int = 1
 }
 

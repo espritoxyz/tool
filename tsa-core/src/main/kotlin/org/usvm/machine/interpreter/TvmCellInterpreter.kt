@@ -1,7 +1,6 @@
 package org.usvm.machine.interpreter
 
 import org.ton.bytecode.TvmAliasInst
-import org.usvm.machine.types.TvmBuilderType
 import org.ton.bytecode.TvmCellBuildEndcInst
 import org.ton.bytecode.TvmCellBuildInst
 import org.ton.bytecode.TvmCellBuildNewcInst
@@ -75,10 +74,7 @@ import org.ton.bytecode.TvmCellParseSdcutfirstInst
 import org.ton.bytecode.TvmCellParseSdskipfirstInst
 import org.ton.bytecode.TvmCellParseSrefsInst
 import org.ton.bytecode.TvmCellParseXctosInst
-import org.usvm.machine.types.TvmCellType
 import org.ton.bytecode.TvmInst
-import org.usvm.machine.types.TvmIntegerType
-import org.usvm.machine.types.TvmSliceType
 import org.usvm.UBoolExpr
 import org.usvm.UExpr
 import org.usvm.UHeapRef
@@ -91,11 +87,11 @@ import org.usvm.machine.TvmContext.Companion.sliceRefPosField
 import org.usvm.machine.TvmSizeSort
 import org.usvm.machine.TvmStepScope
 import org.usvm.machine.state.TvmState
-import org.usvm.machine.types.TvmSymbolicCellDataBitArray
 import org.usvm.machine.state.addInt
 import org.usvm.machine.state.addOnStack
 import org.usvm.machine.state.allocEmptyCell
 import org.usvm.machine.state.allocSliceFromCell
+import org.usvm.machine.state.assertType
 import org.usvm.machine.state.builderCopy
 import org.usvm.machine.state.builderStoreDataBits
 import org.usvm.machine.state.builderStoreInt
@@ -111,7 +107,6 @@ import org.usvm.machine.state.doSwap
 import org.usvm.machine.state.doWithStateCtx
 import org.usvm.machine.state.getSliceRemainingBitsCount
 import org.usvm.machine.state.getSliceRemainingRefsCount
-import org.usvm.machine.types.makeSliceTypeLoad
 import org.usvm.machine.state.newStmt
 import org.usvm.machine.state.nextStmt
 import org.usvm.machine.state.signedIntegerFitsBits
@@ -129,8 +124,15 @@ import org.usvm.machine.state.takeLastSlice
 import org.usvm.machine.state.throwIntegerOutOfRangeError
 import org.usvm.machine.state.throwTypeCheckError
 import org.usvm.machine.state.unsignedIntegerFitsBits
-import org.usvm.machine.types.TvmSymbolicCellDataInteger
 import org.usvm.machine.types.Endian
+import org.usvm.machine.types.TvmBuilderType
+import org.usvm.machine.types.TvmCellType
+import org.usvm.machine.types.TvmDataCellType
+import org.usvm.machine.types.TvmIntegerType
+import org.usvm.machine.types.TvmSliceType
+import org.usvm.machine.types.TvmSymbolicCellDataBitArray
+import org.usvm.machine.types.TvmSymbolicCellDataInteger
+import org.usvm.machine.types.makeSliceTypeLoad
 import org.usvm.mkSizeExpr
 import org.usvm.mkSizeLtExpr
 import org.usvm.sizeSort
@@ -564,6 +566,8 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
             scope.doWithState(throwTypeCheckError)
             return
         }
+
+        scope.doWithState { assertType(cell, TvmDataCellType) }
 
         val slice = scope.calcOnState { allocSliceFromCell(cell) }
 

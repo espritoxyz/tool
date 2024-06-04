@@ -25,7 +25,9 @@ import org.usvm.machine.types.TvmType
 data class TypeCastException(
     val oldType: TvmType,
     val newType: TvmType
-): RuntimeException()
+): RuntimeException() {
+    override val message: String = "Trying to cast $oldType value to $newType"
+}
 
 private fun TvmStack.add(value: UExpr<out USort>, type: TvmRealType) {
     // TODO check size 256?

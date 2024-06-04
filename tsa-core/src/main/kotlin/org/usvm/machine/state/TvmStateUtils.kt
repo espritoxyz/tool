@@ -16,6 +16,7 @@ import org.usvm.machine.TvmSizeSort
 import org.usvm.machine.TvmStepScope
 import org.usvm.machine.types.TvmBuilderType
 import org.usvm.machine.types.TvmCellType
+import org.usvm.machine.types.TvmDataCellType
 import org.usvm.machine.types.TvmNullType
 import org.usvm.machine.types.TvmSliceType
 import org.usvm.machine.types.TvmType
@@ -121,6 +122,7 @@ fun TvmState.initializeSymbolicSlice(ref: UConcreteHeapRef) = with(ctx) {
     // Cell in input slices must be represented with static refs to be correctly processed in TvmCellRefsRegion
     val cell = generateSymbolicCell()
     memory.writeField(ref, TvmContext.sliceCellField, addressSort, cell, guard = trueExpr)
+    assertType(cell, TvmDataCellType)
 }
 
 fun TvmState.generateSymbolicBuilder(): UHeapRef =

@@ -1,8 +1,6 @@
 package org.usvm.machine.interpreter
 
 import io.ksmt.expr.KBitVecValue
-import org.usvm.machine.types.TvmBuilderType
-import org.usvm.machine.types.TvmCellType
 import org.ton.bytecode.TvmDictDeleteDictdelInst
 import org.ton.bytecode.TvmDictDeleteDictdelgetInst
 import org.ton.bytecode.TvmDictDeleteDictdelgetrefInst
@@ -128,9 +126,6 @@ import org.ton.bytecode.TvmDictSetDictusetrefInst
 import org.ton.bytecode.TvmDictSetInst
 import org.ton.bytecode.TvmDictSpecialInst
 import org.ton.bytecode.TvmDictSubInst
-import org.usvm.machine.types.TvmIntegerType
-import org.usvm.machine.types.TvmNullType
-import org.usvm.machine.types.TvmSliceType
 import org.usvm.UBoolExpr
 import org.usvm.UBvSort
 import org.usvm.UExpr
@@ -144,11 +139,11 @@ import org.usvm.machine.intValue
 import org.usvm.machine.state.DictId
 import org.usvm.machine.state.DictKeyInfo
 import org.usvm.machine.state.DictValueType
-import org.usvm.machine.types.TvmSymbolicCellDataDictConstructorBit
 import org.usvm.machine.state.TvmState
 import org.usvm.machine.state.addInt
 import org.usvm.machine.state.addOnStack
 import org.usvm.machine.state.allocSliceFromCell
+import org.usvm.machine.state.allocSliceFromData
 import org.usvm.machine.state.assertIfSat
 import org.usvm.machine.state.assertType
 import org.usvm.machine.state.builderCopy
@@ -158,12 +153,10 @@ import org.usvm.machine.state.calcOnStateCtx
 import org.usvm.machine.state.consumeDefaultGas
 import org.usvm.machine.state.copyDict
 import org.usvm.machine.state.dictAddKeyValue
+import org.usvm.machine.state.dictContainsKey
 import org.usvm.machine.state.dictGetValue
 import org.usvm.machine.state.dictRemoveKey
 import org.usvm.machine.state.doWithStateCtx
-import org.usvm.machine.state.allocSliceFromData
-import org.usvm.machine.state.dictContainsKey
-import org.usvm.machine.types.makeSliceTypeLoad
 import org.usvm.machine.state.newStmt
 import org.usvm.machine.state.nextStmt
 import org.usvm.machine.state.sliceCopy
@@ -176,7 +169,14 @@ import org.usvm.machine.state.takeLastCell
 import org.usvm.machine.state.takeLastInt
 import org.usvm.machine.state.takeLastSlice
 import org.usvm.machine.state.throwTypeCheckError
+import org.usvm.machine.types.TvmBuilderType
+import org.usvm.machine.types.TvmCellType
 import org.usvm.machine.types.TvmDictCellType
+import org.usvm.machine.types.TvmIntegerType
+import org.usvm.machine.types.TvmNullType
+import org.usvm.machine.types.TvmSliceType
+import org.usvm.machine.types.TvmSymbolicCellMaybeDictConstructorBit
+import org.usvm.machine.types.makeSliceTypeLoad
 
 class TvmDictOperationInterpreter(private val ctx: TvmContext) {
     fun visitTvmDictInst(scope: TvmStepScope, inst: TvmDictInst) {
@@ -349,6 +349,7 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
         }
     }
 
+    // this is actually load_maybe_ref, not necessarily load_dict
     private fun doLoadDict(inst: TvmDictSerialInst, scope: TvmStepScope, returnUpdatedSlice: Boolean) {
         val slice = scope.calcOnStateCtx { stack.takeLastSlice() }
         if (slice == null) {
@@ -356,13 +357,13 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
             return
         }
 
-        val dictConstructorTypeBit = scope.slicePreloadDataBits(slice, bits = 1) ?: return
-        scope.doWithState { makeSliceTypeLoad(slice, TvmSymbolicCellDataDictConstructorBit(ctx)) }
+        val maybeConstructorTypeBit = scope.slicePreloadDataBits(slice, bits = 1) ?: return
+        scope.doWithState { makeSliceTypeLoad(slice, TvmSymbolicCellMaybeDictConstructorBit(ctx)) }
 
-        val dictIsNotEmpty = scope.calcOnStateCtx { mkEq(dictConstructorTypeBit, mkBv(value = 1, sizeBits = 1u)) }
+        val isNotEmpty = scope.calcOnStateCtx { mkEq(maybeConstructorTypeBit, mkBv(value = 1, sizeBits = 1u)) }
 
         scope.fork(
-            dictIsNotEmpty,
+            isNotEmpty,
             blockOnFalseState = {
                 addOnStack(ctx.nullValue, TvmNullType)
 
@@ -379,7 +380,6 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
         scope.doWithStateCtx {
             val dictCellRef = scope.slicePreloadNextRef(slice) ?: return@doWithStateCtx
             addOnStack(dictCellRef, TvmCellType)
-            assertType(dictCellRef, TvmDictCellType)
 
             if (returnUpdatedSlice) {
                 val updatedSlice = memory.allocConcrete(TvmSliceType).also { sliceCopy(slice, it) }
