@@ -88,7 +88,7 @@ data class C7Register(
         }.entries.extendToSize(idx + 1)
 
         return globalEntries.getOrNull(idx)?.cell
-            ?: error("Cannot find global varaible with index $idx")
+            ?: error("Cannot find global variable with index $idx")
     }
 
     operator fun set(idx: Int, value: TvmStackEntry) {

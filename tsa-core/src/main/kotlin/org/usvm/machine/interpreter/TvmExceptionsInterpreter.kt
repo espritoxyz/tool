@@ -1,9 +1,9 @@
 package org.usvm.machine.interpreter
 
-import io.ksmt.expr.KBitVecValue
-import io.ksmt.utils.BvUtils.bigIntValue
 import org.ton.bytecode.TvmExceptionsInst
+import org.ton.bytecode.TvmExceptionsThrowInst
 import org.ton.bytecode.TvmExceptionsThrowShortInst
+import org.ton.bytecode.TvmExceptionsThrowanyInst
 import org.ton.bytecode.TvmExceptionsThrowanyifInst
 import org.ton.bytecode.TvmExceptionsThrowanyifnotInst
 import org.ton.bytecode.TvmExceptionsThrowargInst
@@ -23,6 +23,7 @@ import org.usvm.machine.state.newStmt
 import org.usvm.machine.state.nextStmt
 import org.usvm.machine.state.setFailure
 import org.usvm.machine.state.takeLastInt
+import org.usvm.utils.intValueOrNull
 
 class TvmExceptionsInterpreter(private val ctx: TvmContext) {
     fun visitExceptionInst(scope: TvmStepScope, stmt: TvmExceptionsInst) {
@@ -69,6 +70,25 @@ class TvmExceptionsInterpreter(private val ctx: TvmContext) {
 
                 doThrowIfInst(scope, stmt, StackCodeExtractor, invertCondition = true)
             }
+            is TvmExceptionsThrowInst -> {
+                scope.consumeDefaultGas(stmt)
+
+                scope.doWithState {
+                    // TODO push parameter to the stack
+                    methodResult = TvmMethodResult.TvmFailure(TvmUnknownFailure(stmt.n.toUInt()), TvmFailureType.UnknownError)
+                }
+            }
+            is TvmExceptionsThrowanyInst -> {
+                scope.consumeDefaultGas(stmt)
+
+                scope.doWithState {
+                    val code = stack.takeLastInt().intValueOrNull
+                        ?: error("Cannot extract concrete code exception from the stack")
+
+                    // TODO push parameter to the stack
+                    methodResult = TvmMethodResult.TvmFailure(TvmUnknownFailure(code.toUInt()), TvmFailureType.UnknownError)
+                }
+            }
             else -> TODO("Unknown stmt: $stmt")
         }
     }
@@ -106,7 +126,7 @@ class TvmExceptionsInterpreter(private val ctx: TvmContext) {
         override fun code(state: TvmState): Int = code
     }
     private data object StackCodeExtractor : ExceptionCodeExtractor {
-        override fun code(state: TvmState): Int = (state.takeLastInt() as? KBitVecValue<*>)?.bigIntValue()?.toInt()
+        override fun code(state: TvmState): Int = state.takeLastInt().intValueOrNull
             ?: error("Cannot extract concrete code exception from the stack")
     }
 }

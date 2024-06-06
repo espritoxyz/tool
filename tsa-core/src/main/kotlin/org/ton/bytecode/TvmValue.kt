@@ -17,4 +17,6 @@ data class TvmContinuationValue(
 ) {
     fun takeCurrentStmt(): TvmInst = codeBlock.instList.getOrNull(currentInstIndex)
         ?: error("No instruction with index $currentInstIndex in code block $codeBlock")
+
+    override fun toString(): String = "inst $currentInstIndex in $codeBlock"
 }
