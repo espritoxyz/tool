@@ -1,6 +1,6 @@
 package org.usvm.machine
 
-import io.ksmt.solver.z3.KZ3Solver
+import io.ksmt.solver.yices.KYicesSolver
 import org.usvm.machine.types.TvmType
 import org.usvm.UBv32SizeExprProvider
 import org.usvm.UComponents
@@ -25,7 +25,7 @@ class TvmComponents : UComponents<TvmType, TvmSizeSort> {
     override fun <Context : UContext<TvmSizeSort>> mkSolver(ctx: Context): USolverBase<TvmType> {
         val (translator, decoder) = buildTranslatorAndLazyDecoder(ctx)
 
-        val solver = KZ3Solver(ctx)
+        val solver = KYicesSolver(ctx)
         val typeSolver = UTypeSolver(typeSystem)
         return USolverBase(ctx, solver, typeSolver, translator, decoder, 1000.milliseconds)
     }

@@ -105,7 +105,7 @@ class TvmMachine(private val options: UMachineOptions = defaultOptions) : UMachi
     companion object {
         private val logger = object : KLogging() {}.logger
 
-        private const val LOOP_ITERATIONS_LIMIT: Int = 10 // TODO find the best value
+        private const val LOOP_ITERATIONS_LIMIT: Int = 2 // TODO find the best value
 
         private val defaultOptions: UMachineOptions = UMachineOptions(
             pathSelectionStrategies = listOf(PathSelectionStrategy.DFS),

@@ -11,6 +11,7 @@ import org.usvm.api.makeSymbolicPrimitive
 import org.usvm.machine.TvmContext.Companion.ADDRESS_BITS
 import org.usvm.machine.TvmContext.Companion.CONFIG_KEY_LENGTH
 import org.usvm.machine.TvmContext.TvmInt257Sort
+import org.usvm.machine.types.TvmDataCellType
 import org.usvm.machine.types.TvmDictCellType
 
 
@@ -115,6 +116,21 @@ fun TvmState.initConfigRoot(): UHeapRef = with(ctx) {
     setConfigParam(configDict, 25, msgPrices)
 
     /**
+     * Index: 34
+     */
+    val validatorSet = allocCellFromFields(
+        mkBvHex("12", tagBits),                 // validators_ext tag
+        mkBv(1717587720, uint32Bits),           // utime_since
+        mkBv(1717653256, uint32Bits),           // utime_until
+        mkBv(345, uint16Bits),                  // total
+        mkBv(100, uint16Bits),                  // main
+        mkBv(1152921504606846802, uint64Bits),  // total_weight
+        // TODO real dict
+        mkBv(0, sizeBits = 1u),                 // list
+    )
+    setConfigParam(configDict, 34, validatorSet)
+
+    /**
      * Index: 40
      */
     val defaultFlatFineValue = BigInteger.valueOf(101) * BigInteger.valueOf(10).pow(9) // 101 TON
@@ -144,8 +160,15 @@ fun TvmState.initConfigRoot(): UHeapRef = with(ctx) {
     )
     setConfigParam(configDict, 71, ethereumBridge)
 
-    // TODO 34
-    // TODO 80
+    /**
+     * Index: 80
+     */
+    // TODO: find documentation
+    val dns = allocCellFromFields(
+        // TODO real dict
+        mkBv(0, sizeBits = 1u),     // ???
+    )
+    setConfigParam(configDict, 80, dns)
 
     configDict
 }
@@ -176,6 +199,8 @@ private fun TvmState.allocCellFromFields(vararg fields: KExpr<KBvSort>): UHeapRe
 }
 
 private fun TvmState.setConfigParam(dict: UHeapRef, idx: Int, cellValue: UHeapRef) = with(ctx) {
+    assertType(cellValue, TvmDataCellType)
+
     dictAddKeyValue(
         dict,
         DictId(CONFIG_KEY_LENGTH),

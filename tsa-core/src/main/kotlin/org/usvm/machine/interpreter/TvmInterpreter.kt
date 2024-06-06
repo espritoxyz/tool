@@ -245,6 +245,7 @@ import org.ton.bytecode.TvmContConditionalIfnotjmpInst
 import org.ton.bytecode.TvmContConditionalIfnotjmprefInst
 import org.ton.bytecode.TvmContConditionalIfnotrefInst
 import org.ton.bytecode.TvmContConditionalIfrefelserefInst
+import org.ton.bytecode.TvmContRegistersSamealtsaveInst
 import org.ton.bytecode.TvmContRegistersSaveInst
 import org.ton.bytecode.TvmInstList
 import org.usvm.machine.TvmStepScope
@@ -1322,8 +1323,15 @@ class TvmInterpreter(
 
         when (stmt) {
             is TvmContRegistersPushctrInst -> visitTvmPushCtrInst(scope, stmt)
+            is TvmContRegistersSamealtsaveInst -> {
+                // TODO make a real implementation
+
+                scope.doWithState { newStmt(stmt.nextStmt()) }
+            }
             is TvmContRegistersSaveInst -> {
                 // TODO make a real implementation
+
+                scope.doWithState { newStmt(stmt.nextStmt()) }
             }
             is TvmContRegistersPopctrInst -> {
                 scope.doWithState {

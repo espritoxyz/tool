@@ -23,6 +23,7 @@ dependencies {
 
     // todo: remove ksmt-core exclude after upgrading ksmt version in USVM
     implementation("io.ksmt:ksmt-core:${Versions.ksmt}")
+    implementation("io.ksmt:ksmt-yices:${Versions.ksmt}")
 
     implementation(group = Packages.usvm, name = "usvm-core", version = Versions.usvm) {
         exclude(group = "io.ksmt", module = "ksmt-core")

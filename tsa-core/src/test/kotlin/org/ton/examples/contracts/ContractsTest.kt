@@ -32,7 +32,6 @@ class ContractsTest {
         analyzeContract(walletPath, methodsNumber = 7)
     }
 
-    @EnabledIfEnvironmentVariable(named = runHardTestsVar, matches = runHardTestsRegex)
     @Test
     fun nftItem() {
         analyzeContract(nftItemPath, methodsNumber = 15)
@@ -68,6 +67,22 @@ class ContractsTest {
         analyzeContract(subscriptionPluginPath, methodsNumber = 4)
     }
 
+    @EnabledIfEnvironmentVariable(named = runHardTestsVar, matches = runHardTestsRegex)
+    @Test
+    fun bridge() {
+        analyzeContract(bridgePath, methodsNumber = 8)
+    }
+
+    @Test
+    fun bridgeVotesCollector() {
+        analyzeContract(bridgeVotesCollectorPath, methodsNumber = 5)
+    }
+
+    @Test
+    fun nominatorPool() {
+        analyzeContract(nominatorPoolPath, methodsNumber = 10)
+    }
+
     @Ignore
     @Test
     fun universalLockupWallet() {
@@ -76,20 +91,8 @@ class ContractsTest {
 
     @Ignore
     @Test
-    fun bridge() {
-        analyzeContract(bridgePath, methodsNumber = 8)
-    }
-
-    @Ignore
-    @Test
     fun bridgeMultisig() {
         analyzeContract(bridgeMultisigPath, methodsNumber = 18)
-    }
-
-    @Ignore
-    @Test
-    fun bridgeVotesCollector() {
-        analyzeContract(bridgeVotesCollectorPath, methodsNumber = 5)
     }
 
     @Ignore
@@ -101,19 +104,13 @@ class ContractsTest {
     @Ignore
     @Test
     fun storageProvider() {
-        analyzeContract(storageProviderPath, methodsNumber = 14)
+        analyzeContract(storageProviderPath, methodsNumber = 10)
     }
 
     @Ignore
     @Test
     fun vesting() {
         analyzeContract(vestingPath, methodsNumber = 9)
-    }
-
-    @Ignore
-    @Test
-    fun nominatorPool() {
-        analyzeContract(nominatorPoolPath, methodsNumber = 3)
     }
 
     private fun analyzeContract(
