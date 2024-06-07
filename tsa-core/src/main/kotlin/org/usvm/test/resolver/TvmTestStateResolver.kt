@@ -21,7 +21,7 @@ import org.usvm.machine.state.TvmMethodResult
 import org.usvm.machine.types.TvmSymbolicCellMaybeDictConstructorBit
 import org.usvm.machine.types.TvmSymbolicCellDataInteger
 import org.usvm.machine.types.TvmSymbolicCellDataType
-import org.usvm.machine.types.CellDataTypeInfo
+import org.usvm.machine.types.TvmDataCellLoadedTypeInfo
 import org.usvm.machine.state.TvmCellRefsRegionValueInfo
 import org.usvm.machine.state.TvmDataCellTypesError
 import org.usvm.machine.state.TvmRefsMemoryRegion
@@ -168,7 +168,7 @@ class TvmTestStateResolver(
             refs.add(refCell)
         }
 
-        val knownLoads = state.cellDataTypeInfo.addressToActions[ref] ?: persistentListOf()
+        val knownLoads = state.tvmDataCellLoadedTypeInfo.addressToActions[ref] ?: persistentListOf()
         val tvmCellValue = TvmTestDataCellValue(data, refs, resolveTypeLoad(knownLoads))
 
         tvmCellValue.also { resolvedCache[ref.address] = tvmCellValue }
@@ -234,7 +234,7 @@ class TvmTestStateResolver(
         }
     }
 
-    private fun resolveTypeLoad(loads: List<CellDataTypeInfo.Load>): List<TvmCellDataTypeLoad> =
+    private fun resolveTypeLoad(loads: List<TvmDataCellLoadedTypeInfo.Load>): List<TvmCellDataTypeLoad> =
         loads.mapNotNull {
             if (model.eval(it.guard).isTrue) {
                 TvmCellDataTypeLoad(resolveCellDataType(it.type), resolveInt(it.offset))

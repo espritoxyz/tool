@@ -18,7 +18,7 @@ import org.usvm.UState
 import org.usvm.constraints.UPathConstraints
 import org.usvm.isStaticHeapRef
 import org.usvm.machine.TvmContext
-import org.usvm.machine.types.CellDataTypeInfo
+import org.usvm.machine.types.TvmDataCellLoadedTypeInfo
 import org.usvm.machine.types.TvmRealReferenceType
 import org.usvm.machine.types.TvmType
 import org.usvm.machine.types.TvmTypeSystem
@@ -44,7 +44,7 @@ class TvmState(
     forkPoints: PathNode<PathNode<TvmInst>> = PathNode.root(),
     var methodResult: TvmMethodResult = TvmMethodResult.NoCall,
     targets: UTargetsSet<TvmTarget, TvmInst> = UTargetsSet.empty(),
-    val cellDataTypeInfo: CellDataTypeInfo = CellDataTypeInfo.empty(),
+    val tvmDataCellLoadedTypeInfo: TvmDataCellLoadedTypeInfo = TvmDataCellLoadedTypeInfo.empty(),
     val typeSystem: TvmTypeSystem
 ) : UState<TvmType, TvmCodeBlock, TvmInst, TvmContext, TvmTarget, TvmState>(
     ctx,
@@ -109,7 +109,7 @@ class TvmState(
             forkPoints = forkPoints,
             methodResult = methodResult,
             targets = targets.clone(),
-            cellDataTypeInfo = cellDataTypeInfo.clone(),
+            tvmDataCellLoadedTypeInfo = tvmDataCellLoadedTypeInfo.clone(),
             typeSystem = typeSystem
         )
     }

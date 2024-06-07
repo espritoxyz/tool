@@ -12,7 +12,7 @@ import org.usvm.machine.state.TvmState
 import org.usvm.memory.GuardedExpr
 import org.usvm.memory.foldHeapRef
 
-class CellDataTypeInfo(
+class TvmDataCellLoadedTypeInfo(
     var addressToActions: PersistentMap<UConcreteHeapRef, PersistentList<Load>>
 ) {
     class Load(val guard: UBoolExpr, val type: TvmSymbolicCellDataType, val offset: UExpr<TvmSizeSort>)
@@ -37,11 +37,11 @@ class CellDataTypeInfo(
         addressToActions = newMap
     }
 
-    fun clone(): CellDataTypeInfo =
-        CellDataTypeInfo(addressToActions)
+    fun clone(): TvmDataCellLoadedTypeInfo =
+        TvmDataCellLoadedTypeInfo(addressToActions)
 
     companion object {
-        fun empty() = CellDataTypeInfo(persistentMapOf())
+        fun empty() = TvmDataCellLoadedTypeInfo(persistentMapOf())
     }
 }
 
@@ -65,7 +65,7 @@ private fun TvmContext.calculateExtendedCoinsLength(coinsPrefix: UExpr<TvmSizeSo
 fun TvmState.makeSliceTypeLoad(slice: UHeapRef, type: TvmSymbolicCellDataType) = with(ctx) {
     val cellAddress = memory.readField(slice, TvmContext.sliceCellField, addressSort)
     val offset = memory.readField(slice, TvmContext.sliceDataPosField, sizeSort)
-    cellDataTypeInfo.makeLoad(cellAddress, offset, type)
+    tvmDataCellLoadedTypeInfo.makeLoad(cellAddress, offset, type)
 }
 
 enum class Endian {

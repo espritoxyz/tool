@@ -1,6 +1,7 @@
 package org.usvm.machine
 
 import mu.KLogging
+import org.ton.TvmInputInfo
 import org.ton.bytecode.TvmCodeBlock
 import org.ton.bytecode.TvmContractCode
 import org.ton.bytecode.TvmInst
@@ -21,7 +22,10 @@ import org.usvm.stopstrategies.StepLimitStopStrategy
 import org.usvm.stopstrategies.StopStrategy
 import java.math.BigInteger
 
-class TvmMachine(private val options: UMachineOptions = defaultOptions) : UMachine<TvmState>() {
+class TvmMachine(
+    private val options: UMachineOptions = defaultOptions,
+    private val checkDataCellContentTypes: Boolean = true,  // TODO: UMachineOptions should be open, and this parameter should be there
+) : UMachine<TvmState>() {
     override fun close() {
         // Do nothing
     }
@@ -29,8 +33,23 @@ class TvmMachine(private val options: UMachineOptions = defaultOptions) : UMachi
     private val components = TvmComponents()
     private val ctx = TvmContext(components)
 
-    fun analyze(contractCode: TvmContractCode, contractData: Cell, methodId: BigInteger): List<TvmState> {
-        val interpreter = TvmInterpreter(ctx, contractCode, typeSystem = components.typeSystem)
+    fun analyze(
+        contractCode: TvmContractCode,
+        contractData: Cell,
+        methodId: BigInteger,
+        givenInputInfo: TvmInputInfo = TvmInputInfo()
+    ): List<TvmState> {
+        val inputInfo = if (checkDataCellContentTypes) {
+            givenInputInfo
+        } else {
+            TvmInputInfo()
+        }
+        val interpreter = TvmInterpreter(
+            ctx,
+            contractCode,
+            typeSystem = components.typeSystem,
+            inputInfo = inputInfo
+        )
         logger.debug("{}.analyze({})", this, contractCode)
         val initialState = interpreter.getInitialState(contractCode, contractData, methodId)
 

@@ -5,6 +5,7 @@ import io.ksmt.utils.BvUtils.bvMaxValueSigned
 import io.ksmt.utils.BvUtils.bvMinValueSigned
 import kotlinx.collections.immutable.persistentListOf
 import mu.KLogging
+import org.ton.TvmInputInfo
 import org.ton.bytecode.TvmAliasInst
 import org.ton.bytecode.TvmAppActionsInst
 import org.ton.bytecode.TvmAppAddrInst
@@ -286,6 +287,7 @@ class TvmInterpreter(
     private val ctx: TvmContext,
     private val contractCode: TvmContractCode,
     val typeSystem: TvmTypeSystem,
+    private val inputInfo: TvmInputInfo,
     var forkBlackList: UForkBlackList<TvmState, TvmInst> = UForkBlackList.createDefault(),
 ) : UInterpreter<TvmState>() {
     companion object {

@@ -1,11 +1,10 @@
 package org.ton
 
-sealed interface TvmInputInfo {
-
-    data object NoInfo : TvmInputInfo
-
-    // all parameters must be listed ?
-    data class TvmParametersInfo(
-        val parameters: List<TvmParameterInfo>
-    ): TvmInputInfo
-}
+/**
+ * [parameterInfos] in [TvmInputInfo] maps parameter indices to their [TvmParameterInfo].
+ * Parameters are indexed from the end.
+ * For example, the last parameter of a function always has index 0.
+ * */
+data class TvmInputInfo(
+    val parameterInfos: Map<Int, TvmParameterInfo> = emptyMap()
+)
