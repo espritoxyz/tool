@@ -37,18 +37,14 @@ class TvmMachine(
         contractCode: TvmContractCode,
         contractData: Cell,
         methodId: BigInteger,
-        givenInputInfo: TvmInputInfo = TvmInputInfo()
+        inputInfo: TvmInputInfo = TvmInputInfo()
     ): List<TvmState> {
-        val inputInfo = if (checkDataCellContentTypes) {
-            givenInputInfo
-        } else {
-            TvmInputInfo()
-        }
         val interpreter = TvmInterpreter(
             ctx,
             contractCode,
             typeSystem = components.typeSystem,
-            inputInfo = inputInfo
+            inputInfo = inputInfo,
+            checkDataCellContentTypes = checkDataCellContentTypes,
         )
         logger.debug("{}.analyze({})", this, contractCode)
         val initialState = interpreter.getInitialState(contractCode, contractData, methodId)

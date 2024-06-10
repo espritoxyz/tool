@@ -288,6 +288,7 @@ class TvmInterpreter(
     private val contractCode: TvmContractCode,
     val typeSystem: TvmTypeSystem,
     private val inputInfo: TvmInputInfo,
+    private val checkDataCellContentTypes: Boolean,
     var forkBlackList: UForkBlackList<TvmState, TvmInst> = UForkBlackList.createDefault(),
 ) : UInterpreter<TvmState>() {
     companion object {
