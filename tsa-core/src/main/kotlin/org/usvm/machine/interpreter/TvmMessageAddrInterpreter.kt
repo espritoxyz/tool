@@ -258,6 +258,7 @@ class TvmMessageAddrInterpreter(private val ctx: TvmContext) {
         val addrVar = mkBv(value = 3, sizeBits = 2u)
 
         makeSliceTypeLoad(updatedSlice, TvmSymbolicCellDataMsgAddr(ctx))
+            ?: return@calcOnStateCtx
         sliceMoveDataPtr(updatedSlice, bits = 2)
 
         // TODO hack! assume that the address is std, since it is the only one we can handle

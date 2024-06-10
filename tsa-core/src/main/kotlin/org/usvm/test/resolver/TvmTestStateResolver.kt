@@ -18,7 +18,7 @@ import org.usvm.machine.TvmContext
 import org.usvm.machine.TvmSizeSort
 import org.usvm.machine.intValue
 import org.usvm.machine.state.TvmMethodResult
-import org.usvm.machine.types.TvmSymbolicCellMaybeDictConstructorBit
+import org.usvm.machine.types.TvmSymbolicCellMaybeConstructorBit
 import org.usvm.machine.types.TvmSymbolicCellDataInteger
 import org.usvm.machine.types.TvmSymbolicCellDataType
 import org.usvm.machine.types.TvmDataCellLoadedTypeInfo
@@ -246,7 +246,7 @@ class TvmTestStateResolver(
     private fun resolveCellDataType(type: TvmSymbolicCellDataType): TvmCellDataType =
         when (type) {
             is TvmSymbolicCellDataInteger -> TvmCellDataInteger(resolveInt(type.sizeBits), type.isSigned, type.endian)
-            is TvmSymbolicCellMaybeDictConstructorBit -> TvmCellDataMaybeConstructorBit
+            is TvmSymbolicCellMaybeConstructorBit -> TvmCellDataMaybeConstructorBit
             is TvmSymbolicCellDataBitArray -> TvmCellDataBitArray(resolveInt(type.sizeBits))
             is TvmSymbolicCellDataMsgAddr -> TvmCellDataMsgAddr
             is TvmSymbolicCellDataCoins -> TvmCellDataCoins(resolveInt(type.coinsPrefix))

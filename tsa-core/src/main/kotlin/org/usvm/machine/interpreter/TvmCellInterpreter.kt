@@ -434,7 +434,9 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
 
         val value = scope.slicePreloadDataBits(slice, sizeBits) ?: return
 
-        scope.doWithState { makeSliceTypeLoad(slice, TvmSymbolicCellDataInteger(mkBv(sizeBits), isSigned, Endian.BigEndian)) }
+        scope.calcOnState {
+            makeSliceTypeLoad(slice, TvmSymbolicCellDataInteger(mkBv(sizeBits), isSigned, Endian.BigEndian))
+        }  ?: return
 
         val extendedValue = if (isSigned) {
             value.signedExtendToInteger()
@@ -473,7 +475,9 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
 
         val value = scope.slicePreloadInt(slice, sizeBits, isSigned) ?: return
 
-        scope.doWithState { makeSliceTypeLoad(slice, TvmSymbolicCellDataInteger(sizeBits.extractToSizeSort(), isSigned, Endian.BigEndian)) }
+        scope.calcOnState {
+            makeSliceTypeLoad(slice, TvmSymbolicCellDataInteger(sizeBits.extractToSizeSort(), isSigned, Endian.BigEndian))
+        } ?: return
 
         scope.doWithState {
             addOnStack(value, TvmIntegerType)
@@ -501,7 +505,9 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
 
         val value = scope.slicePreloadDataBits(slice, sizeBits) ?: return
 
-        scope.doWithState { makeSliceTypeLoad(slice, TvmSymbolicCellDataInteger(mkBv(sizeBits), isSigned, Endian.LittleEndian)) }
+        scope.calcOnState {
+            makeSliceTypeLoad(slice, TvmSymbolicCellDataInteger(mkBv(sizeBits), isSigned, Endian.LittleEndian))
+        } ?: return
 
         val bytes = List(sizeBytes) { byteIdx ->
             val high = sizeBits - 1 - byteIdx * Byte.SIZE_BITS
@@ -549,7 +555,9 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
 
         val resultSlice = scope.calcOnState { allocSliceFromCell(cell) }
 
-        scope.doWithState { makeSliceTypeLoad(slice, TvmSymbolicCellDataBitArray(mkBv(sizeBits))) }
+        scope.calcOnState {
+            makeSliceTypeLoad(slice, TvmSymbolicCellDataBitArray(mkBv(sizeBits)))
+        } ?: return
 
         scope.doWithState {
             addOnStack(resultSlice, TvmSliceType)
@@ -592,7 +600,9 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
             ?: error("Cannot write $sizeBits bits to the empty builder")
         val resultSlice = scope.calcOnState { allocSliceFromCell(cell) }
 
-        scope.doWithState { makeSliceTypeLoad(slice, TvmSymbolicCellDataBitArray(sizeBits.extractToSizeSort())) }
+        scope.calcOnState {
+            makeSliceTypeLoad(slice, TvmSymbolicCellDataBitArray(sizeBits.extractToSizeSort()))
+        } ?: return null
 
         scope.doWithState {
             addOnStack(resultSlice, TvmSliceType)

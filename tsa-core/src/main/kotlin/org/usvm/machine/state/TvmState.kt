@@ -18,6 +18,7 @@ import org.usvm.UState
 import org.usvm.constraints.UPathConstraints
 import org.usvm.isStaticHeapRef
 import org.usvm.machine.TvmContext
+import org.usvm.machine.types.TvmDataCellInfoStorage
 import org.usvm.machine.types.TvmDataCellLoadedTypeInfo
 import org.usvm.machine.types.TvmRealReferenceType
 import org.usvm.machine.types.TvmType
@@ -45,7 +46,8 @@ class TvmState(
     var methodResult: TvmMethodResult = TvmMethodResult.NoCall,
     targets: UTargetsSet<TvmTarget, TvmInst> = UTargetsSet.empty(),
     val tvmDataCellLoadedTypeInfo: TvmDataCellLoadedTypeInfo = TvmDataCellLoadedTypeInfo.empty(),
-    val typeSystem: TvmTypeSystem
+    val typeSystem: TvmTypeSystem,
+    val tvmDataCellInfoStorage: TvmDataCellInfoStorage,
 ) : UState<TvmType, TvmCodeBlock, TvmInst, TvmContext, TvmTarget, TvmState>(
     ctx,
     callStack,
@@ -110,7 +112,8 @@ class TvmState(
             methodResult = methodResult,
             targets = targets.clone(),
             tvmDataCellLoadedTypeInfo = tvmDataCellLoadedTypeInfo.clone(),
-            typeSystem = typeSystem
+            typeSystem = typeSystem,
+            tvmDataCellInfoStorage = tvmDataCellInfoStorage.clone(),
         )
     }
 
@@ -135,5 +138,9 @@ class TvmState(
 
         memory.types.allocate(ref.address, referenceType)
         initializer(ref)
+    }
+
+    init {
+        tvmDataCellInfoStorage.initialize(this)
     }
 }

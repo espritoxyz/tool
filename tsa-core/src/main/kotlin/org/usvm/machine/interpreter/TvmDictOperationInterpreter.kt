@@ -174,7 +174,7 @@ import org.usvm.machine.types.TvmDictCellType
 import org.usvm.machine.types.TvmIntegerType
 import org.usvm.machine.types.TvmNullType
 import org.usvm.machine.types.TvmSliceType
-import org.usvm.machine.types.TvmSymbolicCellMaybeDictConstructorBit
+import org.usvm.machine.types.TvmSymbolicCellMaybeConstructorBit
 import org.usvm.machine.types.makeSliceTypeLoad
 
 class TvmDictOperationInterpreter(private val ctx: TvmContext) {
@@ -357,7 +357,9 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
         }
 
         val maybeConstructorTypeBit = scope.slicePreloadDataBits(slice, bits = 1) ?: return
-        scope.doWithState { makeSliceTypeLoad(slice, TvmSymbolicCellMaybeDictConstructorBit(ctx)) }
+        scope.calcOnState {
+            makeSliceTypeLoad(slice, TvmSymbolicCellMaybeConstructorBit(ctx))
+        } ?: return
 
         val isNotEmpty = scope.calcOnStateCtx { mkEq(maybeConstructorTypeBit, mkBv(value = 1, sizeBits = 1u)) }
 
