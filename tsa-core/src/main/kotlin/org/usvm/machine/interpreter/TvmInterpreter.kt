@@ -279,6 +279,7 @@ import org.usvm.machine.state.returnAltFromContinuation
 import org.usvm.machine.state.switchToContinuation
 import org.usvm.machine.state.returnFromContinuation
 import org.usvm.machine.state.slicePreloadDataBits
+import org.usvm.machine.types.TvmDataCellInfoStorage
 import org.usvm.machine.types.TvmTypeSystem
 
 
@@ -346,6 +347,7 @@ class TvmInterpreter(
         val pathConstraints = UPathConstraints<TvmType>(ctx)
         val memory = UMemory<TvmType, TvmCodeBlock>(ctx, pathConstraints.typeConstraints)
         val refEmptyValue = memory.initializeEmptyRefValues()
+        val dataCellInfo = TvmDataCellInfoStorage.build(stack, inputInfo)
 
         val state = TvmState(
             ctx = ctx,
@@ -357,7 +359,8 @@ class TvmInterpreter(
             emptyRefValue = refEmptyValue,
             gasUsage = persistentListOf(),
             targets = UTargetsSet.from(targets),
-            typeSystem = typeSystem
+            typeSystem = typeSystem,
+            tvmDataCellInfoStorage = dataCellInfo,
         )
 
         state.registers.c4 = C4Register(TvmCellValue(state.generateSymbolicCell()))

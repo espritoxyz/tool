@@ -2,6 +2,7 @@ package org.ton.examples.types
 
 import org.ton.examples.checkInvariants
 import org.ton.examples.funcCompileAndAnalyzeAllMethods
+import org.ton.examples.propertiesFound
 import org.usvm.test.resolver.TvmExecutionWithDataCellTypesError
 import org.usvm.test.resolver.TvmMethodFailure
 import org.usvm.test.resolver.TvmSuccessfulExecution
@@ -28,6 +29,25 @@ class InputParameterInfoTests {
             tests,
             listOf { test ->
                 test.result !is TvmExecutionWithDataCellTypesError
+            }
+        )
+    }
+
+    @Test
+    fun testMaybeInsteadOfInt() {
+        val resourcePath = this::class.java.getResource(maybePath)?.path?.let { Path(it) }
+            ?: error("Cannot find resource $maybePath")
+
+        val results = funcCompileAndAnalyzeAllMethods(resourcePath)
+        assertEquals(1, results.testSuites.size)
+        val tests = results.testSuites.first()
+        assertTrue(tests.any { it.result is TvmSuccessfulExecution })
+        assertTrue(tests.any { it.result is TvmMethodFailure })
+
+        propertiesFound(
+            tests,
+            listOf { test ->
+                test.result is TvmExecutionWithDataCellTypesError
             }
         )
     }
