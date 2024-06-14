@@ -2,6 +2,7 @@ package org.usvm.machine.state
 
 import io.ksmt.KContext
 import io.ksmt.expr.KBitVecValue
+import io.ksmt.utils.uncheckedCast
 import io.ksmt.expr.KInterpretedValue
 import org.ton.bytecode.TvmCell
 import org.usvm.machine.types.TvmBuilderType
@@ -16,8 +17,8 @@ import org.usvm.UIteExpr
 import org.usvm.USort
 import org.usvm.api.readField
 import org.usvm.api.writeField
-import org.usvm.collection.field.UInputFieldReading
 import org.usvm.machine.TvmContext
+import org.usvm.machine.TvmContext.Companion.CELL_DATA_BITS
 import org.usvm.machine.TvmContext.Companion.MAX_DATA_LENGTH
 import org.usvm.machine.TvmContext.Companion.cellDataField
 import org.usvm.machine.TvmContext.Companion.cellDataLengthField
@@ -87,8 +88,6 @@ private fun splitSizeExpr(
         when (sizeExpr) {
             is KInterpretedValue ->
                 GuardedExpr(sizeExpr, ctx.trueExpr) to null
-            is UInputFieldReading<*, *> ->
-                null to GuardedExpr(sizeExpr, ctx.trueExpr)
             is UIteExpr<TvmSizeSort> -> {
                 val cond = sizeExpr.condition
                 val (trueConcrete, trueSymbolic) = splitSizeExpr(sizeExpr.trueBranch)
@@ -97,7 +96,10 @@ private fun splitSizeExpr(
                 val symbolic = mergeCellExprsIntoIte(cond, trueSymbolic, falseSymbolic)
                 concrete to symbolic
             }
-            else -> error("Unexpected expr $sizeExpr")
+            else -> {
+                // Any complex expressions containing symbolic values are considered fully symbolic
+                null to GuardedExpr(sizeExpr, ctx.trueExpr)
+            }
         }
     }
 }
@@ -233,7 +235,7 @@ fun TvmStepScope.slicePreloadDataBits(
     val cellData = memory.readField(cell, cellDataField, cellDataSort)
     val dataPosition = memory.readField(slice, sliceDataPosField, sizeSort)
     val offset = mkBvAddExpr(dataPosition, sizeBits)
-    val offsetDataPos = mkBvSubExpr(cellDataLength, offset)
+    val offsetDataPos = mkBvSubExpr(maxDataLengthSizeExpr, offset)
     val readingEnd = mkBvAddExpr(dataPosition, sizeBits)
 
     checkCellDataUnderflow(this@slicePreloadDataBits, cell, minSize = readingEnd, quietBlock = quietBlock)
@@ -339,26 +341,30 @@ fun TvmState.builderStoreDataBits(builder: UHeapRef, bits: UExpr<UBvSort>) = wit
     val builderData = memory.readField(builder, cellDataField, cellDataSort)
     val builderDataLength = memory.readField(builder, cellDataLengthField, sizeSort)
 
-    val updatedData: UExpr<TvmCellDataSort> = if (builderDataLength is KBitVecValue<*>) {
+    val updatedLength = mkSizeAddExpr(builderDataLength, mkSizeExpr(bits.sort.sizeBits.toInt()))
+
+    val updatedData: UExpr<TvmCellDataSort> = if (builderDataLength is KBitVecValue) {
         val size = builderDataLength.intValue()
         val updatedData = if (size > 0) {
-            val oldData = mkBvExtractExpr(high = size - 1, low = 0, builderData)
+            val oldData = mkBvExtractExpr(high = MAX_DATA_LENGTH - 1, low = MAX_DATA_LENGTH - size, builderData)
             mkBvConcatExpr(oldData, bits)
         } else {
             bits
         }
 
-        check(updatedData.sort.sizeBits <= cellDataSort.sizeBits) { "Builder data overflow" }
+        val updatedDataSizeBits = updatedData.sort.sizeBits
 
-        updatedData.zeroExtendToSort(cellDataSort)
+        if (updatedDataSizeBits < CELL_DATA_BITS) {
+            mkBvConcatExpr(
+                updatedData,
+                mkBv(0, CELL_DATA_BITS - updatedDataSizeBits)
+            )
+        } else {
+            updatedData
+        }.uncheckedCast()
     } else {
-        val bitsLengthValue = bits.sort.sizeBits.toInt().toBv257()
-        val shiftedData = mkBvShiftLeftExpr(builderData, bitsLengthValue.zeroExtendToSort(builderData.sort))
-
-        mkBvOrExpr(shiftedData, bits.zeroExtendToSort(shiftedData.sort))
+        updateBuilderData(builderData, bits.zeroExtendToSort(builderData.sort), updatedLength)
     }
-
-    val updatedLength = mkSizeAddExpr(builderDataLength, mkSizeExpr(bits.sort.sizeBits.toInt()))
 
     memory.writeField(builder, cellDataField, cellDataSort, updatedData, guard = trueExpr)
     memory.writeField(builder, cellDataLengthField, sizeSort, updatedLength, guard = trueExpr)
@@ -384,8 +390,7 @@ fun <S : UBvSort> TvmStepScope.builderStoreDataBits(
     val trashBits = mkSizeSubExpr(mkSizeExpr(MAX_DATA_LENGTH), sizeBits).zeroExtendToSort(cellDataSort)
     val normalizedBits = mkBvLogicalShiftRightExpr(mkBvShiftLeftExpr(extendedBits, trashBits), trashBits)
 
-    val shiftedData = mkBvShiftLeftExpr(builderData, sizeBits.zeroExtendToSort(builderData.sort))
-    val updatedData = mkBvOrExpr(shiftedData, normalizedBits)
+    val updatedData = updateBuilderData(builderData, normalizedBits, newDataLength)
 
     return doWithState {
         memory.writeField(builder, cellDataField, cellDataSort, updatedData, guard = trueExpr)
@@ -416,13 +421,25 @@ fun TvmStepScope.builderStoreInt(
         value
     }
 
-    val shiftedData = mkBvShiftLeftExpr(builderData, sizeBits.zeroExtendToSort(builderData.sort))
-    val updatedData = mkBvOrExpr(shiftedData, normalizedValue.zeroExtendToSort(shiftedData.sort))
+    val updatedData = updateBuilderData(builderData, normalizedValue.zeroExtendToSort(builderData.sort), updatedLength)
 
     return doWithState {
         memory.writeField(builder, cellDataField, cellDataSort, updatedData, guard = trueExpr)
         memory.writeField(builder, cellDataLengthField, sizeSort, updatedLength, guard = trueExpr)
     }
+}
+
+private fun TvmContext.updateBuilderData(
+    builderData: UExpr<TvmCellDataSort>,
+    bits: UExpr<TvmCellDataSort>,
+    updatedBuilderDataLength: UExpr<TvmSizeSort>,
+): UExpr<TvmCellDataSort> {
+    val shiftedBits: UExpr<TvmCellDataSort> = mkBvShiftLeftExpr(
+        bits,
+        mkBvSubExpr(maxDataLengthSizeExpr, updatedBuilderDataLength).zeroExtendToSort(builderData.sort)
+    )
+
+    return mkBvOrExpr(builderData, shiftedBits)
 }
 
 fun TvmState.builderStoreNextRef(builder: UHeapRef, ref: UHeapRef) = with(ctx) {
@@ -443,11 +460,11 @@ fun TvmStepScope.builderStoreSlice(builder: UHeapRef, slice: UHeapRef, quietBloc
         cellDataLength,
         unsatBlock = { error("Cannot ensure correctness for data length in cell $cell") }
     ) ?: return null
-
-    val cellData = calcOnState { memory.readField(cell, cellDataField, cellDataSort) }
     val dataPosition = calcOnState { memory.readField(slice, sliceDataPosField, sizeSort) }
 
     val bitsToWriteLength = mkSizeSubExpr(cellDataLength, dataPosition)
+    val cellData = slicePreloadDataBits(slice, bitsToWriteLength, quietBlock)
+        ?: return null
 
     val cellRefsSize = calcOnState { memory.readField(cell, cellRefsLengthField, sizeSort) }
     val refsPosition = calcOnState { memory.readField(slice, sliceRefPosField, sizeSort) }

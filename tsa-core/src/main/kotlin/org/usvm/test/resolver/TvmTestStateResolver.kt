@@ -250,7 +250,7 @@ class TvmTestStateResolver(
         val dataLength = resolveInt(memory.readField(cell, TvmContext.cellDataLengthField, sizeSort))
             .coerceAtMost(TvmContext.MAX_DATA_LENGTH).coerceAtLeast(0)
 
-        return data.drop(TvmContext.MAX_DATA_LENGTH - dataLength)
+        return data.take(dataLength)
     }
 
     private fun resolveInt(expr: UExpr<out USort>): Int = extractInt(evaluateInModel(expr))
