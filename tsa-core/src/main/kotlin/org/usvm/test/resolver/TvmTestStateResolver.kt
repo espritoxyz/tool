@@ -25,7 +25,6 @@ import org.usvm.machine.types.CellDataTypeInfo
 import org.usvm.machine.state.TvmCellRefsRegionValueInfo
 import org.usvm.machine.state.TvmRefsMemoryRegion
 import org.usvm.machine.state.TvmStack
-import org.usvm.machine.state.TvmStack.TvmStackEntry
 import org.usvm.machine.state.TvmStack.TvmStackTupleValue
 import org.usvm.machine.state.TvmStack.TvmStackTupleValueConcreteNew
 import org.usvm.machine.state.TvmState
@@ -58,14 +57,14 @@ class TvmTestStateResolver(
 
     private val resolvedCache = mutableMapOf<UConcreteHeapAddress, TvmTestCellValue>()
 
-    fun resolveParameters(): List<TvmTestValue> = stack.inputElements.mapNotNull { resolveEntry(it) }.reversed()
+    fun resolveParameters(): List<TvmTestValue> = stack.inputValues.filterNotNull().map { resolveStackValue(it) }.reversed()
 
     fun resolveResultStack(): TvmMethodSymbolicResult {
         val results = state.stack.results
 
         // Do not include exit code for exceptional results to the result
         val resultsWithoutExitCode = if (state.methodResult is TvmMethodResult.TvmFailure) results.dropLast(1) else results
-        val resolvedResults = resultsWithoutExitCode.mapNotNull { resolveEntry(it) }
+        val resolvedResults = resultsWithoutExitCode.filterNotNull().map { resolveStackValue(it) }
 
         return when (val it = state.methodResult) {
             TvmMethodResult.NoCall -> error("Missed result for state $state")
@@ -76,9 +75,7 @@ class TvmTestStateResolver(
 
     fun resolveGasUsage(): Int = model.eval(state.calcConsumedGas()).intValue()
 
-    fun resolveEntry(entry: TvmStackEntry): TvmTestValue? {
-        val stackValue = entry.cell ?: return null
-
+    fun resolveStackValue(stackValue: TvmStack.TvmStackValue): TvmTestValue {
         return when (stackValue) {
             is TvmStack.TvmStackIntValue -> resolveInt257(stackValue.intValue)
             is TvmStack.TvmStackCellValue -> resolveCell(stackValue.cellValue.also { state.ensureSymbolicCellInitialized(it) })
@@ -95,7 +92,7 @@ class TvmTestStateResolver(
     private fun resolveTuple(tuple: TvmStackTupleValue): TvmTestTupleValue = when (tuple) {
         is TvmStackTupleValueConcreteNew -> {
             val elements = tuple.entries.map {
-                resolveEntry(it)
+                it.cell(stack)?.let { value -> resolveStackValue(value) }
                     ?: TvmTestNullValue // We do not care what is its real value as it was never used
             }
 
@@ -104,7 +101,7 @@ class TvmTestStateResolver(
         is TvmStack.TvmStackTupleValueInputValue -> {
             val size = resolveInt(tuple.size)
             val elements = (0 ..< size).map {
-                resolveEntry(tuple[it, stack])
+                tuple[it, stack].cell(stack)?.let { value -> resolveStackValue(value) }
                     ?: TvmTestNullValue // We do not care what is its real value as it was never used
             }
 

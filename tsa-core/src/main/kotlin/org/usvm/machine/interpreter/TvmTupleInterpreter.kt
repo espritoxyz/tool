@@ -55,7 +55,7 @@ import org.usvm.machine.state.consumeGas
 import org.usvm.machine.state.doWithStateCtx
 import org.usvm.machine.state.newStmt
 import org.usvm.machine.state.nextStmt
-import org.usvm.machine.state.takeLastInt
+import org.usvm.machine.state.takeLastIntOrThrowTypeError
 import org.usvm.machine.state.takeLastTuple
 import org.usvm.machine.state.throwIntegerOutOfRangeError
 import org.usvm.machine.state.throwTypeCheckError
@@ -357,7 +357,7 @@ class TvmTupleInterpreter(private val ctx: TvmContext) {
         nullsCount: Int,
         skipOneEntryUnderTop: Boolean
     ) {
-        val value = scope.takeLastInt()
+        val value = scope.takeLastIntOrThrowTypeError() ?: return
         val condition = scope.calcOnStateCtx {
             val cond = mkEq(value, zeroValue)
             if (swapIfZero) cond else cond.not()

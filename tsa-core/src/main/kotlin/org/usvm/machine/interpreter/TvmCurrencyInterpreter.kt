@@ -20,7 +20,7 @@ import org.usvm.machine.state.sliceMoveDataPtr
 import org.usvm.machine.state.slicePreloadDataBits
 import org.usvm.machine.state.slicePreloadInt
 import org.usvm.machine.state.takeLastBuilder
-import org.usvm.machine.state.takeLastInt
+import org.usvm.machine.state.takeLastIntOrNull
 import org.usvm.machine.state.takeLastSlice
 import org.usvm.machine.state.throwTypeCheckError
 import org.usvm.mkSizeExpr
@@ -79,7 +79,7 @@ class TvmCurrencyInterpreter(private val ctx: TvmContext) {
 
     private fun visitStoreGrams(scope: TvmStepScope, stmt: TvmAppCurrencyStgramsInst) {
         scope.doWithStateCtx {
-            val (grams, builder) = stack.takeLastInt() to stack.takeLastBuilder()
+            val (grams, builder) = stack.takeLastIntOrNull() to stack.takeLastBuilder()
             if (builder == null) {
                 throwTypeCheckError(this)
                 return@doWithStateCtx

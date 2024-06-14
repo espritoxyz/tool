@@ -75,7 +75,7 @@ data class C7Register(
      */
     lateinit var configRoot: UHeapRef
 
-    operator fun get(idx: Int): TvmStack.TvmStackValue {
+    operator fun get(idx: Int, stack: TvmStack): TvmStack.TvmStackValue {
         if (idx == 0) {
             TODO("Support getting tuple with blockchain specific data")
         }
@@ -87,7 +87,7 @@ data class C7Register(
             "Global variables are not initialized yet"
         }.entries.extendToSize(idx + 1)
 
-        return globalEntries.getOrNull(idx)?.cell
+        return globalEntries.getOrNull(idx)?.cell(stack)
             ?: error("Cannot find global variable with index $idx")
     }
 

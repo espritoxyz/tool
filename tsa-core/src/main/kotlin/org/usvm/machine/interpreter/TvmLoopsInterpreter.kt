@@ -35,7 +35,7 @@ import org.usvm.machine.state.consumeDefaultGas
 import org.usvm.machine.state.throwIntegerOutOfRangeError
 import org.usvm.machine.state.signedIntegerFitsBits
 import org.usvm.machine.state.takeLastContinuation
-import org.usvm.machine.state.takeLastInt
+import org.usvm.machine.state.takeLastIntOrThrowTypeError
 
 class TvmLoopsInterpreter(private val ctx: TvmContext) {
     fun visitTvmContLoopsInst(scope: TvmStepScope, stmt: TvmContLoopsInst) {
@@ -74,7 +74,7 @@ class TvmLoopsInterpreter(private val ctx: TvmContext) {
     ) {
         with(ctx) {
             val continuation = with(scope) { stmt.extractContinuation(continuationExtractor) }
-            val loopRepeatTimes = scope.takeLastInt()
+            val loopRepeatTimes = scope.takeLastIntOrThrowTypeError() ?: return
             val inRangeConstraint = signedIntegerFitsBits(loopRepeatTimes, bits = 32u)
 
             scope.fork(
@@ -170,7 +170,7 @@ class TvmLoopsInterpreter(private val ctx: TvmContext) {
     }
 
     private fun visitArtificialUntilInst(scope: TvmStepScope, stmt: TvmArtificialUntilInst) {
-        val x = scope.takeLastInt()
+        val x = scope.takeLastIntOrThrowTypeError() ?: return
         val continueLoopCondition = ctx.mkEq(x, ctx.zeroValue)
 
         scope.fork(
@@ -206,7 +206,7 @@ class TvmLoopsInterpreter(private val ctx: TvmContext) {
     }
 
     private fun visitArtificialWhileEndInst(scope: TvmStepScope, stmt: TvmArtificialWhileEndInst) {
-        val x = scope.takeLastInt()
+        val x = scope.takeLastIntOrThrowTypeError() ?: return
         val continueLoopCondition = with(ctx) {
             mkEq(x, zeroValue).not()
         }

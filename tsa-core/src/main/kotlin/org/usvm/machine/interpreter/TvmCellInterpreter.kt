@@ -119,7 +119,7 @@ import org.usvm.machine.state.slicePreloadNextRef
 import org.usvm.machine.state.slicePreloadRef
 import org.usvm.machine.state.takeLastBuilder
 import org.usvm.machine.state.takeLastCell
-import org.usvm.machine.state.takeLastInt
+import org.usvm.machine.state.takeLastIntOrThrowTypeError
 import org.usvm.machine.state.takeLastSlice
 import org.usvm.machine.state.throwIntegerOutOfRangeError
 import org.usvm.machine.state.throwTypeCheckError
@@ -149,7 +149,7 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
             is TvmCellParseLdrefInst -> visitLoadRefInst(scope, stmt)
             is TvmCellParsePldrefidxInst -> doPreloadRef(scope, stmt, refIdx = mkSizeExpr(stmt.n))
             is TvmCellParsePldrefvarInst -> {
-                val refIdx = scope.calcOnState { stack.takeLastInt() }
+                val refIdx = scope.calcOnState { takeLastIntOrThrowTypeError() } ?: return
                 doPreloadRef(scope, stmt, refIdx = refIdx.extractToSizeSort())
             }
             is TvmCellParseLduInst -> visitLoadIntInst(scope, stmt, stmt.c + 1, isSigned = false, preload = false, quiet = false)
@@ -416,7 +416,8 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
     ): Unit = with(ctx) {
         scope.consumeDefaultGas(stmt)
 
-        val (sizeBits, slice) = scope.calcOnState { stack.takeLastInt() to stack.takeLastSlice() }
+        val sizeBits = scope.takeLastIntOrThrowTypeError() ?: return
+        val slice = scope.calcOnState { stack.takeLastSlice() }
         if (slice == null) {
             scope.doWithState(throwTypeCheckError)
             return
@@ -523,10 +524,11 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
     ): Unit? = with(ctx) {
         scope.consumeDefaultGas(stmt)
 
-        val (sizeBits, slice) = scope.calcOnState { stack.takeLastInt() to stack.takeLastSlice() }
+        val sizeBits = scope.takeLastIntOrThrowTypeError() ?: return null
+        val slice = scope.calcOnState { stack.takeLastSlice() }
         if (slice == null) {
             scope.doWithState(throwTypeCheckError)
-            return@with
+            return null
         }
 
         val notOutOfRangeExpr = unsignedIntegerFitsBits(sizeBits, bits = 10u)
@@ -667,7 +669,7 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
             return
         }
 
-        val intValue = scope.takeLastInt()
+        val intValue = scope.takeLastIntOrThrowTypeError() ?: return
 
         val updatedBuilder = scope.calcOnState {
             memory.allocConcrete(TvmBuilderType).also { builderCopy(builder, it) }
@@ -691,7 +693,8 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
     private fun visitStoreIntXInst(scope: TvmStepScope, stmt: TvmInst, isSigned: Boolean) = with(ctx) {
         scope.consumeDefaultGas(stmt)
 
-        val (bits, builder) = scope.calcOnState { stack.takeLastInt() to stack.takeLastBuilder() }
+        val bits = scope.takeLastIntOrThrowTypeError() ?: return
+        val builder = scope.calcOnState { stack.takeLastBuilder() }
         if (builder == null) {
             scope.doWithState(throwTypeCheckError)
             return
@@ -708,7 +711,7 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
 
         checkOutOfRange(bitsNotOutOfRangeExpr, scope) ?: return
 
-        val intValue = scope.takeLastInt()
+        val intValue = scope.takeLastIntOrThrowTypeError() ?: return
 
         val valueNotOutOfRangeExpr = if (isSigned) {
             signedIntegerFitsBits(intValue, bits)

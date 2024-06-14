@@ -1,0 +1,17 @@
+"Fift.fif" include
+"Asm.fif" include
+
+PROGRAM{
+  0 DECLMETHOD slice_for_add
+  1 DECLMETHOD slice_for_less
+  slice_for_add PROC:<{
+      x{61} PUSHSLICE  // Supposed to be string "a" (found this by compiling FunC file)
+      x{61} PUSHSLICE
+      ADD
+  }>
+  slice_for_less PROC:<{
+      x{61} PUSHSLICE  // Supposed to be string "a" (found this by compiling FunC file)
+      1 PUSHINT
+      LESS
+  }>
+}END>c

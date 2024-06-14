@@ -4,9 +4,7 @@ import org.usvm.machine.types.TvmBuilderType
 import org.usvm.machine.types.TvmCellType
 import org.usvm.machine.types.TvmContinuationType
 import org.ton.bytecode.TvmContinuationValue
-import org.usvm.NULL_ADDRESS
 import org.usvm.UAddressSort
-import org.usvm.UConcreteHeapRef
 import org.usvm.machine.types.TvmIntegerType
 import org.usvm.machine.types.TvmRealReferenceType
 import org.usvm.machine.types.TvmSliceType
@@ -59,19 +57,26 @@ fun TvmStack.addTuple(value: TvmStackTupleValue) {
 
 fun TvmStackValue.toStackEntry(): TvmConcreteStackEntry = TvmConcreteStackEntry(this)
 
-fun TvmStack.takeLastInt(): UExpr<TvmInt257Sort> {
+fun TvmStack.takeLastIntOrNull(): UExpr<TvmInt257Sort>? {
     val intStackValue = takeLast(TvmIntegerType) { id ->
         ctx.mkRegisterReading(id, ctx.int257sort)
+    }
+
+    if (intStackValue !is TvmStack.TvmStackIntValue) {
+        return null
     }
 
     return intStackValue.intValue
 }
 
-fun TvmState.takeLastInt(): UExpr<TvmInt257Sort> =
-    stack.takeLastInt()
+fun TvmState.takeLastIntOrThrowTypeError(): UExpr<TvmInt257Sort>? =
+    stack.takeLastIntOrNull() ?: run {
+        throwTypeCheckError(this)
+        null
+    }
 
-fun TvmStepScope.takeLastInt(): UExpr<TvmInt257Sort> =
-    calcOnState { stack.takeLastInt() }
+fun TvmStepScope.takeLastIntOrThrowTypeError(): UExpr<TvmInt257Sort>? =
+    calcOnState { takeLastIntOrThrowTypeError() }
 
 context(TvmState)
 fun TvmStack.takeLastCell(): UHeapRef? =
@@ -100,9 +105,9 @@ fun TvmStepScope.takeLastTuple(): TvmStackTupleValue? = calcOnStateCtx {
     val lastEntry = stack.takeLastEntry()
 
     when (lastEntry) {
-        is TvmConcreteStackEntry -> lastEntry.cell as? TvmStackTupleValue
+        is TvmConcreteStackEntry -> lastEntry.cell(stack) as? TvmStackTupleValue
         is TvmInputStackEntry -> {
-            val cell = lastEntry.cell
+            val cell = lastEntry.cell(stack)
             if (cell != null) {
                 return@calcOnStateCtx cell as? TvmStackTupleValue
             }
@@ -118,7 +123,9 @@ fun TvmStepScope.takeLastTuple(): TvmStackTupleValue? = calcOnStateCtx {
             ) ?: return@calcOnStateCtx null
 
             val symbolicTuple = TvmStack.TvmStackTupleValueInputNew(entries = mutableMapOf(), size = size)
-            symbolicTuple.also { lastEntry.cell = it }
+            symbolicTuple.also {
+                stack.putInputEntryValue(lastEntry, it)
+            }
         }
     }
 }

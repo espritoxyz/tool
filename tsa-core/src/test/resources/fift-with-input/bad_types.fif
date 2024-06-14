@@ -1,0 +1,24 @@
+"Fift.fif" include
+"Asm.fif" include
+
+PROGRAM{
+  0 DECLMETHOD main
+  1 DECLMETHOD bad_types
+  bad_types PROC:<{
+
+    ROT
+    LESS
+    IF:<{
+      LDREF
+    }>ELSE<{
+      1 PUSHINT
+      ADD
+    }>
+
+  }>
+  main PROC:<{
+    0 PUSHINT
+    0 PUSHINT
+    bad_types CALLDICT
+  }>
+}END>c

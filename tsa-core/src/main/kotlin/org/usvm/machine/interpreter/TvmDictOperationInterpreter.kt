@@ -166,7 +166,7 @@ import org.usvm.machine.state.slicePreloadDataBits
 import org.usvm.machine.state.slicePreloadNextRef
 import org.usvm.machine.state.takeLastBuilder
 import org.usvm.machine.state.takeLastCell
-import org.usvm.machine.state.takeLastInt
+import org.usvm.machine.state.takeLastIntOrThrowTypeError
 import org.usvm.machine.state.takeLastSlice
 import org.usvm.machine.state.throwTypeCheckError
 import org.usvm.machine.types.TvmBuilderType
@@ -814,7 +814,7 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
     }
 
     private fun loadKeyLength(scope: TvmStepScope): Int {
-        val keyLengthExpr = scope.takeLastInt()
+        val keyLengthExpr = scope.takeLastIntOrThrowTypeError()
 
         if (keyLengthExpr !is KBitVecValue<*>) {
             TODO("Non-concrete key length: $keyLengthExpr")
@@ -847,8 +847,10 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
     ): UExpr<UBvSort>? = scope.calcOnStateCtx {
         // todo: handle keyLength errors
         when (keyType) {
-            DictKeyType.SIGNED_INT -> takeLastInt().let { mkBvExtractExpr(high = keyLength - 1, low = 0, it) }
-            DictKeyType.UNSIGNED_INT -> takeLastInt().let { mkBvExtractExpr(high = keyLength - 1, low = 0, it) }
+            DictKeyType.SIGNED_INT -> takeLastIntOrThrowTypeError()
+                ?.let { mkBvExtractExpr(high = keyLength - 1, low = 0, it) }
+            DictKeyType.UNSIGNED_INT -> takeLastIntOrThrowTypeError()
+                ?.let { mkBvExtractExpr(high = keyLength - 1, low = 0, it) }
             DictKeyType.SLICE -> {
                 val slice = stack.takeLastSlice()
                 if (slice == null) {
@@ -856,7 +858,7 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
                     return@calcOnStateCtx null
                 }
 
-                scope.slicePreloadDataBits(slice, keyLength) ?: return@calcOnStateCtx null
+                scope.slicePreloadDataBits(slice, keyLength)
             }
         }
     }

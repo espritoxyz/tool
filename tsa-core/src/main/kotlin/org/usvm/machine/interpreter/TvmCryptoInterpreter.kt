@@ -21,7 +21,7 @@ import org.usvm.machine.state.nextStmt
 import org.usvm.machine.state.slicePreloadDataBits
 import org.usvm.machine.state.takeLastBuilder
 import org.usvm.machine.state.takeLastCell
-import org.usvm.machine.state.takeLastInt
+import org.usvm.machine.state.takeLastIntOrThrowTypeError
 import org.usvm.machine.state.takeLastSlice
 import org.usvm.machine.state.throwUnknownCellUnderflowError
 import org.usvm.machine.state.throwTypeCheckError
@@ -64,14 +64,14 @@ class TvmCryptoInterpreter(private val ctx: TvmContext) {
     private fun visitCheckSignatureInst(scope: TvmStepScope, stmt: TvmAppCryptoChksignuInst) {
         scope.consumeDefaultGas(stmt)
 
-        val key = scope.takeLastInt()
+        val key = scope.takeLastIntOrThrowTypeError()
         val signature = scope.calcOnState { stack.takeLastSlice() }
         if (signature == null) {
             scope.doWithState(throwTypeCheckError)
             return
         }
 
-        val hash = scope.takeLastInt()
+        val hash = scope.takeLastIntOrThrowTypeError()
 
         // Check that signature is correct - it contains at least 512 bits
         val bits = scope.slicePreloadDataBits(signature, bits = 512)

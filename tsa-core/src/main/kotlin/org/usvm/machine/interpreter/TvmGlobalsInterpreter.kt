@@ -11,7 +11,7 @@ import org.usvm.machine.state.consumeDefaultGas
 import org.usvm.machine.state.consumeGas
 import org.usvm.machine.state.newStmt
 import org.usvm.machine.state.nextStmt
-import org.usvm.machine.state.takeLastInt
+import org.usvm.machine.state.takeLastIntOrNull
 import org.usvm.machine.state.toStackEntry
 import org.usvm.utils.intValueOrNull
 
@@ -23,7 +23,7 @@ class TvmGlobalsInterpreter(private val ctx: TvmContext) {
                 scope.consumeDefaultGas(stmt)
 
                 scope.doWithState {
-                    val value = registers.c7[stmt.k]
+                    val value = registers.c7[stmt.k, stack]
                     stack.addStackEntry(value.toStackEntry())
                 }
             }
@@ -31,9 +31,9 @@ class TvmGlobalsInterpreter(private val ctx: TvmContext) {
                 scope.consumeDefaultGas(stmt)
 
                 scope.doWithState {
-                    val index = stack.takeLastInt().intValueOrNull
+                    val index = stack.takeLastIntOrNull()?.intValueOrNull
                         ?: TODO("Get global variable with symbolic index")
-                    val value = registers.c7[index]
+                    val value = registers.c7[index, stack]
                     stack.addStackEntry(value.toStackEntry())
                 }
             }
@@ -52,7 +52,7 @@ class TvmGlobalsInterpreter(private val ctx: TvmContext) {
                 scope.doWithState { consumeGas(26) }
 
                 scope.doWithState {
-                    val index = stack.takeLastInt().intValueOrNull
+                    val index = stack.takeLastIntOrNull()?.intValueOrNull
                         ?: TODO("Set global variable with symbolic index")
                     val value = stack.takeLastEntry()
 

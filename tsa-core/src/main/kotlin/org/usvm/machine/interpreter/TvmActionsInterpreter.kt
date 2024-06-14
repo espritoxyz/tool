@@ -11,7 +11,7 @@ import org.usvm.machine.state.doWithStateCtx
 import org.usvm.machine.state.newStmt
 import org.usvm.machine.state.nextStmt
 import org.usvm.machine.state.takeLastCell
-import org.usvm.machine.state.takeLastInt
+import org.usvm.machine.state.takeLastIntOrNull
 
 class TvmActionsInterpreter(private val ctx: TvmContext) {
     fun visitActionsStmt(scope: TvmStepScope, stmt: TvmAppActionsInst) {
@@ -27,7 +27,7 @@ class TvmActionsInterpreter(private val ctx: TvmContext) {
 
     private fun visitSendRawMsgInst(scope: TvmStepScope, stmt: TvmAppActionsSendrawmsgInst) {
         scope.doWithStateCtx {
-            val (mode, cell) = stack.takeLastInt() to stack.takeLastCell()
+            val (mode, cell) = stack.takeLastIntOrNull() to stack.takeLastCell()
 
             // TODO make a real implementation
             newStmt(stmt.nextStmt())
@@ -36,7 +36,7 @@ class TvmActionsInterpreter(private val ctx: TvmContext) {
 
     private fun visitRawReserveInst(scope: TvmStepScope, stmt: TvmAppActionsRawreserveInst) {
         scope.doWithState {
-            val (mode, value) = stack.takeLastInt() to stack.takeLastInt()
+            val (mode, value) = stack.takeLastIntOrNull() to stack.takeLastIntOrNull()
 
             // TODO make a real implementation
             newStmt(stmt.nextStmt())

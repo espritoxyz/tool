@@ -15,7 +15,7 @@ import org.usvm.machine.state.doWithStateCtx
 import org.usvm.machine.state.newStmt
 import org.usvm.machine.state.nextStmt
 import org.usvm.machine.state.setFailure
-import org.usvm.machine.state.takeLastInt
+import org.usvm.machine.state.takeLastIntOrThrowTypeError
 
 class TvmGasInterpreter(private val ctx: TvmContext) {
     fun visitGasInst(scope: TvmStepScope, stmt: TvmAppGasInst) {
@@ -46,7 +46,7 @@ class TvmGasInterpreter(private val ctx: TvmContext) {
 
     private fun visitSetGasLimitInst(scope: TvmStepScope, stmt: TvmAppGasSetgaslimitInst) {
         with(ctx) {
-            val gasLimit = scope.takeLastInt().extractToSizeSort()
+            val gasLimit = (scope.takeLastIntOrThrowTypeError() ?: return).extractToSizeSort()
             val consumedGas = scope.calcOnState { calcConsumedGas() }
 
             scope.fork(

@@ -23,7 +23,7 @@ import org.usvm.machine.state.generateSymbolicCell
 import org.usvm.machine.state.getConfigParam
 import org.usvm.machine.state.newStmt
 import org.usvm.machine.state.nextStmt
-import org.usvm.machine.state.takeLastInt
+import org.usvm.machine.state.takeLastIntOrThrowTypeError
 import org.usvm.machine.state.toStackEntry
 import org.usvm.machine.types.TvmCellType
 import org.usvm.machine.types.TvmSliceType
@@ -110,7 +110,7 @@ class TvmConfigInterpreter(private val ctx: TvmContext) {
     }
 
     private fun visitConfigParamInst(scope: TvmStepScope, stmt: TvmAppConfigConfigoptparamInst) = with(ctx) {
-        val idx = scope.calcOnState { stack.takeLastInt() }
+        val idx = scope.takeLastIntOrThrowTypeError() ?: return@with
         val configDict = scope.calcOnState { registers.c7.configRoot }
 
         val absIdx = mkIte(mkBvSignedGreaterOrEqualExpr(idx, zeroValue), idx, mkBvNegationExpr(idx))
