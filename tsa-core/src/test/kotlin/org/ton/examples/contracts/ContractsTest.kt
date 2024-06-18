@@ -23,6 +23,12 @@ class ContractsTest {
     private val vestingPath: String = "/contracts/vesting/vesting_wallet.fc"
     private val singleNominatorPath: String = "/contracts/single-nominator/single-nominator.fc"
     private val nominatorPoolPath: String = "/contracts/nominator-pool/pool.fc"
+    private val stocksPath: String = "/contracts/stocks/stock_options.fc"
+
+    @Test
+    fun testStocks() {
+        analyzeContract(stocksPath, methodsNumber = 6)
+    }
 
     @Test
     fun testWallet() {
