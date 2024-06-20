@@ -1,5 +1,6 @@
 package org.usvm.machine.types
 
+import org.ton.TvmDataCellStructure
 import org.ton.TvmInputInfo
 import org.ton.TvmParameterInfo
 import org.usvm.UBoolExpr
@@ -42,10 +43,31 @@ class TvmDataCellInfoStorage private constructor(
         return cache[address] ?: emptyList()
     }
 
-    fun getNoConflictCondition(load: TvmDataCellLoadedTypeInfo.Load): UBoolExpr = with(ctx) {
+    fun getNoConflictCondition(
+        state: TvmState,
+        load: TvmDataCellLoadedTypeInfo.Load
+    ): UBoolExpr = with(ctx) {
         val trees = treesOfAddress(load.address)
-        val conflictHappensGuard = trees.fold(falseExpr as UBoolExpr) { acc, tree ->
-            acc
+        val conflictHappensGuard = trees.fold(falseExpr as UBoolExpr) { accOuter, tree ->
+            tree.fold(accOuter) { acc, vertex ->
+                val vertexGuard = vertex.lazyGuard(state)
+                val offsetGuard = load.offset eq mkBv(vertex.prefixSize)
+                val conflictGuard = when (val struct = vertex.structure) {
+                    is TvmDataCellStructure.Unknown, is TvmDataCellStructure.SwitchPrefix -> {
+                        // no conflict here
+                        falseExpr
+                    }
+                    is TvmDataCellStructure.Empty -> {
+                        // conflict, if loaded more than 0 bits
+                        mkBvSignedGreaterExpr(load.type.sizeBits, mkBv(0))
+                    }
+                    is TvmDataCellStructure.KnownTypePrefix -> {
+                        // conflict, if types are not consistent
+                        struct.typeOfPrefix.accepts(load.type).not()
+                    }
+                }
+                acc or (offsetGuard and vertexGuard and conflictGuard)
+            }
         }
         return (load.guard and conflictHappensGuard).not()
     }

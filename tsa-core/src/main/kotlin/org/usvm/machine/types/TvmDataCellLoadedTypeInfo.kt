@@ -93,7 +93,7 @@ fun TvmStepScope.makeSliceTypeLoad(slice: UHeapRef, type: TvmSymbolicCellDataTyp
         val offset = memory.readField(slice, TvmContext.sliceDataPosField, sizeSort)
         val loadList = tvmDataCellLoadedTypeInfo.makeLoad(cellAddress, offset, type)
         loadList.forEach { load ->
-            val noConflictCond = tvmDataCellInfoStorage.getNoConflictCondition(load)
+            val noConflictCond = tvmDataCellInfoStorage.getNoConflictCondition(this, load)
             fork(
                 noConflictCond,
                 blockOnFalseState = {
