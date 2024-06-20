@@ -5,6 +5,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.encodeToStream
 import mu.KLogging
+import org.ton.TvmInputInfo
 import org.ton.bytecode.TvmContractCode
 import org.ton.cell.Cell
 import org.usvm.machine.FuncAnalyzer.Companion.FIFT_EXECUTABLE
@@ -31,7 +32,8 @@ sealed interface TvmAnalyzer {
     fun analyzeAllMethods(
         sourcesPath: Path,
         contractDataHex: String? = null,
-        methodsBlackList: Set<Int> = hashSetOf(Int.MAX_VALUE)
+        methodsBlackList: Set<Int> = hashSetOf(Int.MAX_VALUE),
+        inputInfo: TvmInputInfo = TvmInputInfo(),
     ): TvmContractSymbolicTestResult
 }
 
@@ -40,7 +42,8 @@ data object TactAnalyzer : TvmAnalyzer {
     override fun analyzeAllMethods(
         sourcesPath: Path,
         contractDataHex: String?,
-        methodsBlackList: Set<Int>
+        methodsBlackList: Set<Int>,
+        inputInfo: TvmInputInfo,
     ): TvmContractSymbolicTestResult {
         val outputDir = createTempDirectory(CONFIG_OUTPUT_PREFIX)
         val sourcesInOutputDir = sourcesPath.copyTo(outputDir.resolve(sourcesPath.fileName))
@@ -52,7 +55,7 @@ data object TactAnalyzer : TvmAnalyzer {
             val bocFile = outputDir.walk().singleOrNull { it.toFile().extension == "boc" }
                 ?: error("Cannot find .boc file after compiling the Tact source $sourcesPath")
 
-            return BocAnalyzer.analyzeAllMethods(bocFile, contractDataHex, methodsBlackList)
+            return BocAnalyzer.analyzeAllMethods(bocFile, contractDataHex, methodsBlackList, inputInfo)
         } finally {
             outputDir.deleteRecursively()
             configFile.deleteIfExists()
@@ -118,12 +121,13 @@ class FuncAnalyzer(
     override fun analyzeAllMethods(
         sourcesPath: Path,
         contractDataHex: String?,
-        methodsBlackList: Set<Int>
+        methodsBlackList: Set<Int>,
+        inputInfo: TvmInputInfo,
     ): TvmContractSymbolicTestResult {
         val tmpBocFile = createTempFile(suffix = ".boc")
         try {
             compileFuncSourceToBoc(sourcesPath, tmpBocFile)
-            return BocAnalyzer.analyzeAllMethods(tmpBocFile, contractDataHex, methodsBlackList)
+            return BocAnalyzer.analyzeAllMethods(tmpBocFile, contractDataHex, methodsBlackList, inputInfo)
         } finally {
             tmpBocFile.deleteIfExists()
         }
@@ -160,12 +164,13 @@ class FiftAnalyzer(
     override fun analyzeAllMethods(
         sourcesPath: Path,
         contractDataHex: String?,
-        methodsBlackList: Set<Int>
+        methodsBlackList: Set<Int>,
+        inputInfo: TvmInputInfo,
     ): TvmContractSymbolicTestResult {
         val tmpBocFile = createTempFile(suffix = ".boc")
         try {
             compileFiftToBoc(sourcesPath, tmpBocFile)
-            return BocAnalyzer.analyzeAllMethods(tmpBocFile, contractDataHex, methodsBlackList)
+            return BocAnalyzer.analyzeAllMethods(tmpBocFile, contractDataHex, methodsBlackList, inputInfo)
         } finally {
             tmpBocFile.deleteIfExists()
         }
@@ -323,10 +328,11 @@ data object BocAnalyzer : TvmAnalyzer {
     override fun analyzeAllMethods(
         sourcesPath: Path,
         contractDataHex: String?,
-        methodsBlackList: Set<Int>
+        methodsBlackList: Set<Int>,
+        inputInfo: TvmInputInfo,
     ): TvmContractSymbolicTestResult {
         val contract = loadContractFromBoc(sourcesPath)
-        return analyzeAllMethods(contract, methodsBlackList, contractDataHex)
+        return analyzeAllMethods(contract, methodsBlackList, contractDataHex, inputInfo)
     }
 
     fun loadContractFromBoc(bocFilePath: Path): TvmContractCode {
@@ -362,7 +368,8 @@ data object BocAnalyzer : TvmAnalyzer {
 fun analyzeAllMethods(
     contract: TvmContractCode,
     methodsBlackList: Set<Int> = hashSetOf(Int.MAX_VALUE),
-    contractDataHex: String? = null
+    contractDataHex: String? = null,
+    inputInfo: TvmInputInfo = TvmInputInfo(),
 ): TvmContractSymbolicTestResult {
     val contractData = Cell.Companion.of(contractDataHex ?: DEFAULT_CONTRACT_DATA_HEX)
     val machine = TvmMachine()
@@ -372,7 +379,8 @@ fun analyzeAllMethods(
             machine.analyze(
                 contract,
                 contractData,
-                method.id
+                method.id,
+                inputInfo
             )
         }.getOrElse {
             logger.error(it) {

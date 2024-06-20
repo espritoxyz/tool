@@ -347,7 +347,7 @@ class TvmInterpreter(
         val pathConstraints = UPathConstraints<TvmType>(ctx)
         val memory = UMemory<TvmType, TvmCodeBlock>(ctx, pathConstraints.typeConstraints)
         val refEmptyValue = memory.initializeEmptyRefValues()
-        val dataCellInfo = TvmDataCellInfoStorage.build(stack, inputInfo)
+        val dataCellInfo = TvmDataCellInfoStorage.build(ctx, stack, inputInfo)
 
         val state = TvmState(
             ctx = ctx,

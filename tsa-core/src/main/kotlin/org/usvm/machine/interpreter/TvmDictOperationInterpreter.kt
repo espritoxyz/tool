@@ -357,9 +357,8 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
         }
 
         val maybeConstructorTypeBit = scope.slicePreloadDataBits(slice, bits = 1) ?: return
-        scope.calcOnState {
-            makeSliceTypeLoad(slice, TvmSymbolicCellMaybeConstructorBit(ctx))
-        } ?: return
+        scope.makeSliceTypeLoad(slice, TvmSymbolicCellMaybeConstructorBit(ctx))
+            ?: return
 
         val isNotEmpty = scope.calcOnStateCtx { mkEq(maybeConstructorTypeBit, mkBv(value = 1, sizeBits = 1u)) }
 

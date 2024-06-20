@@ -72,7 +72,7 @@ fun TvmStepScope.doWithStateCtx(block: context(TvmContext) TvmState.() -> Unit) 
     block(ctx, this)
 }
 
-fun TvmState.generateSymbolicCell(): UHeapRef = generateSymbolicRef(TvmCellType).also { initializeSymbolicCell(it) }
+fun TvmState.generateSymbolicCell(): UConcreteHeapRef = generateSymbolicRef(TvmCellType).also { initializeSymbolicCell(it) }
 
 fun TvmState.ensureSymbolicCellInitialized(ref: UHeapRef) =
     ensureSymbolicRefInitialized(ref, TvmCellType) { initializeSymbolicCell(it) }

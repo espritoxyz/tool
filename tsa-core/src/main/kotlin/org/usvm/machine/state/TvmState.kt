@@ -59,7 +59,7 @@ class TvmState(
     targets,
 ) {
     override val isExceptional: Boolean
-        get() = methodResult is TvmMethodResult.TvmFailure
+        get() = methodResult is TvmMethodResult.TvmFailure || methodResult is TvmMethodResult.TvmStructuralError
 
     /**
      * All visited last instructions in all visited continuations in the LIFO order.

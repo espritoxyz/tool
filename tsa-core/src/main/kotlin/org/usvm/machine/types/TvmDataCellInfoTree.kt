@@ -28,54 +28,58 @@ class TvmDataCellInfoTree private constructor(
     }
 
     companion object {
-        fun TvmContext.construct(
+        fun construct(
+            ctx: TvmContext,
             structure: TvmDataCellStructure,
             lazyAddress: (TvmState) -> UConcreteHeapRef,
-            lazyGuard: (TvmState) -> UBoolExpr = { trueExpr }
+            lazyGuard: (TvmState) -> UBoolExpr = { ctx.trueExpr }
         ): List<TvmDataCellInfoTree> {
-            val (root, other) = constructRoot(structure, lazyGuard, lazyAddress)
+            val (root, other) = constructRoot(ctx, structure, lazyGuard, lazyAddress)
             val result = TvmDataCellInfoTree(lazyAddress, root)
             return listOf(result) + other
         }
 
-        private fun TvmContext.constructRoot(
+        private fun constructRoot(
+            ctx: TvmContext,
             structure: TvmDataCellStructure,
             lazyGuard: (TvmState) -> UBoolExpr,
             lazyAddress: (TvmState) -> UConcreteHeapRef,
-        ): Pair<Vertex, List<TvmDataCellInfoTree>> = when (structure) {
-            is TvmDataCellStructure.Empty, TvmDataCellStructure.Unknown -> {
-                Vertex(lazyGuard, structure, emptyList()) to emptyList()
-            }
-            is TvmDataCellStructure.KnownTypePrefix -> {
-                val (child, other) = constructRoot(structure.rest, lazyGuard, lazyAddress)
-                Vertex(lazyGuard, structure, listOf(child)) to other
-            }
-            is TvmDataCellStructure.SwitchPrefix -> {
-                val other = mutableListOf<TvmDataCellInfoTree>()
-                val lazyPrefix = { state: TvmState ->
-                    val address = lazyAddress(state)
-                    val cellContent = state.memory.readField(address, cellDataField, cellDataSort)
-                    mkBvExtractExpr(high = structure.switchSize - 1, low = 0, cellContent)
+        ): Pair<Vertex, List<TvmDataCellInfoTree>> = with(ctx) {
+            when (structure) {
+                is TvmDataCellStructure.Empty, TvmDataCellStructure.Unknown -> {
+                    Vertex(lazyGuard, structure, emptyList()) to emptyList()
                 }
-                val children = structure.variants.entries.map { (key, variant) ->
-                    val expectedPrefix = mkBv(key, structure.switchSize.toUInt())
-                    val newGuard = { state: TvmState ->
-                        val prefix = lazyPrefix(state)
-                        lazyGuard(state) and (prefix eq expectedPrefix)
+                is TvmDataCellStructure.KnownTypePrefix -> {
+                    val (child, other) = constructRoot(ctx, structure.rest, lazyGuard, lazyAddress)
+                    Vertex(lazyGuard, structure, listOf(child)) to other
+                }
+                is TvmDataCellStructure.SwitchPrefix -> {
+                    val other = mutableListOf<TvmDataCellInfoTree>()
+                    val lazyPrefix = { state: TvmState ->
+                        val address = lazyAddress(state)
+                        val cellContent = state.memory.readField(address, cellDataField, cellDataSort)
+                        mkBvExtractExpr(high = structure.switchSize - 1, low = 0, cellContent)
                     }
-                    val newOther = variant.refs.flatMapIndexed { index, refStructure ->
-                        val refAddress = { state: TvmState ->
-                            val address = lazyAddress(state)
-                            state.readCellRef(address, mkSizeExpr(index)) as UConcreteHeapRef
+                    val children = structure.variants.entries.map { (key, variant) ->
+                        val expectedPrefix = mkBv(key, structure.switchSize.toUInt())
+                        val newGuard = { state: TvmState ->
+                            val prefix = lazyPrefix(state)
+                            lazyGuard(state) and (prefix eq expectedPrefix)
                         }
-                        construct(refStructure, refAddress, lazyGuard = newGuard)
+                        val newOther = variant.refs.flatMapIndexed { index, refStructure ->
+                            val refAddress = { state: TvmState ->
+                                val address = lazyAddress(state)
+                                state.readCellRef(address, mkSizeExpr(index)) as UConcreteHeapRef
+                            }
+                            construct(ctx, refStructure, refAddress, lazyGuard = newGuard)
+                        }
+                        other += newOther
+                        val (child, childOther) = constructRoot(ctx, variant.selfRest, newGuard, lazyAddress)
+                        other += childOther
+                        child
                     }
-                    other += newOther
-                    val (child, childOther) = constructRoot(variant.selfRest, newGuard, lazyAddress)
-                    other += childOther
-                    child
+                    Vertex(lazyGuard, structure, children) to other
                 }
-                Vertex(lazyGuard, structure, children) to other
             }
         }
     }

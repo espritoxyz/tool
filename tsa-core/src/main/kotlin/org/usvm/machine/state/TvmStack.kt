@@ -49,6 +49,12 @@ class TvmStack(
         return lastStackEntry
     }
 
+    fun peekStackEntry(i: Int): TvmStackEntry {
+        extendStack(i + 1)
+        val index = stackIndex(i)
+        return stack[index]
+    }
+
     fun addStackEntry(entry: TvmStackEntry) {
         stack = stack.add(entry)
     }
@@ -256,11 +262,11 @@ class TvmStack(
     }
 
     fun putInputEntryValue(entry: TvmInputStackEntry, value: TvmStackValue) {
-        // TODO: check type
+        require(entry.id !in inputEntryIdToStackValue || value == inputEntryIdToStackValue[entry.id])
         inputEntryIdToStackValue = inputEntryIdToStackValue.put(entry.id, value)
     }
 
-    private fun getStackValue(
+    fun getStackValue(
         entry: TvmStackEntry,
         expectedType: TvmRealType,
         createEntry: (Int) -> UExpr<out USort>

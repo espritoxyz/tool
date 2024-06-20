@@ -1,5 +1,7 @@
 package org.ton.examples.types
 
+import org.ton.TvmInputInfo
+import org.ton.TvmParameterInfo
 import org.ton.examples.checkInvariants
 import org.ton.examples.funcCompileAndAnalyzeAllMethods
 import org.ton.examples.propertiesFound
@@ -19,7 +21,8 @@ class InputParameterInfoTests {
         val resourcePath = this::class.java.getResource(maybePath)?.path?.let { Path(it) }
             ?: error("Cannot find resource $maybePath")
 
-        val results = funcCompileAndAnalyzeAllMethods(resourcePath)
+        val inputInfo = TvmInputInfo(mapOf(0 to TvmParameterInfo.SliceInfo(TvmParameterInfo.DataCellInfo(maybeStructure))))
+        val results = funcCompileAndAnalyzeAllMethods(resourcePath, inputInfo = inputInfo)
         assertEquals(1, results.testSuites.size)
         val tests = results.testSuites.first()
         assertTrue(tests.any { it.result is TvmSuccessfulExecution })
@@ -38,7 +41,8 @@ class InputParameterInfoTests {
         val resourcePath = this::class.java.getResource(maybePath)?.path?.let { Path(it) }
             ?: error("Cannot find resource $maybePath")
 
-        val results = funcCompileAndAnalyzeAllMethods(resourcePath)
+        val inputInfo = TvmInputInfo(mapOf(0 to TvmParameterInfo.SliceInfo(TvmParameterInfo.DataCellInfo(int64Structure))))
+        val results = funcCompileAndAnalyzeAllMethods(resourcePath, inputInfo = inputInfo)
         assertEquals(1, results.testSuites.size)
         val tests = results.testSuites.first()
         assertTrue(tests.any { it.result is TvmSuccessfulExecution })

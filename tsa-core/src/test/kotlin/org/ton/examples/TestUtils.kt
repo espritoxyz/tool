@@ -1,5 +1,6 @@
 package org.ton.examples
 
+import org.ton.TvmInputInfo
 import org.ton.bytecode.TvmContractCode
 import org.usvm.machine.types.TvmIntegerType
 import org.usvm.machine.BocAnalyzer
@@ -36,30 +37,36 @@ fun tactCompileAndAnalyzeAllMethods(
     tactSourcesPath: Path,
     contractDataHex: String? = null,
     methodsBlackList: Set<Int> = hashSetOf(Int.MAX_VALUE),
+    inputInfo: TvmInputInfo = TvmInputInfo(),
 ): TvmContractSymbolicTestResult = TactAnalyzer.analyzeAllMethods(
     tactSourcesPath,
     contractDataHex,
-    methodsBlackList
+    methodsBlackList,
+    inputInfo,
 )
 
 fun funcCompileAndAnalyzeAllMethods(
     funcSourcesPath: Path,
     contractDataHex: String? = null,
     methodsBlackList: Set<Int> = hashSetOf(Int.MAX_VALUE),
+    inputInfo: TvmInputInfo = TvmInputInfo(),
 ): TvmContractSymbolicTestResult = FuncAnalyzer(funcStdlibPath = FUNC_STDLIB_RESOURCE, fiftStdlibPath = FIFT_STDLIB_RESOURCE).analyzeAllMethods(
     funcSourcesPath,
     contractDataHex,
-    methodsBlackList
+    methodsBlackList,
+    inputInfo,
 )
 
 fun compileAndAnalyzeFift(
     fiftPath: Path,
     contractDataHex: String? = null,
     methodsBlackList: Set<Int> = hashSetOf(Int.MAX_VALUE),
+    inputInfo: TvmInputInfo = TvmInputInfo(),
 ): TvmContractSymbolicTestResult = FiftAnalyzer(fiftStdlibPath = FIFT_STDLIB_RESOURCE).analyzeAllMethods(
     fiftPath,
     contractDataHex,
     methodsBlackList,
+    inputInfo,
 )
 
 /**
@@ -74,7 +81,9 @@ fun analyzeAllMethods(
     bytecodePath: String,
     contractDataHex: String? = null,
     methodsBlackList: Set<Int> = hashSetOf(Int.MAX_VALUE),
-): TvmContractSymbolicTestResult = BocAnalyzer.analyzeAllMethods(Path(bytecodePath), contractDataHex, methodsBlackList)
+    inputInfo: TvmInputInfo = TvmInputInfo(),
+): TvmContractSymbolicTestResult =
+    BocAnalyzer.analyzeAllMethods(Path(bytecodePath), contractDataHex, methodsBlackList, inputInfo)
 
 /**
  * Run method with [methodId].

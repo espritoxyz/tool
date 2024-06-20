@@ -8,21 +8,39 @@ import org.usvm.*
 import org.usvm.api.readField
 import org.usvm.machine.TvmContext
 import org.usvm.machine.TvmSizeSort
+import org.usvm.machine.TvmStepScope
+import org.usvm.machine.state.TvmDataCellTypesError
 import org.usvm.machine.state.TvmState
+import org.usvm.machine.state.calcOnStateCtx
+import org.usvm.machine.state.setFailure
 import org.usvm.memory.GuardedExpr
 import org.usvm.memory.foldHeapRef
+import org.usvm.test.resolver.TvmExecutionWithDataCellTypesError
 
 class TvmDataCellLoadedTypeInfo(
     var addressToActions: PersistentMap<UConcreteHeapRef, PersistentList<Load>>
 ) {
-    class Load(val guard: UBoolExpr, val type: TvmSymbolicCellDataType, val offset: UExpr<TvmSizeSort>)
+    class Load(
+        val guard: UBoolExpr,
+        val type: TvmSymbolicCellDataType,
+        val offset: UExpr<TvmSizeSort>,
+        val address: UConcreteHeapRef,
+    )
 
-    fun makeLoad(cellAddress: UHeapRef, offset: UExpr<TvmSizeSort>, type: TvmSymbolicCellDataType) {
+    fun makeLoad(
+        cellAddress: UHeapRef,
+        offset: UExpr<TvmSizeSort>,
+        type: TvmSymbolicCellDataType
+    ): List<Load> {
         val ctx = cellAddress.ctx
+        val loadList = mutableListOf<Load>()
         val blockOnConcreteAddress = { map: PersistentMap<UConcreteHeapRef, PersistentList<Load>>, guardedExpr: GuardedExpr<UConcreteHeapRef> ->
-            val oldList = map.getOrDefault(guardedExpr.expr, persistentListOf())
-            val newList = oldList.add(Load(guardedExpr.guard, type, offset))
-            map.put(guardedExpr.expr, newList)
+            val ref = guardedExpr.expr
+            val oldList = map.getOrDefault(ref, persistentListOf())
+            val load = Load(guardedExpr.guard, type, offset, ref)
+            loadList.add(load)
+            val newList = oldList.add(load)
+            map.put(ref, newList)
         }
         val newMap = foldHeapRef(
             ref = cellAddress,
@@ -35,6 +53,8 @@ class TvmDataCellLoadedTypeInfo(
         )
 
         addressToActions = newMap
+
+        return loadList
     }
 
     fun clone(): TvmDataCellLoadedTypeInfo =
@@ -62,13 +82,24 @@ private fun TvmContext.calculateExtendedCoinsLength(coinsPrefix: UExpr<TvmSizeSo
     return mkBvAddExpr(extendedLength, mkSizeExpr(4))
 }
 
-fun TvmState.makeSliceTypeLoad(slice: UHeapRef, type: TvmSymbolicCellDataType): Unit? = with(ctx) {
-    val cellAddress = memory.readField(slice, TvmContext.sliceCellField, addressSort)
-    val offset = memory.readField(slice, TvmContext.sliceDataPosField, sizeSort)
-    tvmDataCellLoadedTypeInfo.makeLoad(cellAddress, offset, type)
-}
-
 enum class Endian {
     LittleEndian,
     BigEndian
+}
+
+fun TvmStepScope.makeSliceTypeLoad(slice: UHeapRef, type: TvmSymbolicCellDataType): Unit? {
+    return calcOnStateCtx {
+        val cellAddress = memory.readField(slice, TvmContext.sliceCellField, addressSort)
+        val offset = memory.readField(slice, TvmContext.sliceDataPosField, sizeSort)
+        val loadList = tvmDataCellLoadedTypeInfo.makeLoad(cellAddress, offset, type)
+        loadList.forEach { load ->
+            val noConflictCond = tvmDataCellInfoStorage.getNoConflictCondition(load)
+            fork(
+                noConflictCond,
+                blockOnFalseState = {
+                    methodResult = TvmDataCellTypesError(load.type, load.type) // TODO
+                }
+            ) ?: return@calcOnStateCtx null
+        }
+    }
 }
