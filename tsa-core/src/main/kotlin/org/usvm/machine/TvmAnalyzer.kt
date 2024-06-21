@@ -33,7 +33,7 @@ sealed interface TvmAnalyzer {
         sourcesPath: Path,
         contractDataHex: String? = null,
         methodsBlackList: Set<Int> = hashSetOf(Int.MAX_VALUE),
-        inputInfo: TvmInputInfo = TvmInputInfo(),
+        inputInfo: Map<Int, TvmInputInfo> = emptyMap(),
     ): TvmContractSymbolicTestResult
 }
 
@@ -43,7 +43,7 @@ data object TactAnalyzer : TvmAnalyzer {
         sourcesPath: Path,
         contractDataHex: String?,
         methodsBlackList: Set<Int>,
-        inputInfo: TvmInputInfo,
+        inputInfo: Map<Int, TvmInputInfo>,
     ): TvmContractSymbolicTestResult {
         val outputDir = createTempDirectory(CONFIG_OUTPUT_PREFIX)
         val sourcesInOutputDir = sourcesPath.copyTo(outputDir.resolve(sourcesPath.fileName))
@@ -122,7 +122,7 @@ class FuncAnalyzer(
         sourcesPath: Path,
         contractDataHex: String?,
         methodsBlackList: Set<Int>,
-        inputInfo: TvmInputInfo,
+        inputInfo: Map<Int, TvmInputInfo>,
     ): TvmContractSymbolicTestResult {
         val tmpBocFile = createTempFile(suffix = ".boc")
         try {
@@ -165,7 +165,7 @@ class FiftAnalyzer(
         sourcesPath: Path,
         contractDataHex: String?,
         methodsBlackList: Set<Int>,
-        inputInfo: TvmInputInfo,
+        inputInfo: Map<Int, TvmInputInfo>,
     ): TvmContractSymbolicTestResult {
         val tmpBocFile = createTempFile(suffix = ".boc")
         try {
@@ -329,7 +329,7 @@ data object BocAnalyzer : TvmAnalyzer {
         sourcesPath: Path,
         contractDataHex: String?,
         methodsBlackList: Set<Int>,
-        inputInfo: TvmInputInfo,
+        inputInfo: Map<Int, TvmInputInfo>,
     ): TvmContractSymbolicTestResult {
         val contract = loadContractFromBoc(sourcesPath)
         return analyzeAllMethods(contract, methodsBlackList, contractDataHex, inputInfo)
@@ -369,7 +369,7 @@ fun analyzeAllMethods(
     contract: TvmContractCode,
     methodsBlackList: Set<Int> = hashSetOf(Int.MAX_VALUE),
     contractDataHex: String? = null,
-    inputInfo: TvmInputInfo = TvmInputInfo(),
+    inputInfo: Map<Int, TvmInputInfo> = emptyMap(),
 ): TvmContractSymbolicTestResult {
     val contractData = Cell.Companion.of(contractDataHex ?: DEFAULT_CONTRACT_DATA_HEX)
     val machine = TvmMachine()
@@ -380,7 +380,7 @@ fun analyzeAllMethods(
                 contract,
                 contractData,
                 method.id,
-                inputInfo
+                inputInfo[method.id.toInt()] ?: TvmInputInfo()
             )
         }.getOrElse {
             logger.error(it) {

@@ -37,7 +37,7 @@ fun tactCompileAndAnalyzeAllMethods(
     tactSourcesPath: Path,
     contractDataHex: String? = null,
     methodsBlackList: Set<Int> = hashSetOf(Int.MAX_VALUE),
-    inputInfo: TvmInputInfo = TvmInputInfo(),
+    inputInfo: Map<Int, TvmInputInfo> = emptyMap(),
 ): TvmContractSymbolicTestResult = TactAnalyzer.analyzeAllMethods(
     tactSourcesPath,
     contractDataHex,
@@ -49,7 +49,7 @@ fun funcCompileAndAnalyzeAllMethods(
     funcSourcesPath: Path,
     contractDataHex: String? = null,
     methodsBlackList: Set<Int> = hashSetOf(Int.MAX_VALUE),
-    inputInfo: TvmInputInfo = TvmInputInfo(),
+    inputInfo: Map<Int, TvmInputInfo> = emptyMap(),
 ): TvmContractSymbolicTestResult = FuncAnalyzer(funcStdlibPath = FUNC_STDLIB_RESOURCE, fiftStdlibPath = FIFT_STDLIB_RESOURCE).analyzeAllMethods(
     funcSourcesPath,
     contractDataHex,
@@ -61,7 +61,7 @@ fun compileAndAnalyzeFift(
     fiftPath: Path,
     contractDataHex: String? = null,
     methodsBlackList: Set<Int> = hashSetOf(Int.MAX_VALUE),
-    inputInfo: TvmInputInfo = TvmInputInfo(),
+    inputInfo: Map<Int, TvmInputInfo> = emptyMap(),
 ): TvmContractSymbolicTestResult = FiftAnalyzer(fiftStdlibPath = FIFT_STDLIB_RESOURCE).analyzeAllMethods(
     fiftPath,
     contractDataHex,
@@ -81,7 +81,7 @@ fun analyzeAllMethods(
     bytecodePath: String,
     contractDataHex: String? = null,
     methodsBlackList: Set<Int> = hashSetOf(Int.MAX_VALUE),
-    inputInfo: TvmInputInfo = TvmInputInfo(),
+    inputInfo: Map<Int, TvmInputInfo> = emptyMap(),
 ): TvmContractSymbolicTestResult =
     BocAnalyzer.analyzeAllMethods(Path(bytecodePath), contractDataHex, methodsBlackList, inputInfo)
 

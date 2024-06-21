@@ -8,8 +8,11 @@ import org.usvm.UConcreteHeapRef
 import org.usvm.api.readField
 import org.usvm.machine.TvmContext
 import org.usvm.machine.TvmContext.Companion.sliceCellField
+import org.usvm.machine.state.TvmMethodResult.TvmStructuralError
+import org.usvm.machine.state.TvmReadingOfUnexpectedType
 import org.usvm.machine.state.TvmStack
 import org.usvm.machine.state.TvmState
+import org.usvm.machine.state.TvmUnexpectedReading
 import org.usvm.machine.state.generateSymbolicCell
 import org.usvm.machine.state.generateSymbolicSlice
 import org.usvm.machine.types.TvmDataCellInfoTree.Companion.construct
@@ -43,33 +46,41 @@ class TvmDataCellInfoStorage private constructor(
         return cache[address] ?: emptyList()
     }
 
-    fun getNoConflictCondition(
+    fun getNoConflictConditions(
         state: TvmState,
         load: TvmDataCellLoadedTypeInfo.Load
-    ): UBoolExpr = with(ctx) {
+    ): Map<TvmStructuralError, UBoolExpr> = with(ctx) {
         val trees = treesOfAddress(load.address)
-        val conflictHappensGuard = trees.fold(falseExpr as UBoolExpr) { accOuter, tree ->
-            tree.fold(accOuter) { acc, vertex ->
+        val result = mutableMapOf<TvmStructuralError, UBoolExpr>()
+        trees.forEach { tree ->
+            tree.fold(Unit) { _, vertex ->
                 val vertexGuard = vertex.lazyGuard(state)
                 val offsetGuard = load.offset eq mkBv(vertex.prefixSize)
-                val conflictGuard = when (val struct = vertex.structure) {
+                when (val struct = vertex.structure) {
                     is TvmDataCellStructure.Unknown, is TvmDataCellStructure.SwitchPrefix -> {
                         // no conflict here
-                        falseExpr
                     }
                     is TvmDataCellStructure.Empty -> {
-                        // conflict, if loaded more than 0 bits
-                        mkBvSignedGreaterExpr(load.type.sizeBits, mkBv(0))
+                        // TvmUnexpectedReading, if loaded more than 0 bits
+                        val error = TvmUnexpectedReading(load.type)
+                        val oldValue = result.getOrDefault(error, trueExpr)
+                        val conflict = mkBvSignedGreaterExpr(load.type.sizeBits, mkBv(0))
+                        result[error] = oldValue and (load.guard and vertexGuard and offsetGuard and conflict).not()
                     }
                     is TvmDataCellStructure.KnownTypePrefix -> {
                         // conflict, if types are not consistent
-                        struct.typeOfPrefix.accepts(load.type).not()
+                        val error = TvmReadingOfUnexpectedType(
+                            expectedType = struct.typeOfPrefix,
+                            actualType = load.type
+                        )
+                        val oldValue = result.getOrDefault(error, trueExpr)
+                        val conflict = struct.typeOfPrefix.accepts(load.type).not()
+                        result[error] = oldValue and (load.guard and vertexGuard and offsetGuard and conflict).not()
                     }
                 }
-                acc or (offsetGuard and vertexGuard and conflictGuard)
             }
         }
-        return (load.guard and conflictHappensGuard).not()
+        return result
     }
 
     // this behavior might be changed in the future

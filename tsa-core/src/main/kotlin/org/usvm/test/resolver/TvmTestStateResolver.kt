@@ -4,6 +4,7 @@ import io.ksmt.expr.KBitVecValue
 import io.ksmt.utils.BvUtils.toBigIntegerSigned
 import kotlinx.collections.immutable.persistentListOf
 import org.ton.bytecode.TvmCodeBlock
+import org.ton.bytecode.TvmInst
 import org.usvm.machine.types.TvmType
 import org.usvm.NULL_ADDRESS
 import org.usvm.UAddressSort
@@ -23,12 +24,14 @@ import org.usvm.machine.types.TvmSymbolicCellDataInteger
 import org.usvm.machine.types.TvmSymbolicCellDataType
 import org.usvm.machine.types.TvmDataCellLoadedTypeInfo
 import org.usvm.machine.state.TvmCellRefsRegionValueInfo
-import org.usvm.machine.state.TvmDataCellTypesError
+import org.usvm.machine.state.TvmReadingOfUnexpectedType
 import org.usvm.machine.state.TvmRefsMemoryRegion
 import org.usvm.machine.state.TvmStack
 import org.usvm.machine.state.TvmStack.TvmStackTupleValue
 import org.usvm.machine.state.TvmStack.TvmStackTupleValueConcreteNew
 import org.usvm.machine.state.TvmState
+import org.usvm.machine.state.TvmUnexpectedEndOfReading
+import org.usvm.machine.state.TvmUnexpectedReading
 import org.usvm.machine.types.TvmSymbolicCellDataBitArray
 import org.usvm.machine.state.calcConsumedGas
 import org.usvm.machine.state.ensureSymbolicBuilderInitialized
@@ -72,25 +75,33 @@ class TvmTestStateResolver(
             TvmMethodResult.NoCall -> error("Missed result for state $state")
             is TvmMethodResult.TvmFailure -> TvmMethodFailure(it, state.lastStmt, it.exit.exitCode, resolvedResults)
             is TvmMethodResult.TvmSuccess -> TvmSuccessfulExecution(it.exit.exitCode, resolvedResults)
-            is TvmMethodResult.TvmStructuralError -> resolveTvmStructuralError(resolvedResults, it)
+            is TvmMethodResult.TvmStructuralError -> resolveTvmStructuralError(state.lastStmt, resolvedResults, it)
         }
     }
 
     private fun resolveTvmStructuralError(
+        lastStmt: TvmInst,
         stack: List<TvmTestValue>,
         exit: TvmMethodResult.TvmStructuralError,
     ): TvmExecutionWithStructuralError =
         when (exit) {
-            is TvmDataCellTypesError -> TvmExecutionWithDataCellTypesError(
-                expected = resolveCellDataType(exit.expectedType),
-                actual = resolveCellDataType(exit.actualType),
-                stack = stack
+            is TvmUnexpectedReading -> TvmExecutionWithUnexpectedReading(
+                resolveCellDataType(exit.readingType),
+                lastStmt,
+                stack,
+            )
+            is TvmUnexpectedEndOfReading -> TvmExecutionWithUnexpectedEndOfReading(lastStmt, stack)
+            is TvmReadingOfUnexpectedType -> TvmExecutionWithReadingOfUnexpectedType(
+                expectedType = exit.expectedType,
+                actualType = resolveCellDataType(exit.actualType),
+                lastStmt,
+                stack
             )
         }
 
     fun resolveGasUsage(): Int = model.eval(state.calcConsumedGas()).intValue()
 
-    fun resolveStackValue(stackValue: TvmStack.TvmStackValue): TvmTestValue {
+    private fun resolveStackValue(stackValue: TvmStack.TvmStackValue): TvmTestValue {
         return when (stackValue) {
             is TvmStack.TvmStackIntValue -> resolveInt257(stackValue.intValue)
             is TvmStack.TvmStackCellValue -> resolveCell(stackValue.cellValue.also { state.ensureSymbolicCellInitialized(it) })

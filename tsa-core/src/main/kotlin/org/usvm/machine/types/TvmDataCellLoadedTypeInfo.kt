@@ -9,13 +9,9 @@ import org.usvm.api.readField
 import org.usvm.machine.TvmContext
 import org.usvm.machine.TvmSizeSort
 import org.usvm.machine.TvmStepScope
-import org.usvm.machine.state.TvmDataCellTypesError
-import org.usvm.machine.state.TvmState
 import org.usvm.machine.state.calcOnStateCtx
-import org.usvm.machine.state.setFailure
 import org.usvm.memory.GuardedExpr
 import org.usvm.memory.foldHeapRef
-import org.usvm.test.resolver.TvmExecutionWithDataCellTypesError
 
 class TvmDataCellLoadedTypeInfo(
     var addressToActions: PersistentMap<UConcreteHeapRef, PersistentList<Load>>
@@ -93,13 +89,15 @@ fun TvmStepScope.makeSliceTypeLoad(slice: UHeapRef, type: TvmSymbolicCellDataTyp
         val offset = memory.readField(slice, TvmContext.sliceDataPosField, sizeSort)
         val loadList = tvmDataCellLoadedTypeInfo.makeLoad(cellAddress, offset, type)
         loadList.forEach { load ->
-            val noConflictCond = tvmDataCellInfoStorage.getNoConflictCondition(this, load)
-            fork(
-                noConflictCond,
-                blockOnFalseState = {
-                    methodResult = TvmDataCellTypesError(load.type, load.type) // TODO
-                }
-            ) ?: return@calcOnStateCtx null
+            val noConflictCond = tvmDataCellInfoStorage.getNoConflictConditions(this, load)
+            noConflictCond.entries.forEach { (error, cond) ->
+                fork(
+                    cond,
+                    blockOnFalseState = {
+                        methodResult = error
+                    }
+                ) ?: return@calcOnStateCtx null
+            }
         }
     }
 }

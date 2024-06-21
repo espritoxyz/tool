@@ -45,7 +45,9 @@ sealed interface TvmMethodResult {
     }
 
     @Serializable
-    sealed interface TvmStructuralError: TvmMethodResult
+    sealed interface TvmStructuralError: TvmMethodResult {
+        val message: String
+    }
 }
 
 object TvmNormalExit : TvmSuccessfulExit {
@@ -154,7 +156,22 @@ data class TvmUnknownFailure(override val exitCode: UInt): TvmErrorExit {
 
 // TODO add remaining
 
-data class TvmDataCellTypesError(
-    val expectedType: TvmSymbolicCellDataType,
+data class TvmUnexpectedReading(
+    val readingType: TvmSymbolicCellDataType,
+) : TvmStructuralError {
+    override val message: String =
+        "Unexpected reading of $readingType: expected end of cell"
+}
+
+data object TvmUnexpectedEndOfReading : TvmStructuralError {
+    override val message: String =
+        "Unexpected end of reading: slice is not supposed to be empty"
+}
+
+data class TvmReadingOfUnexpectedType(
+    val expectedType: TvmCellDataType, // TODO: this can be symbolic?
     val actualType: TvmSymbolicCellDataType,
-): TvmStructuralError
+) : TvmStructuralError {
+    override val message: String =
+        "Reading of unexpected type: expected reading of $expectedType, but read $actualType"
+}
