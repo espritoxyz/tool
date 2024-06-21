@@ -21,10 +21,15 @@ class TvmDataCellInfoStorage private constructor(
     private val ctx: TvmContext,
     private val trees: List<TvmDataCellInfoTree>,
     private var addressToTree: Map<UConcreteHeapRef, List<TvmDataCellInfoTree>>? = null,
+    private val checkDataCellContentTypes: Boolean = true,
 ) {
     fun initialize(state: TvmState) {
         if (addressToTree != null)
             return  // already initialized
+        if (!checkDataCellContentTypes) {
+            addressToTree = emptyMap()
+            return
+        }
         val result = mutableMapOf<UConcreteHeapRef, MutableList<TvmDataCellInfoTree>>()
         trees.forEach { tree ->
             val address = tree.lazyAddress(state)
@@ -88,10 +93,14 @@ class TvmDataCellInfoStorage private constructor(
 
     companion object {
         fun build(
+            checkDataCellContentTypes: Boolean,
             ctx: TvmContext,
             stack: TvmStack,
             info: TvmInputInfo,
         ): TvmDataCellInfoStorage {
+            if (!checkDataCellContentTypes) {
+                return TvmDataCellInfoStorage(ctx, emptyList(), checkDataCellContentTypes = false)
+            }
             val trees = mutableListOf<TvmDataCellInfoTree>()
             info.parameterInfos.entries.forEach { (param, paramInfo) ->
                 val entry = stack.peekStackEntry(param)
