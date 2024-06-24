@@ -21,3 +21,10 @@ val prefixInt64Structure = TvmDataCellStructure.KnownTypePrefix(
     TvmCellDataInteger(64, isSigned = true, Endian.BigEndian),
     rest = TvmDataCellStructure.Unknown
 )
+
+val someRefStructure = TvmDataCellStructure.SwitchPrefix(
+    switchSize = 0,
+    variants = mapOf(
+        "" to TvmDataCellStructure.SwitchVariant(TvmDataCellStructure.Empty, listOf(TvmDataCellStructure.Unknown)),
+    ),
+)

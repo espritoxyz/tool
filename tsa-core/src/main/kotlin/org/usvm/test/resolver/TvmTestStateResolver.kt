@@ -247,7 +247,7 @@ class TvmTestStateResolver(
 
     private fun resolveTypeLoad(loads: List<TvmDataCellLoadedTypeInfo.Action>): List<TvmCellDataTypeLoad> =
         loads.mapNotNull {
-            if (it is TvmDataCellLoadedTypeInfo.Load && model.eval(it.guard).isTrue) {
+            if (it is TvmDataCellLoadedTypeInfo.LoadData && model.eval(it.guard).isTrue) {
                 TvmCellDataTypeLoad(resolveCellDataType(it.type), resolveInt(it.offset))
             } else {
                 null

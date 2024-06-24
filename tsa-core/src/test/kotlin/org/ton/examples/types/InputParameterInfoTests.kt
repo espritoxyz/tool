@@ -129,4 +129,23 @@ class InputParameterInfoTests {
             }
         )
     }
+
+    @Test
+    fun testUnexpectedEndOfCell2() {
+        val resourcePath = this::class.java.getResource(endOfCellPath)?.path?.let { Path(it) }
+            ?: error("Cannot find resource $endOfCellPath")
+
+        val inputInfo = TvmInputInfo(mapOf(0 to TvmParameterInfo.SliceInfo(TvmParameterInfo.DataCellInfo(someRefStructure))))
+        val results = funcCompileAndAnalyzeAllMethods(resourcePath, inputInfo = mapOf(0 to inputInfo))
+        assertEquals(1, results.testSuites.size)
+        val tests = results.testSuites.first()
+        assertTrue(tests.any { it.result !is TvmSuccessfulExecution })
+
+        propertiesFound(
+            tests,
+            listOf { test ->
+                test.result is TvmExecutionWithUnexpectedEndOfReading
+            }
+        )
+    }
 }

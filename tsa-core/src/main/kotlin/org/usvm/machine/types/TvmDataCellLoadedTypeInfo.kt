@@ -23,7 +23,7 @@ class TvmDataCellLoadedTypeInfo(
         val address: UConcreteHeapRef
     }
 
-    class Load(
+    class LoadData(
         override val guard: UBoolExpr,
         val type: TvmSymbolicCellDataType,
         val offset: UExpr<TvmSizeSort>,
@@ -34,6 +34,7 @@ class TvmDataCellLoadedTypeInfo(
         override val guard: UBoolExpr,
         override val address: UConcreteHeapRef,
         val offset: UExpr<TvmSizeSort>,
+        val refNumber: UExpr<TvmSizeSort>,
     ) : Action
 
     private fun <ConcreteAction: Action> registerAction(
@@ -69,13 +70,17 @@ class TvmDataCellLoadedTypeInfo(
         cellAddress: UHeapRef,
         offset: UExpr<TvmSizeSort>,
         type: TvmSymbolicCellDataType
-    ): List<Load> {
-        val action = { ref: GuardedExpr<UConcreteHeapRef> -> Load(ref.guard, type, offset, ref.expr) }
+    ): List<LoadData> {
+        val action = { ref: GuardedExpr<UConcreteHeapRef> -> LoadData(ref.guard, type, offset, ref.expr) }
         return registerAction(cellAddress, action)
     }
 
-    fun makeEndOfCell(cellAddress: UHeapRef, offset: UExpr<TvmSizeSort>): List<EndOfCell> {
-        val action = { ref: GuardedExpr<UConcreteHeapRef> -> EndOfCell(ref.guard, ref.expr, offset) }
+    fun makeEndOfCell(
+        cellAddress: UHeapRef,
+        offset: UExpr<TvmSizeSort>,
+        refNumber: UExpr<TvmSizeSort>
+    ): List<EndOfCell> {
+        val action = { ref: GuardedExpr<UConcreteHeapRef> -> EndOfCell(ref.guard, ref.expr, offset, refNumber) }
         return registerAction(cellAddress, action)
     }
 
@@ -132,7 +137,8 @@ fun TvmStepScope.assertEndOfCell(slice: UHeapRef): Unit? {
     return calcOnStateCtx {
         val cellAddress = memory.readField(slice, TvmContext.sliceCellField, addressSort)
         val offset = memory.readField(slice, TvmContext.sliceDataPosField, sizeSort)
-        val actions = tvmDataCellLoadedTypeInfo.makeEndOfCell(cellAddress, offset)
+        val refNumber = memory.readField(slice, TvmContext.sliceRefPosField, sizeSort)
+        val actions = tvmDataCellLoadedTypeInfo.makeEndOfCell(cellAddress, offset, refNumber)
         actions.forEach {
             val noConflictCond = tvmDataCellInfoStorage.getNoUnexpectedEndOfReadingCondition(this, it)
             fork(

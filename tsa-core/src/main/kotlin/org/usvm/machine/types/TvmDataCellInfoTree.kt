@@ -21,7 +21,8 @@ class TvmDataCellInfoTree private constructor(
         val lazyGuard: (TvmState) -> UBoolExpr,
         val structure: TvmDataCellStructure,
         val prefixSize: Int,  // TODO: symbolic values are probably possible here
-        private val children: List<Vertex>
+        val refNumber: Int,
+        private val children: List<Vertex>,
     ) {
         internal fun <Acc> fold(init: Acc, f: (Acc, Vertex) -> Acc): Acc {
             return children.fold(f(init, this)) { acc, child -> child.fold(acc, f) }
@@ -35,7 +36,7 @@ class TvmDataCellInfoTree private constructor(
             lazyAddress: (TvmState) -> UConcreteHeapRef,
             lazyGuard: (TvmState) -> UBoolExpr = { ctx.trueExpr }
         ): List<TvmDataCellInfoTree> {
-            val (root, other) = constructVertex(ctx, structure, lazyGuard, lazyAddress, 0)
+            val (root, other) = constructVertex(ctx, structure, lazyGuard, lazyAddress, 0, 0)
             val result = TvmDataCellInfoTree(lazyAddress, root)
             return listOf(result) + other
         }
@@ -46,10 +47,11 @@ class TvmDataCellInfoTree private constructor(
             lazyGuard: (TvmState) -> UBoolExpr,
             lazyAddress: (TvmState) -> UConcreteHeapRef,
             prefixSize: Int,
+            refNumber: Int,
         ): Pair<Vertex, List<TvmDataCellInfoTree>> = with(ctx) {
             when (structure) {
                 is TvmDataCellStructure.Empty, TvmDataCellStructure.Unknown -> {
-                    Vertex(lazyGuard, structure, prefixSize, emptyList()) to emptyList()
+                    Vertex(lazyGuard, structure, prefixSize, refNumber, emptyList()) to emptyList()
                 }
                 is TvmDataCellStructure.KnownTypePrefix -> {
                     val (child, other) = constructVertex(
@@ -57,22 +59,31 @@ class TvmDataCellInfoTree private constructor(
                         structure.rest,
                         lazyGuard,
                         lazyAddress,
-                        prefixSize + structure.typeOfPrefix.bitSize
+                        prefixSize + structure.typeOfPrefix.bitSize,
+                        refNumber,
                     )
-                    Vertex(lazyGuard, structure, prefixSize, listOf(child)) to other
+                    Vertex(lazyGuard, structure, prefixSize, refNumber, listOf(child)) to other
                 }
                 is TvmDataCellStructure.SwitchPrefix -> {
                     val other = mutableListOf<TvmDataCellInfoTree>()
                     val lazyPrefix = { state: TvmState ->
                         val address = lazyAddress(state)
                         val cellContent = state.memory.readField(address, cellDataField, cellDataSort)
+                        require(structure.switchSize > 0)
                         mkBvExtractExpr(high = structure.switchSize - 1, low = 0, cellContent)
                     }
                     val children = structure.variants.entries.map { (key, variant) ->
-                        val expectedPrefix = mkBv(key, structure.switchSize.toUInt())
+                        val expectedPrefix = if (key.isEmpty()) {
+                            null
+                        } else {
+                            mkBv(key, structure.switchSize.toUInt())
+                        }
                         val newGuard = { state: TvmState ->
-                            val prefix = lazyPrefix(state)
-                            lazyGuard(state) and (prefix eq expectedPrefix)
+                            val prefixGuard = expectedPrefix?.let {
+                                val prefix = lazyPrefix(state)
+                                prefix eq expectedPrefix
+                            } ?: trueExpr
+                            lazyGuard(state) and prefixGuard
                         }
                         val newOther = variant.refs.flatMapIndexed { index, refStructure ->
                             val refAddress = { state: TvmState ->
@@ -87,12 +98,13 @@ class TvmDataCellInfoTree private constructor(
                             variant.selfRest,
                             newGuard,
                             lazyAddress,
-                            prefixSize + structure.switchSize
+                            prefixSize + structure.switchSize,
+                            refNumber + variant.refs.size,
                         )
                         other += childOther
                         child
                     }
-                    Vertex(lazyGuard, structure, prefixSize, children) to other
+                    Vertex(lazyGuard, structure, prefixSize, refNumber, children) to other
                 }
             }
         }
