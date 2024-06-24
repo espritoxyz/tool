@@ -10,6 +10,7 @@ class CellParseTest {
     private val cellParseFiftPath: String = "/cell/CellParse.fif"
     private val cellParseFiftFailurePath: String = "/cell/CellParseFailure.fif"
     private val slicePushFiftPath: String = "/cell/SlicePush.fif"
+    private val loadGramsFiftPath: String = "/cell/load_grams.fif"
 
     @Test
     fun cellLoadIntTest() {
@@ -41,6 +42,19 @@ class CellParseTest {
     fun slicePushTest() {
         val fiftResourcePath = this::class.java.getResource(slicePushFiftPath)?.path?.let { Path(it) }
             ?: error("Cannot find resource fift $slicePushFiftPath")
+
+        val symbolicResult = compileAndAnalyzeFift(fiftResourcePath)
+        val methodIds = (0..1).toSet()
+
+        compareSymbolicAndConcreteResults(methodIds, symbolicResult) { methodId ->
+            runFiftMethod(fiftResourcePath, methodId)
+        }
+    }
+
+    @Test
+    fun loadGramsTest() {
+        val fiftResourcePath = this::class.java.getResource(loadGramsFiftPath)?.path?.let { Path(it) }
+            ?: error("Cannot find resource fift $loadGramsFiftPath")
 
         val symbolicResult = compileAndAnalyzeFift(fiftResourcePath)
         val methodIds = (0..1).toSet()

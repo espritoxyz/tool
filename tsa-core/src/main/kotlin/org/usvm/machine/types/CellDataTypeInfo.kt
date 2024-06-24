@@ -52,7 +52,15 @@ class TvmSymbolicCellDataInteger(sizeBits: UExpr<TvmSizeSort>, val isSigned: Boo
 class TvmSymbolicCellMaybeDictConstructorBit(ctx: TvmContext): TvmSymbolicCellDataType(ctx.mkBv(1))
 class TvmSymbolicCellDataMsgAddr(ctx: TvmContext): TvmSymbolicCellDataType(ctx.mkBv(2))
 class TvmSymbolicCellDataBitArray(sizeBits: UExpr<TvmSizeSort>): TvmSymbolicCellDataType(sizeBits)
+class TvmSymbolicCellDataCoins(
+    ctx: TvmContext,
+    val coinsPrefix: UExpr<TvmSizeSort>  // 4-bit unsigned integer in front of coins amount
+) : TvmSymbolicCellDataType(ctx.calculateExtendedCoinsLength(coinsPrefix))
 
+private fun TvmContext.calculateExtendedCoinsLength(coinsPrefix: UExpr<TvmSizeSort>): UExpr<TvmSizeSort> {
+    val extendedLength = mkBvShiftLeftExpr(coinsPrefix, shift = mkSizeExpr(3))
+    return mkBvAddExpr(extendedLength, mkSizeExpr(4))
+}
 
 fun TvmState.makeSliceTypeLoad(slice: UHeapRef, type: TvmSymbolicCellDataType) = with(ctx) {
     val cellAddress = memory.readField(slice, TvmContext.sliceCellField, addressSort)

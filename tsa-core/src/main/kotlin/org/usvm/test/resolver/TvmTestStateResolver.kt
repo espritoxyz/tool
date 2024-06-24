@@ -37,6 +37,7 @@ import org.usvm.machine.state.lastStmt
 import org.usvm.machine.state.tvmCellRefsRegion
 import org.usvm.machine.types.TvmDataCellType
 import org.usvm.machine.types.TvmDictCellType
+import org.usvm.machine.types.TvmSymbolicCellDataCoins
 import org.usvm.machine.types.TvmSymbolicCellDataMsgAddr
 import org.usvm.machine.types.getPossibleTypes
 import org.usvm.memory.UMemory
@@ -234,6 +235,7 @@ class TvmTestStateResolver(
             is TvmSymbolicCellMaybeDictConstructorBit -> TvmCellDataMaybeConstructorBit
             is TvmSymbolicCellDataBitArray -> TvmCellDataBitArray(resolveInt(type.sizeBits))
             is TvmSymbolicCellDataMsgAddr -> TvmCellDataMsgAddr
+            is TvmSymbolicCellDataCoins -> TvmCellDataCoins(resolveInt(type.coinsPrefix))
         }
 
     private fun resolveInt257(expr: UExpr<out USort>): TvmTestIntegerValue {

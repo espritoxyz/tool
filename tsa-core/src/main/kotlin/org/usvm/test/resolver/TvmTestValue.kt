@@ -69,6 +69,15 @@ data object TvmCellDataMsgAddr: TvmCellDataType {
 data class TvmCellDataBitArray(override val bitSize: Int): TvmCellDataType
 
 @Serializable
+data class TvmCellDataCoins(val coinPrefix: Int): TvmCellDataType {
+    override val bitSize: Int = 4 + coinPrefix * 8
+
+    init {
+        require(coinPrefix in 0..15)
+    }
+}
+
+@Serializable
 data class TvmCellDataTypeLoad(
     val type: TvmCellDataType,
     val offset: Int

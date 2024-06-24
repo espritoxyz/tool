@@ -23,6 +23,8 @@ import org.usvm.machine.state.takeLastBuilder
 import org.usvm.machine.state.takeLastIntOrNull
 import org.usvm.machine.state.takeLastSlice
 import org.usvm.machine.state.throwTypeCheckError
+import org.usvm.machine.types.TvmSymbolicCellDataCoins
+import org.usvm.machine.types.makeSliceTypeLoad
 import org.usvm.mkSizeExpr
 import org.usvm.sizeSort
 
@@ -49,24 +51,13 @@ class TvmCurrencyInterpreter(private val ctx: TvmContext) {
 
             val length = scope.slicePreloadDataBits(updatedSlice, bits = 4)?.zeroExtendToSort(sizeSort)
                 ?: return@doWithStateCtx
+
+            makeSliceTypeLoad(slice, TvmSymbolicCellDataCoins(ctx, length))
             sliceMoveDataPtr(updatedSlice, bits = 4)
 
             val extendedLength = mkBvShiftLeftExpr(length, shift = mkSizeExpr(3))
-            scope.slicePreloadInt(updatedSlice, extendedLength.zeroExtendToSort(int257sort), isSigned = false)
+            val grams = scope.slicePreloadInt(updatedSlice, extendedLength.zeroExtendToSort(int257sort), isSigned = false)
                 ?: return@doWithStateCtx
-
-            // TODO read the real value
-            val grams = makeSymbolicPrimitive(int257sort)
-            scope.assert(
-                mkBvSignedGreaterOrEqualExpr(grams, zeroValue),
-                unsatBlock = { error("Cannot make grams >= 0") }
-            ) ?: return@doWithStateCtx
-
-            // Grams is any unsigned integer up to `2^((2^4-1)*8) - 1 = 2^120 - 1`
-            scope.assert(
-                mkBvSignedLessOrEqualExpr(grams, maxGramsValue),
-                unsatBlock = { error("Cannot make grams <= `2^120 - 1`") }
-            ) ?: return@doWithStateCtx
 
             sliceMoveDataPtr(updatedSlice, extendedLength)
 

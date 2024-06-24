@@ -57,6 +57,11 @@ class TvmConfigInterpreter(private val ctx: TvmContext) {
                         unsatBlock = { error("Cannot make NOW > $previousValue") }
                     ) ?: return@doWithStateCtx
 
+                    scope.assert(
+                        mkBvSignedGreaterExpr(maxTimestampValue, now),
+                        unsatBlock = { error("Cannot make NOW less than 2^64") }
+                    ) ?: return@doWithStateCtx
+
                     c7.now = now
                     stack.addInt(now)
                 }
@@ -65,6 +70,11 @@ class TvmConfigInterpreter(private val ctx: TvmContext) {
                     scope.assert(
                         mkBvSignedGreaterExpr(logicalTime, zeroValue),
                         unsatBlock = { error("Cannot make positive LTIME") }
+                    ) ?: return@doWithStateCtx
+
+                    scope.assert(
+                        mkBvSignedGreaterExpr(maxTimestampValue, logicalTime),
+                        unsatBlock = { error("Cannot make LTIME less than 2^64") }
                     ) ?: return@doWithStateCtx
 
                     stack.addInt(logicalTime)

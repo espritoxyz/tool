@@ -1,0 +1,31 @@
+"Fift.fif" include
+"Asm.fif" include
+
+PROGRAM{
+    0 DECLMETHOD recv_internal
+    1 DECLMETHOD empty_grams
+
+    // (mostly) generated from load_grams.fc
+    recv_internal PROC:<{
+        244 PUSHINT
+        2 PUSHINT
+        NEWC
+        4 STU
+        16 STU
+        ENDC
+        CTOS
+        LDGRAMS
+        DROP
+    }>
+
+    empty_grams PROC:<{
+        0 PUSHINT
+        NEWC
+        4 STU
+        ENDC
+        CTOS
+        LDGRAMS
+        DROP
+    }>
+
+}END>c

@@ -52,6 +52,7 @@ class TvmContext(components: UComponents<TvmType, TvmSizeSort>) : UContext<TvmSi
     val min257BitValue: KExpr<TvmInt257Sort> = bvMinValueSignedExtended(intBitsValue)
     val max257BitValue: KExpr<TvmInt257Sort> = bvMaxValueSignedExtended(intBitsValue)
     val maxGramsValue: KExpr<TvmInt257Sort> = bvMaxValueUnsigned<UBvSort>(MAX_GRAMS_BITS).unsignedExtendToInteger()
+    val maxTimestampValue = mkBvShiftLeftExpr(oneValue, 64.toBv257())
 
     val zeroSizeExpr: UExpr<TvmSizeSort> = mkSizeExpr(0)
     val maxDataLengthSizeExpr: UExpr<TvmSizeSort> = mkSizeExpr(MAX_DATA_LENGTH)
