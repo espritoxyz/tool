@@ -34,6 +34,7 @@ sealed interface TvmAnalyzer {
         contractDataHex: String? = null,
         methodsBlackList: Set<Int> = hashSetOf(Int.MAX_VALUE),
         inputInfo: Map<Int, TvmInputInfo> = emptyMap(),
+        checkDataCellContentTypes: Boolean = true,
     ): TvmContractSymbolicTestResult
 }
 
@@ -44,6 +45,7 @@ data object TactAnalyzer : TvmAnalyzer {
         contractDataHex: String?,
         methodsBlackList: Set<Int>,
         inputInfo: Map<Int, TvmInputInfo>,
+        checkDataCellContentTypes: Boolean,
     ): TvmContractSymbolicTestResult {
         val outputDir = createTempDirectory(CONFIG_OUTPUT_PREFIX)
         val sourcesInOutputDir = sourcesPath.copyTo(outputDir.resolve(sourcesPath.fileName))
@@ -55,7 +57,13 @@ data object TactAnalyzer : TvmAnalyzer {
             val bocFile = outputDir.walk().singleOrNull { it.toFile().extension == "boc" }
                 ?: error("Cannot find .boc file after compiling the Tact source $sourcesPath")
 
-            return BocAnalyzer.analyzeAllMethods(bocFile, contractDataHex, methodsBlackList, inputInfo)
+            return BocAnalyzer.analyzeAllMethods(
+                bocFile,
+                contractDataHex,
+                methodsBlackList,
+                inputInfo,
+                checkDataCellContentTypes
+            )
         } finally {
             outputDir.deleteRecursively()
             configFile.deleteIfExists()
@@ -123,11 +131,18 @@ class FuncAnalyzer(
         contractDataHex: String?,
         methodsBlackList: Set<Int>,
         inputInfo: Map<Int, TvmInputInfo>,
+        checkDataCellContentTypes: Boolean,
     ): TvmContractSymbolicTestResult {
         val tmpBocFile = createTempFile(suffix = ".boc")
         try {
             compileFuncSourceToBoc(sourcesPath, tmpBocFile)
-            return BocAnalyzer.analyzeAllMethods(tmpBocFile, contractDataHex, methodsBlackList, inputInfo)
+            return BocAnalyzer.analyzeAllMethods(
+                tmpBocFile,
+                contractDataHex,
+                methodsBlackList,
+                inputInfo,
+                checkDataCellContentTypes,
+            )
         } finally {
             tmpBocFile.deleteIfExists()
         }
@@ -166,11 +181,18 @@ class FiftAnalyzer(
         contractDataHex: String?,
         methodsBlackList: Set<Int>,
         inputInfo: Map<Int, TvmInputInfo>,
+        checkDataCellContentTypes: Boolean,
     ): TvmContractSymbolicTestResult {
         val tmpBocFile = createTempFile(suffix = ".boc")
         try {
             compileFiftToBoc(sourcesPath, tmpBocFile)
-            return BocAnalyzer.analyzeAllMethods(tmpBocFile, contractDataHex, methodsBlackList, inputInfo)
+            return BocAnalyzer.analyzeAllMethods(
+                tmpBocFile,
+                contractDataHex,
+                methodsBlackList,
+                inputInfo,
+                checkDataCellContentTypes,
+            )
         } finally {
             tmpBocFile.deleteIfExists()
         }
@@ -330,9 +352,10 @@ data object BocAnalyzer : TvmAnalyzer {
         contractDataHex: String?,
         methodsBlackList: Set<Int>,
         inputInfo: Map<Int, TvmInputInfo>,
+        checkDataCellContentTypes: Boolean,
     ): TvmContractSymbolicTestResult {
         val contract = loadContractFromBoc(sourcesPath)
-        return analyzeAllMethods(contract, methodsBlackList, contractDataHex, inputInfo)
+        return analyzeAllMethods(contract, methodsBlackList, contractDataHex, inputInfo, checkDataCellContentTypes)
     }
 
     fun loadContractFromBoc(bocFilePath: Path): TvmContractCode {
@@ -370,9 +393,10 @@ fun analyzeAllMethods(
     methodsBlackList: Set<Int> = hashSetOf(Int.MAX_VALUE),
     contractDataHex: String? = null,
     inputInfo: Map<Int, TvmInputInfo> = emptyMap(),
+    checkDataCellContentTypes: Boolean = true,
 ): TvmContractSymbolicTestResult {
     val contractData = Cell.Companion.of(contractDataHex ?: DEFAULT_CONTRACT_DATA_HEX)
-    val machine = TvmMachine()
+    val machine = TvmMachine(checkDataCellContentTypes = checkDataCellContentTypes)
     val methodsExceptDictPushConst = contract.methods.filterKeys { it.toInt() !in methodsBlackList }
     val methodStates = methodsExceptDictPushConst.values.associateWith { method ->
         runCatching {

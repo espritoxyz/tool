@@ -38,11 +38,13 @@ fun tactCompileAndAnalyzeAllMethods(
     contractDataHex: String? = null,
     methodsBlackList: Set<Int> = hashSetOf(Int.MAX_VALUE),
     inputInfo: Map<Int, TvmInputInfo> = emptyMap(),
+    checkDataCellContentTypes: Boolean = true,
 ): TvmContractSymbolicTestResult = TactAnalyzer.analyzeAllMethods(
     tactSourcesPath,
     contractDataHex,
     methodsBlackList,
     inputInfo,
+    checkDataCellContentTypes,
 )
 
 fun funcCompileAndAnalyzeAllMethods(
@@ -50,11 +52,13 @@ fun funcCompileAndAnalyzeAllMethods(
     contractDataHex: String? = null,
     methodsBlackList: Set<Int> = hashSetOf(Int.MAX_VALUE),
     inputInfo: Map<Int, TvmInputInfo> = emptyMap(),
+    checkDataCellContentTypes: Boolean = true,
 ): TvmContractSymbolicTestResult = FuncAnalyzer(funcStdlibPath = FUNC_STDLIB_RESOURCE, fiftStdlibPath = FIFT_STDLIB_RESOURCE).analyzeAllMethods(
     funcSourcesPath,
     contractDataHex,
     methodsBlackList,
     inputInfo,
+    checkDataCellContentTypes,
 )
 
 fun compileAndAnalyzeFift(
@@ -62,11 +66,13 @@ fun compileAndAnalyzeFift(
     contractDataHex: String? = null,
     methodsBlackList: Set<Int> = hashSetOf(Int.MAX_VALUE),
     inputInfo: Map<Int, TvmInputInfo> = emptyMap(),
+    checkDataCellContentTypes: Boolean = true,
 ): TvmContractSymbolicTestResult = FiftAnalyzer(fiftStdlibPath = FIFT_STDLIB_RESOURCE).analyzeAllMethods(
     fiftPath,
     contractDataHex,
     methodsBlackList,
     inputInfo,
+    checkDataCellContentTypes,
 )
 
 /**

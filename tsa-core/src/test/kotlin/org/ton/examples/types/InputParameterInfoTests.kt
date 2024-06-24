@@ -82,4 +82,17 @@ class InputParameterInfoTests {
             }
         )
     }
+
+    @Test
+    fun testTurnOff() {
+        val resourcePath = this::class.java.getResource(maybePath)?.path?.let { Path(it) }
+            ?: error("Cannot find resource $maybePath")
+
+        val inputInfo = TvmInputInfo(mapOf(0 to TvmParameterInfo.SliceInfo(TvmParameterInfo.DataCellInfo(TvmDataCellStructure.Empty))))
+        val results = funcCompileAndAnalyzeAllMethods(resourcePath, inputInfo = mapOf(0 to inputInfo), checkDataCellContentTypes = false)
+        assertEquals(1, results.testSuites.size)
+        val tests = results.testSuites.first()
+        assertTrue(tests.any { it.result is TvmSuccessfulExecution })
+        assertTrue(tests.any { it.result is TvmMethodFailure })
+    }
 }
