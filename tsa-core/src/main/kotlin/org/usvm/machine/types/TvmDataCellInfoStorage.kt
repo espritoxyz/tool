@@ -12,10 +12,12 @@ import org.usvm.machine.state.TvmMethodResult.TvmStructuralError
 import org.usvm.machine.state.TvmReadingOfUnexpectedType
 import org.usvm.machine.state.TvmStack
 import org.usvm.machine.state.TvmState
+import org.usvm.machine.state.TvmUnexpectedEndOfReading
 import org.usvm.machine.state.TvmUnexpectedReading
 import org.usvm.machine.state.generateSymbolicCell
 import org.usvm.machine.state.generateSymbolicSlice
 import org.usvm.machine.types.TvmDataCellInfoTree.Companion.construct
+import org.usvm.mkSizeExpr
 
 class TvmDataCellInfoStorage private constructor(
     private val ctx: TvmContext,
@@ -81,6 +83,37 @@ class TvmDataCellInfoStorage private constructor(
                         val oldValue = result.getOrDefault(error, trueExpr)
                         val conflict = struct.typeOfPrefix.accepts(load.type).not()
                         result[error] = oldValue and (load.guard and vertexGuard and offsetGuard and conflict).not()
+                    }
+                }
+            }
+        }
+        return result
+    }
+
+    fun getNoUnexpectedEndOfReadingCondition(
+        state: TvmState,
+        endOfCell: TvmDataCellLoadedTypeInfo.EndOfCell
+    ): UBoolExpr = with(ctx) {
+        val trees = treesOfAddress(endOfCell.address)
+        var result: UBoolExpr = trueExpr
+        trees.forEach { tree ->
+            tree.fold(Unit) { _, vertex ->
+                val vertexGuard = vertex.lazyGuard(state)
+                when (val struct = vertex.structure) {
+                    is TvmDataCellStructure.Empty, TvmDataCellStructure.Unknown -> {
+                        // no conflict here
+                    }
+                    is TvmDataCellStructure.SwitchPrefix -> {
+                        // TvmUnexpectedEndOfReading, if got here
+                        val border = vertex.prefixSize + struct.switchSize
+                        val offsetGuard = mkBvSignedLessExpr(endOfCell.offset, mkSizeExpr(border))
+                        result = result and (endOfCell.guard and vertexGuard and offsetGuard).not()
+                    }
+                    is TvmDataCellStructure.KnownTypePrefix -> {
+                        // TvmUnexpectedEndOfReading, if got here
+                        val border = vertex.prefixSize + struct.typeOfPrefix.bitSize
+                        val offsetGuard = mkBvSignedLessExpr(endOfCell.offset, mkSizeExpr(border))
+                        result = result and (endOfCell.guard and vertexGuard and offsetGuard).not()
                     }
                 }
             }

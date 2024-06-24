@@ -10,6 +10,7 @@ import org.usvm.test.resolver.TvmCellDataInteger
 import org.usvm.test.resolver.TvmCellDataMaybeConstructorBit
 import org.usvm.test.resolver.TvmExecutionWithReadingOfUnexpectedType
 import org.usvm.test.resolver.TvmExecutionWithStructuralError
+import org.usvm.test.resolver.TvmExecutionWithUnexpectedEndOfReading
 import org.usvm.test.resolver.TvmExecutionWithUnexpectedReading
 import org.usvm.test.resolver.TvmMethodFailure
 import org.usvm.test.resolver.TvmSuccessfulExecution
@@ -20,6 +21,7 @@ import kotlin.test.assertTrue
 
 class InputParameterInfoTests {
     private val maybePath = "/types/maybe.fc"
+    private val endOfCellPath = "/types/end_of_cell.fc"
 
     @Test
     fun testCorrectMaybe() {
@@ -94,5 +96,37 @@ class InputParameterInfoTests {
         val tests = results.testSuites.first()
         assertTrue(tests.any { it.result is TvmSuccessfulExecution })
         assertTrue(tests.any { it.result is TvmMethodFailure })
+    }
+
+    @Test
+    fun testExpectedEndOfCell() {
+        val resourcePath = this::class.java.getResource(endOfCellPath)?.path?.let { Path(it) }
+            ?: error("Cannot find resource $endOfCellPath")
+
+        val inputInfo = TvmInputInfo(mapOf(0 to TvmParameterInfo.SliceInfo(TvmParameterInfo.DataCellInfo(TvmDataCellStructure.Empty))))
+        val results = funcCompileAndAnalyzeAllMethods(resourcePath, inputInfo = mapOf(0 to inputInfo))
+        assertEquals(1, results.testSuites.size)
+        val tests = results.testSuites.first()
+        assertTrue(tests.any { it.result is TvmSuccessfulExecution })
+        assertTrue(tests.any { it.result is TvmMethodFailure })
+    }
+
+    @Test
+    fun testUnexpectedEndOfCell() {
+        val resourcePath = this::class.java.getResource(endOfCellPath)?.path?.let { Path(it) }
+            ?: error("Cannot find resource $endOfCellPath")
+
+        val inputInfo = TvmInputInfo(mapOf(0 to TvmParameterInfo.SliceInfo(TvmParameterInfo.DataCellInfo(int64Structure))))
+        val results = funcCompileAndAnalyzeAllMethods(resourcePath, inputInfo = mapOf(0 to inputInfo))
+        assertEquals(1, results.testSuites.size)
+        val tests = results.testSuites.first()
+        assertTrue(tests.any { it.result !is TvmSuccessfulExecution })
+
+        propertiesFound(
+            tests,
+            listOf { test ->
+                test.result is TvmExecutionWithUnexpectedEndOfReading
+            }
+        )
     }
 }

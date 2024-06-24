@@ -179,8 +179,8 @@ class TvmTestStateResolver(
             refs.add(refCell)
         }
 
-        val knownLoads = state.tvmDataCellLoadedTypeInfo.addressToActions[ref] ?: persistentListOf()
-        val tvmCellValue = TvmTestDataCellValue(data, refs, resolveTypeLoad(knownLoads))
+        val knownActions = state.tvmDataCellLoadedTypeInfo.addressToActions[ref] ?: persistentListOf()
+        val tvmCellValue = TvmTestDataCellValue(data, refs, resolveTypeLoad(knownActions))
 
         tvmCellValue.also { resolvedCache[ref.address] = tvmCellValue }
     }
@@ -245,9 +245,9 @@ class TvmTestStateResolver(
         }
     }
 
-    private fun resolveTypeLoad(loads: List<TvmDataCellLoadedTypeInfo.Load>): List<TvmCellDataTypeLoad> =
+    private fun resolveTypeLoad(loads: List<TvmDataCellLoadedTypeInfo.Action>): List<TvmCellDataTypeLoad> =
         loads.mapNotNull {
-            if (model.eval(it.guard).isTrue) {
+            if (it is TvmDataCellLoadedTypeInfo.Load && model.eval(it.guard).isTrue) {
                 TvmCellDataTypeLoad(resolveCellDataType(it.type), resolveInt(it.offset))
             } else {
                 null
