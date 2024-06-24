@@ -80,6 +80,11 @@ class TvmExecutionWithUnexpectedEndOfReading(
     stack: List<TvmTestValue>,
 ) : TvmExecutionWithStructuralError(lastStmt, stack)
 
+class TvmExecutionWithUnexpectedRefReading(
+    lastStmt: TvmInst,
+    stack: List<TvmTestValue>,
+) : TvmExecutionWithStructuralError(lastStmt, stack)
+
 class TvmExecutionWithReadingOfUnexpectedType(
     val expectedType: TvmCellDataType,
     val actualType: TvmCellDataType,

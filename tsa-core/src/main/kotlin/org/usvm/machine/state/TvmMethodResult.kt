@@ -163,6 +163,11 @@ data class TvmUnexpectedReading(
         "Unexpected reading of $readingType: expected end of cell"
 }
 
+data object TvmUnexpectedRefReading : TvmStructuralError {
+    override val message: String =
+        "Unexpected reading of a reference: slice should have no references left."
+}
+
 data object TvmUnexpectedEndOfReading : TvmStructuralError {
     override val message: String =
         "Unexpected end of reading: slice is not supposed to be empty"
