@@ -34,12 +34,7 @@ class TvmDataCellInfoStorage private constructor(
         val result = mutableMapOf<UConcreteHeapRef, MutableList<TvmDataCellInfoTree>>()
         trees.forEach { tree ->
             val address = tree.lazyAddress(state)
-            val list = result[address] ?: run {
-                val list = mutableListOf<TvmDataCellInfoTree>()
-                result[address] = list
-                list
-            }
-            list.add(tree)
+result.getOrPut(address) { mutableListOf() }.add(tree)
         }
         addressToTree = result
     }
