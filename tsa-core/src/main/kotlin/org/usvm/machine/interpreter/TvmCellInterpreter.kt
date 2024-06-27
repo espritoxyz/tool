@@ -147,6 +147,7 @@ import org.usvm.machine.types.TvmSliceType
 import org.usvm.machine.types.TvmSymbolicCellDataBitArray
 import org.usvm.machine.types.TvmSymbolicCellDataInteger
 import org.usvm.machine.types.assertEndOfCell
+import org.usvm.machine.types.makeSliceRefLoad
 import org.usvm.machine.types.makeSliceTypeLoad
 import org.usvm.mkSizeAddExpr
 import org.usvm.mkSizeExpr
@@ -335,6 +336,8 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
             scope.doWithState(ctx.throwTypeCheckError)
             return
         }
+
+        scope.makeSliceRefLoad(slice) ?: return
 
         val updatedSlice = scope.calcOnState {
             memory.allocConcrete(TvmSliceType).also { sliceCopy(slice, it) }

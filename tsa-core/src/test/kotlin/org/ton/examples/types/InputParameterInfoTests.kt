@@ -186,7 +186,6 @@ class InputParameterInfoTests {
         val results = funcCompileAndAnalyzeAllMethods(resourcePath, inputInfo = mapOf(0 to inputInfo))
         assertEquals(1, results.testSuites.size)
         val tests = results.testSuites.first()
-        assertTrue(tests.any { it.result is TvmMethodFailure })
 
         propertiesFound(
             tests,

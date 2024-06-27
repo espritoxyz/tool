@@ -10,6 +10,7 @@ import org.usvm.machine.TvmContext
 import org.usvm.machine.TvmSizeSort
 import org.usvm.machine.TvmStepScope
 import org.usvm.machine.state.TvmUnexpectedEndOfReading
+import org.usvm.machine.state.TvmUnexpectedRefReading
 import org.usvm.machine.state.calcOnStateCtx
 import org.usvm.memory.GuardedExpr
 import org.usvm.memory.foldHeapRef
@@ -30,6 +31,12 @@ class TvmDataCellLoadedTypeInfo(
         override val address: UConcreteHeapRef,
     ) : Action
 
+    class LoadRef(
+        override val guard: UBoolExpr,
+        override val address: UConcreteHeapRef,
+        val refNumber: UExpr<TvmSizeSort>,
+    ) : Action
+
     class EndOfCell(
         override val guard: UBoolExpr,
         override val address: UConcreteHeapRef,
@@ -43,7 +50,9 @@ class TvmDataCellLoadedTypeInfo(
     ): List<ConcreteAction> {
         val ctx = cellAddress.ctx
         val actionList = mutableListOf<ConcreteAction>()
-        val blockOnConcreteAddress = { map: PersistentMap<UConcreteHeapRef, PersistentList<Action>>, guardedExpr: GuardedExpr<UConcreteHeapRef> ->
+        val blockOnConcreteAddress = {
+            map: PersistentMap<UConcreteHeapRef, PersistentList<Action>>,
+            guardedExpr: GuardedExpr<UConcreteHeapRef> ->
             val ref = guardedExpr.expr
             val oldList = map.getOrDefault(ref, persistentListOf())
             val actionInstance = action(guardedExpr)
@@ -66,12 +75,20 @@ class TvmDataCellLoadedTypeInfo(
         return actionList
     }
 
-    fun makeLoad(
+    fun loadData(
         cellAddress: UHeapRef,
         offset: UExpr<TvmSizeSort>,
-        type: TvmSymbolicCellDataType
+        type: TvmSymbolicCellDataType,
     ): List<LoadData> {
         val action = { ref: GuardedExpr<UConcreteHeapRef> -> LoadData(ref.guard, type, offset, ref.expr) }
+        return registerAction(cellAddress, action)
+    }
+
+    fun loadRef(
+        cellAddress: UHeapRef,
+        refPos: UExpr<TvmSizeSort>,
+    ): List<LoadRef> {
+        val action = { ref: GuardedExpr<UConcreteHeapRef> -> LoadRef(ref.guard, ref.expr, refPos) }
         return registerAction(cellAddress, action)
     }
 
@@ -118,9 +135,9 @@ fun TvmStepScope.makeSliceTypeLoad(slice: UHeapRef, type: TvmSymbolicCellDataTyp
     return calcOnStateCtx {
         val cellAddress = memory.readField(slice, TvmContext.sliceCellField, addressSort)
         val offset = memory.readField(slice, TvmContext.sliceDataPosField, sizeSort)
-        val loadList = tvmDataCellLoadedTypeInfo.makeLoad(cellAddress, offset, type)
+        val loadList = tvmDataCellLoadedTypeInfo.loadData(cellAddress, offset, type)
         loadList.forEach { load ->
-            val noConflictCond = tvmDataCellInfoStorage.getNoConflictConditions(this, load)
+            val noConflictCond = tvmDataCellInfoStorage.getNoConflictConditionsForLoadData(this, load)
             noConflictCond.entries.forEach { (error, cond) ->
                 fork(
                     cond,
@@ -145,6 +162,24 @@ fun TvmStepScope.assertEndOfCell(slice: UHeapRef): Unit? {
                 noConflictCond,
                 blockOnFalseState = {
                     methodResult = TvmUnexpectedEndOfReading
+                }
+            ) ?: return@calcOnStateCtx null
+        }
+    }
+}
+
+
+fun TvmStepScope.makeSliceRefLoad(slice: UHeapRef): Unit? {
+    return calcOnStateCtx {
+        val cellAddress = memory.readField(slice, TvmContext.sliceCellField, addressSort)
+        val refNumber = mkBvAddExpr(memory.readField(slice, TvmContext.sliceRefPosField, sizeSort), mkSizeExpr(1))
+        val loadList = tvmDataCellLoadedTypeInfo.loadRef(cellAddress, refNumber)
+        loadList.forEach { load ->
+            val noConflictCond = tvmDataCellInfoStorage.getNoUnexpectedLoadRefCondition(this, load)
+            fork(
+                noConflictCond,
+                blockOnFalseState = {
+                    methodResult = TvmUnexpectedRefReading
                 }
             ) ?: return@calcOnStateCtx null
         }

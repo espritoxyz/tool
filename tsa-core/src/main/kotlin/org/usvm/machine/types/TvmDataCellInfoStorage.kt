@@ -52,7 +52,7 @@ class TvmDataCellInfoStorage private constructor(
         return cache[address] ?: emptyList()
     }
 
-    fun getNoConflictConditions(
+    fun getNoConflictConditionsForLoadData(
         state: TvmState,
         loadData: TvmDataCellLoadedTypeInfo.LoadData
     ): Map<TvmStructuralError, UBoolExpr> = with(ctx) {
@@ -103,6 +103,32 @@ class TvmDataCellInfoStorage private constructor(
                 // conflict, if ended cell before loaded all refs
                 val refNumberGuard = mkBvSignedLessExpr(endOfCell.refNumber, mkSizeExpr(vertex.refNumber))
                 result = result and (endOfCell.guard and vertexGuard and (offsetGuard or refNumberGuard)).not()
+            }
+        }
+        return result
+    }
+
+
+    fun getNoUnexpectedLoadRefCondition(
+        state: TvmState,
+        loadRef: TvmDataCellLoadedTypeInfo.LoadRef,
+    ): UBoolExpr = with(ctx) {
+        val trees = treesOfAddress(loadRef.address)
+        var result: UBoolExpr = trueExpr
+        trees.forEach { tree ->
+            tree.fold(Unit) { _, vertex ->
+                val vertexGuard = vertex.lazyGuard(state)
+                when (val struct = vertex.structure) {
+                    is TvmDataCellStructure.Unknown,
+                    is TvmDataCellStructure.SwitchPrefix,
+                    is TvmDataCellStructure.KnownTypePrefix -> {
+                        // no conflict here
+                    }
+                    is TvmDataCellStructure.Empty -> {
+                        val conflict = mkBvSignedGreaterExpr(loadRef.refNumber, mkSizeExpr(vertex.refNumber))
+                        result = result and (vertexGuard and conflict).not()
+                    }
+                }
             }
         }
         return result
