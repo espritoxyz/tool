@@ -118,7 +118,7 @@ class TvmDataCellInfoStorage private constructor(
         trees.forEach { tree ->
             tree.fold(Unit) { _, vertex ->
                 val vertexGuard = vertex.lazyGuard(state)
-                when (val struct = vertex.structure) {
+                when (vertex.structure) {
                     is TvmDataCellStructure.Unknown,
                     is TvmDataCellStructure.SwitchPrefix,
                     is TvmDataCellStructure.KnownTypePrefix -> {
