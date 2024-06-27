@@ -4,8 +4,10 @@ import org.usvm.UBoolExpr
 import org.usvm.UConcreteHeapRef
 import org.usvm.machine.TvmContext
 import org.usvm.machine.state.TvmState
+import org.usvm.mkSizeExpr
 import org.usvm.sizeSort
 import org.usvm.test.resolver.TvmCellDataBitArray
+import org.usvm.test.resolver.TvmCellDataCoins
 import org.usvm.test.resolver.TvmCellDataInteger
 import org.usvm.test.resolver.TvmCellDataMaybeConstructorBit
 import org.usvm.test.resolver.TvmCellDataMsgAddr
@@ -58,6 +60,13 @@ fun TvmCellDataType.accepts(symbolicType: TvmSymbolicCellDataType): UBoolExpr =
                 falseExpr
             } else {
                 symbolicType.sizeBits eq mkBv(bitSize)
+            }
+        }
+        is TvmCellDataCoins -> {
+            if (symbolicType !is TvmSymbolicCellDataCoins) {
+                falseExpr
+            } else {
+                symbolicType.coinsPrefix eq mkBv(coinPrefix)
             }
         }
     }

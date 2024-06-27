@@ -6,7 +6,6 @@ import org.ton.bytecode.TvmAppCurrencyStgramsInst
 import org.usvm.machine.types.TvmBuilderType
 import org.usvm.machine.types.TvmIntegerType
 import org.usvm.machine.types.TvmSliceType
-import org.usvm.api.makeSymbolicPrimitive
 import org.usvm.machine.TvmContext
 import org.usvm.machine.TvmStepScope
 import org.usvm.machine.state.addOnStack
@@ -51,7 +50,8 @@ class TvmCurrencyInterpreter(private val ctx: TvmContext) {
             val length = scope.slicePreloadDataBits(updatedSlice, bits = 4)?.zeroExtendToSort(sizeSort)
                 ?: return@doWithStateCtx
 
-            makeSliceTypeLoad(slice, TvmSymbolicCellDataCoins(ctx, length))
+            scope.makeSliceTypeLoad(slice, TvmSymbolicCellDataCoins(ctx, length))
+                ?: return@doWithStateCtx
             sliceMoveDataPtr(updatedSlice, bits = 4)
 
             val extendedLength = mkBvShiftLeftExpr(length, shift = mkSizeExpr(3))
