@@ -36,7 +36,14 @@ class TvmDataCellInfoTree private constructor(
             lazyAddress: (TvmState) -> UConcreteHeapRef,
             lazyGuard: (TvmState) -> UBoolExpr = { ctx.trueExpr }
         ): List<TvmDataCellInfoTree> {
-            val (root, other) = constructVertex(ctx, structure, lazyGuard, lazyAddress, 0, 0)
+            val (root, other) = constructVertex(
+                ctx,
+                structure,
+                lazyGuard,
+                lazyAddress,
+                prefixSize = 0,
+                refNumber = 0,
+            )
             val result = TvmDataCellInfoTree(lazyAddress, root)
             return listOf(result) + other
         }

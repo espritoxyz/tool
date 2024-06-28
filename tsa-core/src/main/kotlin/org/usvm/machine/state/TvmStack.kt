@@ -262,7 +262,9 @@ class TvmStack(
     }
 
     fun putInputEntryValue(entry: TvmInputStackEntry, value: TvmStackValue) {
-        require(entry.id !in inputEntryIdToStackValue || value == inputEntryIdToStackValue[entry.id])
+        require(entry.id !in inputEntryIdToStackValue || value == inputEntryIdToStackValue[entry.id]) {
+            "Contradicting values for TvmInputStackEntry $entry"
+        }
         inputEntryIdToStackValue = inputEntryIdToStackValue.put(entry.id, value)
     }
 

@@ -24,7 +24,7 @@ import java.math.BigInteger
 
 class TvmMachine(
     private val options: UMachineOptions = defaultOptions,
-    private val checkDataCellContentTypes: Boolean = true,  // TODO: UMachineOptions should be open, and this parameter should be there
+    private val tvmOptions: TvmMachineOptions = TvmMachineOptions(),
 ) : UMachine<TvmState>() {
     override fun close() {
         // Do nothing
@@ -44,7 +44,7 @@ class TvmMachine(
             contractCode,
             typeSystem = components.typeSystem,
             inputInfo = inputInfo,
-            checkDataCellContentTypes = checkDataCellContentTypes,
+            checkDataCellContentTypes = tvmOptions.checkDataCellContentTypes,
         )
         logger.debug("{}.analyze({})", this, contractCode)
         val initialState = interpreter.getInitialState(contractCode, contractData, methodId)

@@ -360,7 +360,7 @@ class TvmInterpreter(
             gasUsage = persistentListOf(),
             targets = UTargetsSet.from(targets),
             typeSystem = typeSystem,
-            tvmDataCellInfoStorage = dataCellInfo,
+            dataCellInfoStorage = dataCellInfo,
         )
 
         state.registers.c4 = C4Register(TvmCellValue(state.generateSymbolicCell()))

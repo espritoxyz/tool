@@ -17,6 +17,7 @@ import org.usvm.machine.state.generateSymbolicCell
 import org.usvm.machine.state.generateSymbolicSlice
 import org.usvm.machine.types.TvmDataCellInfoTree.Companion.construct
 import org.usvm.mkSizeExpr
+import org.usvm.mkSizeGtExpr
 
 class TvmDataCellInfoStorage private constructor(
     private val ctx: TvmContext,
@@ -25,8 +26,9 @@ class TvmDataCellInfoStorage private constructor(
     private val checkDataCellContentTypes: Boolean = true,
 ) {
     fun initialize(state: TvmState) {
-        if (addressToTree != null)
+        if (addressToTree != null) {
             return  // already initialized
+        }
         if (!checkDataCellContentTypes) {
             addressToTree = emptyMap()
             return
@@ -34,7 +36,7 @@ class TvmDataCellInfoStorage private constructor(
         val result = mutableMapOf<UConcreteHeapRef, MutableList<TvmDataCellInfoTree>>()
         trees.forEach { tree ->
             val address = tree.lazyAddress(state)
-result.getOrPut(address) { mutableListOf() }.add(tree)
+            result.getOrPut(address) { mutableListOf() }.add(tree)
         }
         addressToTree = result
     }
@@ -65,7 +67,7 @@ result.getOrPut(address) { mutableListOf() }.add(tree)
                         // TvmUnexpectedReading, if loaded more than 0 bits
                         val error = TvmUnexpectedReading(loadData.type)
                         val oldValue = result.getOrDefault(error, trueExpr)
-                        val conflict = mkBvSignedGreaterExpr(loadData.type.sizeBits, mkBv(0))
+                        val conflict = mkSizeGtExpr(loadData.type.sizeBits, zeroSizeExpr)
                         result[error] = oldValue and (loadData.guard and vertexGuard and offsetGuard and conflict).not()
                     }
                     is TvmDataCellStructure.KnownTypePrefix -> {

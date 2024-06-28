@@ -45,9 +45,9 @@ class TvmState(
     forkPoints: PathNode<PathNode<TvmInst>> = PathNode.root(),
     var methodResult: TvmMethodResult = TvmMethodResult.NoCall,
     targets: UTargetsSet<TvmTarget, TvmInst> = UTargetsSet.empty(),
-    val tvmDataCellLoadedTypeInfo: TvmDataCellLoadedTypeInfo = TvmDataCellLoadedTypeInfo.empty(),
+    val dataCellLoadedTypeInfo: TvmDataCellLoadedTypeInfo = TvmDataCellLoadedTypeInfo.empty(),
     val typeSystem: TvmTypeSystem,
-    val tvmDataCellInfoStorage: TvmDataCellInfoStorage,
+    val dataCellInfoStorage: TvmDataCellInfoStorage,
 ) : UState<TvmType, TvmCodeBlock, TvmInst, TvmContext, TvmTarget, TvmState>(
     ctx,
     callStack,
@@ -111,9 +111,9 @@ class TvmState(
             forkPoints = forkPoints,
             methodResult = methodResult,
             targets = targets.clone(),
-            tvmDataCellLoadedTypeInfo = tvmDataCellLoadedTypeInfo.clone(),
+            dataCellLoadedTypeInfo = dataCellLoadedTypeInfo.clone(),
             typeSystem = typeSystem,
-            tvmDataCellInfoStorage = tvmDataCellInfoStorage.clone(),
+            dataCellInfoStorage = dataCellInfoStorage.clone(),
         )
     }
 
@@ -141,6 +141,6 @@ class TvmState(
     }
 
     init {
-        tvmDataCellInfoStorage.initialize(this)
+        dataCellInfoStorage.initialize(this)
     }
 }
