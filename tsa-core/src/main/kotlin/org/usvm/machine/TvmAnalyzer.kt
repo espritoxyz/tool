@@ -34,7 +34,7 @@ sealed interface TvmAnalyzer {
         contractDataHex: String? = null,
         methodsBlackList: Set<Int> = hashSetOf(Int.MAX_VALUE),
         inputInfo: Map<Int, TvmInputInfo> = emptyMap(),
-        checkDataCellContentTypes: Boolean = true,
+        tvmOptions: TvmMachineOptions = TvmMachineOptions(),
     ): TvmContractSymbolicTestResult
 }
 
@@ -45,7 +45,7 @@ data object TactAnalyzer : TvmAnalyzer {
         contractDataHex: String?,
         methodsBlackList: Set<Int>,
         inputInfo: Map<Int, TvmInputInfo>,
-        checkDataCellContentTypes: Boolean,
+        tvmOptions: TvmMachineOptions,
     ): TvmContractSymbolicTestResult {
         val outputDir = createTempDirectory(CONFIG_OUTPUT_PREFIX)
         val sourcesInOutputDir = sourcesPath.copyTo(outputDir.resolve(sourcesPath.fileName))
@@ -62,7 +62,7 @@ data object TactAnalyzer : TvmAnalyzer {
                 contractDataHex,
                 methodsBlackList,
                 inputInfo,
-                checkDataCellContentTypes
+                tvmOptions,
             )
         } finally {
             outputDir.deleteRecursively()
@@ -131,7 +131,7 @@ class FuncAnalyzer(
         contractDataHex: String?,
         methodsBlackList: Set<Int>,
         inputInfo: Map<Int, TvmInputInfo>,
-        checkDataCellContentTypes: Boolean,
+        tvmOptions: TvmMachineOptions,
     ): TvmContractSymbolicTestResult {
         val tmpBocFile = createTempFile(suffix = ".boc")
         try {
@@ -141,7 +141,7 @@ class FuncAnalyzer(
                 contractDataHex,
                 methodsBlackList,
                 inputInfo,
-                checkDataCellContentTypes,
+                tvmOptions,
             )
         } finally {
             tmpBocFile.deleteIfExists()
@@ -181,7 +181,7 @@ class FiftAnalyzer(
         contractDataHex: String?,
         methodsBlackList: Set<Int>,
         inputInfo: Map<Int, TvmInputInfo>,
-        checkDataCellContentTypes: Boolean,
+        tvmOptions: TvmMachineOptions,
     ): TvmContractSymbolicTestResult {
         val tmpBocFile = createTempFile(suffix = ".boc")
         try {
@@ -191,7 +191,7 @@ class FiftAnalyzer(
                 contractDataHex,
                 methodsBlackList,
                 inputInfo,
-                checkDataCellContentTypes,
+                tvmOptions,
             )
         } finally {
             tmpBocFile.deleteIfExists()
@@ -352,10 +352,10 @@ data object BocAnalyzer : TvmAnalyzer {
         contractDataHex: String?,
         methodsBlackList: Set<Int>,
         inputInfo: Map<Int, TvmInputInfo>,
-        checkDataCellContentTypes: Boolean,
+        tvmOptions: TvmMachineOptions,
     ): TvmContractSymbolicTestResult {
         val contract = loadContractFromBoc(sourcesPath)
-        return analyzeAllMethods(contract, methodsBlackList, contractDataHex, inputInfo, checkDataCellContentTypes)
+        return analyzeAllMethods(contract, methodsBlackList, contractDataHex, inputInfo, tvmOptions)
     }
 
     fun loadContractFromBoc(bocFilePath: Path): TvmContractCode {
@@ -393,10 +393,10 @@ fun analyzeAllMethods(
     methodsBlackList: Set<Int> = hashSetOf(Int.MAX_VALUE),
     contractDataHex: String? = null,
     inputInfo: Map<Int, TvmInputInfo> = emptyMap(),
-    checkDataCellContentTypes: Boolean = true,
+    tvmOptions: TvmMachineOptions = TvmMachineOptions(),
 ): TvmContractSymbolicTestResult {
     val contractData = Cell.Companion.of(contractDataHex ?: DEFAULT_CONTRACT_DATA_HEX)
-    val machine = TvmMachine(checkDataCellContentTypes = checkDataCellContentTypes)
+    val machine = TvmMachine(tvmOptions = tvmOptions)
     val methodsExceptDictPushConst = contract.methods.filterKeys { it.toInt() !in methodsBlackList }
     val methodStates = methodsExceptDictPushConst.values.associateWith { method ->
         runCatching {

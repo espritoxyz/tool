@@ -8,6 +8,7 @@ import org.usvm.machine.FiftAnalyzer
 import org.usvm.machine.FiftInterpreterResult
 import org.usvm.machine.FuncAnalyzer
 import org.usvm.machine.TactAnalyzer
+import org.usvm.machine.TvmMachineOptions
 import org.usvm.machine.intValue
 import org.usvm.machine.state.TvmStack
 import org.usvm.test.resolver.TvmContractSymbolicTestResult
@@ -38,13 +39,13 @@ fun tactCompileAndAnalyzeAllMethods(
     contractDataHex: String? = null,
     methodsBlackList: Set<Int> = hashSetOf(Int.MAX_VALUE),
     inputInfo: Map<Int, TvmInputInfo> = emptyMap(),
-    checkDataCellContentTypes: Boolean = true,
+    tvmOptions: TvmMachineOptions = TvmMachineOptions(),
 ): TvmContractSymbolicTestResult = TactAnalyzer.analyzeAllMethods(
     tactSourcesPath,
     contractDataHex,
     methodsBlackList,
     inputInfo,
-    checkDataCellContentTypes,
+    tvmOptions,
 )
 
 fun funcCompileAndAnalyzeAllMethods(
@@ -52,13 +53,13 @@ fun funcCompileAndAnalyzeAllMethods(
     contractDataHex: String? = null,
     methodsBlackList: Set<Int> = hashSetOf(Int.MAX_VALUE),
     inputInfo: Map<Int, TvmInputInfo> = emptyMap(),
-    checkDataCellContentTypes: Boolean = true,
+    tvmOptions: TvmMachineOptions = TvmMachineOptions(),
 ): TvmContractSymbolicTestResult = FuncAnalyzer(funcStdlibPath = FUNC_STDLIB_RESOURCE, fiftStdlibPath = FIFT_STDLIB_RESOURCE).analyzeAllMethods(
     funcSourcesPath,
     contractDataHex,
     methodsBlackList,
     inputInfo,
-    checkDataCellContentTypes,
+    tvmOptions,
 )
 
 fun compileAndAnalyzeFift(
@@ -66,13 +67,13 @@ fun compileAndAnalyzeFift(
     contractDataHex: String? = null,
     methodsBlackList: Set<Int> = hashSetOf(Int.MAX_VALUE),
     inputInfo: Map<Int, TvmInputInfo> = emptyMap(),
-    checkDataCellContentTypes: Boolean = true,
+    tvmOptions: TvmMachineOptions = TvmMachineOptions(),
 ): TvmContractSymbolicTestResult = FiftAnalyzer(fiftStdlibPath = FIFT_STDLIB_RESOURCE).analyzeAllMethods(
     fiftPath,
     contractDataHex,
     methodsBlackList,
     inputInfo,
-    checkDataCellContentTypes,
+    tvmOptions,
 )
 
 /**

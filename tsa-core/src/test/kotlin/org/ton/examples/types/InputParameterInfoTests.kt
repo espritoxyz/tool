@@ -6,6 +6,7 @@ import org.ton.TvmParameterInfo
 import org.ton.examples.checkInvariants
 import org.ton.examples.funcCompileAndAnalyzeAllMethods
 import org.ton.examples.propertiesFound
+import org.usvm.machine.TvmMachineOptions
 import org.usvm.test.resolver.TvmCellDataInteger
 import org.usvm.test.resolver.TvmCellDataMaybeConstructorBit
 import org.usvm.test.resolver.TvmExecutionWithReadingOfUnexpectedType
@@ -93,7 +94,8 @@ class InputParameterInfoTests {
             ?: error("Cannot find resource $maybePath")
 
         val inputInfo = TvmInputInfo(mapOf(0 to TvmParameterInfo.SliceInfo(TvmParameterInfo.DataCellInfo(TvmDataCellStructure.Empty))))
-        val results = funcCompileAndAnalyzeAllMethods(resourcePath, inputInfo = mapOf(0 to inputInfo), checkDataCellContentTypes = false)
+        val options = TvmMachineOptions(checkDataCellContentTypes = false)
+        val results = funcCompileAndAnalyzeAllMethods(resourcePath, inputInfo = mapOf(0 to inputInfo), tvmOptions = options)
         assertEquals(1, results.testSuites.size)
         val tests = results.testSuites.first()
         assertTrue(tests.any { it.result is TvmSuccessfulExecution })
