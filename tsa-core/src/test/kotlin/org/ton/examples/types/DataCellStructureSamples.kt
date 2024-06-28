@@ -7,8 +7,11 @@ import org.usvm.test.resolver.TvmCellDataInteger
 val maybeStructure = TvmDataCellStructure.SwitchPrefix(
     switchSize = 1,
     variants = mapOf(
-        "0" to TvmDataCellStructure.SwitchVariant(TvmDataCellStructure.Empty),
-        "1" to TvmDataCellStructure.SwitchVariant(TvmDataCellStructure.Empty, listOf(TvmDataCellStructure.Unknown)),
+        "0" to TvmDataCellStructure.Empty,
+        "1" to TvmDataCellStructure.LoadRef(
+            ref = TvmDataCellStructure.Unknown,
+            selfRest = TvmDataCellStructure.Empty
+        ),
     ),
 )
 
@@ -22,9 +25,7 @@ val prefixInt64Structure = TvmDataCellStructure.KnownTypePrefix(
     rest = TvmDataCellStructure.Unknown
 )
 
-val someRefStructure = TvmDataCellStructure.SwitchPrefix(
-    switchSize = 0,
-    variants = mapOf(
-        "" to TvmDataCellStructure.SwitchVariant(TvmDataCellStructure.Empty, listOf(TvmDataCellStructure.Unknown)),
-    ),
+val someRefStructure = TvmDataCellStructure.LoadRef(
+    selfRest = TvmDataCellStructure.Empty,
+    ref = TvmDataCellStructure.Unknown,
 )

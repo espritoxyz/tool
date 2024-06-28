@@ -79,39 +79,43 @@ class TvmDataCellInfoTree private constructor(
                         require(structure.switchSize > 0)
                         mkBvExtractExpr(high = structure.switchSize - 1, low = 0, cellContent)
                     }
-                    val children = structure.variants.entries.map { (key, variant) ->
-                        val expectedPrefix = if (key.isEmpty()) {
-                            null
-                        } else {
-                            mkBv(key, structure.switchSize.toUInt())
-                        }
+                    val children = structure.variants.entries.map { (key, selfRestVariant) ->
+                        val expectedPrefix = mkBv(key, structure.switchSize.toUInt())
                         val newGuard = { state: TvmState ->
-                            val prefixGuard = expectedPrefix?.let {
+                            val prefixGuard = expectedPrefix.let {
                                 val prefix = lazyPrefix(state)
                                 prefix eq expectedPrefix
-                            } ?: trueExpr
+                            }
                             lazyGuard(state) and prefixGuard
                         }
-                        val newOther = variant.refs.flatMapIndexed { index, refStructure ->
-                            val refAddress = { state: TvmState ->
-                                val address = lazyAddress(state)
-                                state.readCellRef(address, mkSizeExpr(index)) as UConcreteHeapRef
-                            }
-                            construct(ctx, refStructure, refAddress, lazyGuard = newGuard)
-                        }
-                        other += newOther
                         val (child, childOther) = constructVertex(
                             ctx,
-                            variant.selfRest,
+                            selfRestVariant,
                             newGuard,
                             lazyAddress,
                             prefixSize + structure.switchSize,
-                            refNumber + variant.refs.size,
+                            refNumber,
                         )
                         other += childOther
                         child
                     }
                     Vertex(lazyGuard, structure, prefixSize, refNumber, children) to other
+                }
+                is TvmDataCellStructure.LoadRef -> {
+                    val refAddress = { state: TvmState ->
+                        val address = lazyAddress(state)
+                        state.readCellRef(address, mkSizeExpr(refNumber)) as UConcreteHeapRef
+                    }
+                    val other = construct(ctx, structure.ref, refAddress, lazyGuard)
+                    val (child, childOther) = constructVertex(
+                        ctx,
+                        structure.selfRest,
+                        lazyGuard,
+                        lazyAddress,
+                        prefixSize,
+                        refNumber + 1,
+                    )
+                    Vertex(lazyGuard, structure, prefixSize, refNumber, listOf(child)) to (childOther + other)
                 }
             }
         }

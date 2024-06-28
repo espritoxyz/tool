@@ -60,7 +60,9 @@ class TvmDataCellInfoStorage private constructor(
                 val vertexGuard = vertex.lazyGuard(state)
                 val offsetGuard = loadData.offset eq mkBv(vertex.prefixSize)
                 when (val struct = vertex.structure) {
-                    is TvmDataCellStructure.Unknown, is TvmDataCellStructure.SwitchPrefix -> {
+                    is TvmDataCellStructure.Unknown,
+                    is TvmDataCellStructure.SwitchPrefix,
+                    is TvmDataCellStructure.LoadRef -> {
                         // no conflict here
                     }
                     is TvmDataCellStructure.Empty -> {
@@ -118,7 +120,8 @@ class TvmDataCellInfoStorage private constructor(
                 when (vertex.structure) {
                     is TvmDataCellStructure.Unknown,
                     is TvmDataCellStructure.SwitchPrefix,
-                    is TvmDataCellStructure.KnownTypePrefix -> {
+                    is TvmDataCellStructure.KnownTypePrefix,
+                    is TvmDataCellStructure.LoadRef -> {
                         // no conflict here
                     }
                     is TvmDataCellStructure.Empty -> {
