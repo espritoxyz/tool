@@ -78,26 +78,23 @@ class TvmDataCellLoadedTypeInfo(
         cellAddress: UHeapRef,
         offset: UExpr<TvmSizeSort>,
         type: TvmSymbolicCellDataType,
-    ): List<LoadData> {
-        val action = { ref: GuardedExpr<UConcreteHeapRef> -> LoadData(ref.guard, ref.expr, type, offset) }
-        return registerAction(cellAddress, action)
+    ): List<LoadData> = registerAction(cellAddress) { ref ->
+        LoadData(ref.guard, ref.expr, type, offset)
     }
 
     fun loadRef(
         cellAddress: UHeapRef,
         refPos: UExpr<TvmSizeSort>,
-    ): List<LoadRef> {
-        val action = { ref: GuardedExpr<UConcreteHeapRef> -> LoadRef(ref.guard, ref.expr, refPos) }
-        return registerAction(cellAddress, action)
+    ): List<LoadRef> = registerAction(cellAddress) { ref ->
+        LoadRef(ref.guard, ref.expr, refPos)
     }
 
     fun makeEndOfCell(
         cellAddress: UHeapRef,
         offset: UExpr<TvmSizeSort>,
         refNumber: UExpr<TvmSizeSort>
-    ): List<EndOfCell> {
-        val action = { ref: GuardedExpr<UConcreteHeapRef> -> EndOfCell(ref.guard, ref.expr, offset, refNumber) }
-        return registerAction(cellAddress, action)
+    ): List<EndOfCell> = registerAction(cellAddress) { ref ->
+        EndOfCell(ref.guard, ref.expr, offset, refNumber)
     }
 
     fun clone(): TvmDataCellLoadedTypeInfo =
@@ -129,8 +126,8 @@ class TvmSymbolicCellDataCoins(
 ) : TvmSymbolicCellDataType(ctx.calculateExtendedCoinsLength(coinsPrefix))
 
 private fun TvmContext.calculateExtendedCoinsLength(coinsPrefix: UExpr<TvmSizeSort>): UExpr<TvmSizeSort> {
-    val extendedLength = mkBvShiftLeftExpr(coinsPrefix, shift = mkSizeExpr(3))
-    return mkBvAddExpr(extendedLength, mkSizeExpr(4))
+    val extendedLength = mkBvShiftLeftExpr(coinsPrefix, shift = threeSizeExpr)
+    return mkSizeAddExpr(extendedLength, fourSizeExpr)
 }
 
 fun TvmStepScope.makeSliceTypeLoad(slice: UHeapRef, type: TvmSymbolicCellDataType): Unit? {
@@ -174,7 +171,7 @@ fun TvmStepScope.assertEndOfCell(slice: UHeapRef): Unit? {
 fun TvmStepScope.makeSliceRefLoad(slice: UHeapRef): Unit? {
     return calcOnStateCtx {
         val cellAddress = memory.readField(slice, TvmContext.sliceCellField, addressSort)
-        val refNumber = mkBvAddExpr(memory.readField(slice, TvmContext.sliceRefPosField, sizeSort), mkSizeExpr(1))
+        val refNumber = mkSizeAddExpr(memory.readField(slice, TvmContext.sliceRefPosField, sizeSort), oneSizeExpr)
         val loadList = dataCellLoadedTypeInfo.loadRef(cellAddress, refNumber)
         loadList.forEach { load ->
             val noConflictCond = dataCellInfoStorage.getNoUnexpectedLoadRefCondition(load)

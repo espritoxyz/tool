@@ -78,8 +78,8 @@ fun TvmDataCellLabel.offset(
                 4.toBv257(),
                 isSigned = false
             ).extractToSizeSort()
-            val length = mkBvShiftLeftExpr(prefix, shift = mkSizeExpr(3))
+            val length = mkBvShiftLeftExpr(prefix, shift = threeSizeExpr)
 
-            mkSizeAddExpr(mkSizeExpr(4), length)
+            mkSizeAddExpr(fourSizeExpr, length)
         }
     }

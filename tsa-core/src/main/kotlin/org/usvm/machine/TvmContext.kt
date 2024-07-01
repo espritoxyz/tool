@@ -64,6 +64,9 @@ class TvmContext(components: UComponents<TvmType, TvmSizeSort>) : UContext<TvmSi
     val maxTimestampValue = mkBvShiftLeftExpr(oneValue, 64.toBv257())
 
     val zeroSizeExpr: UExpr<TvmSizeSort> = mkSizeExpr(0)
+    val oneSizeExpr: UExpr<TvmSizeSort> = mkSizeExpr(1)
+    val threeSizeExpr: UExpr<TvmSizeSort> = mkSizeExpr(3)
+    val fourSizeExpr: UExpr<TvmSizeSort> = mkSizeExpr(4)
     val maxDataLengthSizeExpr: UExpr<TvmSizeSort> = mkSizeExpr(MAX_DATA_LENGTH)
     val maxRefsLengthSizeExpr: UExpr<TvmSizeSort> = mkSizeExpr(MAX_REFS_NUMBER)
 

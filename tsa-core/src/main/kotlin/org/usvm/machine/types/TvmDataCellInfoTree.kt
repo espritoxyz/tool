@@ -104,8 +104,10 @@ class TvmDataCellInfoTree private constructor(
             val other = mutableListOf<TvmDataCellInfoTree>()
             val cellContent = state.memory.readField(address, cellDataField, cellDataSort)
             val prefix = mkBvExtractExpr(high = structure.switchSize - 1, low = 0, cellContent)
+            val switchSize = structure.switchSize.toUInt()
+            val newPrefixSize = mkSizeAddExpr(prefixSize, mkSizeExpr(structure.switchSize))
             val children = structure.variants.entries.map { (key, selfRestVariant) ->
-                val expectedPrefix = mkBv(key, structure.switchSize.toUInt())
+                val expectedPrefix = mkBv(key, switchSize)
                 val prefixGuard = prefix eq expectedPrefix
                 val newGuard = guard and prefixGuard
                 val (child, childOther) = constructVertex(
@@ -113,7 +115,7 @@ class TvmDataCellInfoTree private constructor(
                     selfRestVariant,
                     newGuard,
                     address,
-                    mkSizeAddExpr(prefixSize, mkSizeExpr(structure.switchSize)),
+                    newPrefixSize,
                     refNumber,
                 )
                 other += childOther
