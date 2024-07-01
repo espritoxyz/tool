@@ -57,57 +57,89 @@ class TvmDataCellInfoTree private constructor(
             address: UConcreteHeapRef,
             prefixSize: UExpr<TvmSizeSort>,
             refNumber: Int,
-        ): Pair<Vertex, List<TvmDataCellInfoTree>> = with(state.ctx) {
+        ): Pair<Vertex, List<TvmDataCellInfoTree>> =
             when (structure) {
                 is TvmDataCellStructure.Empty, TvmDataCellStructure.Unknown -> {
                     Vertex(guard, structure, prefixSize, refNumber, emptyList()) to emptyList()
                 }
                 is TvmDataCellStructure.KnownTypePrefix -> {
-                    val (child, other) = constructVertex(
-                        state,
-                        structure.rest,
-                        guard,
-                        address,
-                        mkSizeAddExpr(prefixSize, structure.typeOfPrefix.offset(state, address, prefixSize)),
-                        refNumber,
-                    )
-                    Vertex(guard, structure, prefixSize, refNumber, listOf(child)) to other
+                    constructVertexForKnownTypePrefix(structure, state, guard, address, prefixSize, refNumber)
                 }
                 is TvmDataCellStructure.SwitchPrefix -> {
-                    val other = mutableListOf<TvmDataCellInfoTree>()
-                    val cellContent = state.memory.readField(address, cellDataField, cellDataSort)
-                    val prefix = mkBvExtractExpr(high = structure.switchSize - 1, low = 0, cellContent)
-                    val children = structure.variants.entries.map { (key, selfRestVariant) ->
-                        val expectedPrefix = mkBv(key, structure.switchSize.toUInt())
-                        val prefixGuard = prefix eq expectedPrefix
-                        val newGuard = guard and prefixGuard
-                        val (child, childOther) = constructVertex(
-                            state,
-                            selfRestVariant,
-                            newGuard,
-                            address,
-                            mkSizeAddExpr(prefixSize, mkSizeExpr(structure.switchSize)),
-                            refNumber,
-                        )
-                        other += childOther
-                        child
-                    }
-                    Vertex(guard, structure, prefixSize, refNumber, children) to other
+                    constructVertexForSwitchPrefix(structure, state, guard, address, prefixSize, refNumber)
                 }
                 is TvmDataCellStructure.LoadRef -> {
-                    val refAddress = state.readCellRef(address, mkSizeExpr(refNumber)) as UConcreteHeapRef
-                    val other = construct(state, structure.ref, refAddress, guard)
-                    val (child, childOther) = constructVertex(
-                        state,
-                        structure.selfRest,
-                        guard,
-                        address,
-                        prefixSize,
-                        refNumber + 1,
-                    )
-                    Vertex(guard, structure, prefixSize, refNumber, listOf(child)) to (childOther + other)
+                    constructVertexForLoadRef(structure, state, guard, address, prefixSize, refNumber)
                 }
             }
+
+        private fun constructVertexForKnownTypePrefix(
+            structure: TvmDataCellStructure.KnownTypePrefix,
+            state: TvmState,
+            guard: UBoolExpr,
+            address: UConcreteHeapRef,
+            prefixSize: UExpr<TvmSizeSort>,
+            refNumber: Int,
+        ): Pair<Vertex, List<TvmDataCellInfoTree>> = with(state.ctx) {
+            val (child, other) = constructVertex(
+                state,
+                structure.rest,
+                guard,
+                address,
+                mkSizeAddExpr(prefixSize, structure.typeOfPrefix.offset(state, address, prefixSize)),
+                refNumber,
+            )
+            Vertex(guard, structure, prefixSize, refNumber, listOf(child)) to other
+        }
+
+        private fun constructVertexForSwitchPrefix(
+            structure: TvmDataCellStructure.SwitchPrefix,
+            state: TvmState,
+            guard: UBoolExpr,
+            address: UConcreteHeapRef,
+            prefixSize: UExpr<TvmSizeSort>,
+            refNumber: Int,
+        ): Pair<Vertex, List<TvmDataCellInfoTree>> = with(state.ctx) {
+            val other = mutableListOf<TvmDataCellInfoTree>()
+            val cellContent = state.memory.readField(address, cellDataField, cellDataSort)
+            val prefix = mkBvExtractExpr(high = structure.switchSize - 1, low = 0, cellContent)
+            val children = structure.variants.entries.map { (key, selfRestVariant) ->
+                val expectedPrefix = mkBv(key, structure.switchSize.toUInt())
+                val prefixGuard = prefix eq expectedPrefix
+                val newGuard = guard and prefixGuard
+                val (child, childOther) = constructVertex(
+                    state,
+                    selfRestVariant,
+                    newGuard,
+                    address,
+                    mkSizeAddExpr(prefixSize, mkSizeExpr(structure.switchSize)),
+                    refNumber,
+                )
+                other += childOther
+                child
+            }
+            Vertex(guard, structure, prefixSize, refNumber, children) to other
+        }
+
+        private fun constructVertexForLoadRef(
+            structure: TvmDataCellStructure.LoadRef,
+            state: TvmState,
+            guard: UBoolExpr,
+            address: UConcreteHeapRef,
+            prefixSize: UExpr<TvmSizeSort>,
+            refNumber: Int,
+        ): Pair<Vertex, List<TvmDataCellInfoTree>> = with(state.ctx) {
+            val refAddress = state.readCellRef(address, mkSizeExpr(refNumber)) as UConcreteHeapRef
+            val other = construct(state, structure.ref, refAddress, guard)
+            val (child, childOther) = constructVertex(
+                state,
+                structure.selfRest,
+                guard,
+                address,
+                prefixSize,
+                refNumber + 1,
+            )
+            Vertex(guard, structure, prefixSize, refNumber, listOf(child)) to (childOther + other)
         }
     }
 }

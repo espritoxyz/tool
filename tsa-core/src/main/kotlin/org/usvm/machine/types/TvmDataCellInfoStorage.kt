@@ -41,6 +41,7 @@ class TvmDataCellInfoStorage private constructor(
                     is TvmDataCellStructure.LoadRef -> {
                         // no conflict here
                     }
+
                     is TvmDataCellStructure.Empty -> {
                         // TvmUnexpectedReading, if loaded more than 0 bits
                         val error = TvmUnexpectedReading(loadData.type)
@@ -48,6 +49,7 @@ class TvmDataCellInfoStorage private constructor(
                         val conflict = mkSizeGtExpr(loadData.type.sizeBits, zeroSizeExpr)
                         result[error] = oldValue and (loadData.guard and vertex.guard and offsetGuard and conflict).not()
                     }
+
                     is TvmDataCellStructure.KnownTypePrefix -> {
                         // conflict, if types are not consistent
                         val error = TvmReadingOfUnexpectedType(
@@ -96,6 +98,7 @@ class TvmDataCellInfoStorage private constructor(
                     is TvmDataCellStructure.LoadRef -> {
                         // no conflict here
                     }
+
                     is TvmDataCellStructure.Empty -> {
                         val conflict = mkBvSignedGreaterExpr(loadRef.refNumber, mkSizeExpr(vertex.refNumber))
                         result = result and (vertex.guard and conflict).not()
@@ -118,17 +121,20 @@ class TvmDataCellInfoStorage private constructor(
             if (!checkDataCellContentTypes) {
                 return TvmDataCellInfoStorage(state.ctx, emptyMap())
             }
+
             val trees = mutableListOf<TvmDataCellInfoTree>()
             info.parameterInfos.entries.forEach { (param, paramInfo) ->
                 val entry = state.stack.peekStackEntry(param)
                 require(entry is TvmStack.TvmInputStackEntry)
                 trees += buildTreesForParameter(state, paramInfo, entry)
             }
+
             val treeMap = mutableMapOf<UConcreteHeapRef, MutableList<TvmDataCellInfoTree>>()
             trees.forEach { tree ->
                 val list = treeMap.getOrPut(tree.address) { mutableListOf() }
                 list.add(tree)
             }
+
             return TvmDataCellInfoStorage(state.ctx, treeMap)
         }
 
@@ -143,6 +149,7 @@ class TvmDataCellInfoStorage private constructor(
                     val address = stackValue.cellValue as UConcreteHeapRef
                     construct(state, paramInfo.dataCellStructure, address)
                 }
+
                 is TvmParameterInfo.SliceInfo -> {
                     val stackValue = state.stack.getStackValue(entry, TvmSliceType) { state.generateSymbolicSlice() }
                     val sliceAddress = stackValue.sliceValue
@@ -151,6 +158,7 @@ class TvmDataCellInfoStorage private constructor(
                         state.memory.readField(sliceAddress, sliceCellField, state.ctx.addressSort) as UConcreteHeapRef
                     construct(state, paramInfo.cellInfo.dataCellStructure, address)
                 }
+
                 is TvmParameterInfo.NoInfo -> {
                     emptyList()
                 }
