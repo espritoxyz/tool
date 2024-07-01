@@ -12,6 +12,7 @@ import org.usvm.machine.FuncAnalyzer.Companion.FIFT_EXECUTABLE
 import org.usvm.test.resolver.TvmContractSymbolicTestResult
 import org.usvm.test.resolver.TvmTestResolver
 import org.usvm.utils.FileUtils
+import java.math.BigInteger
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.util.concurrent.TimeUnit
@@ -32,8 +33,8 @@ sealed interface TvmAnalyzer {
     fun analyzeAllMethods(
         sourcesPath: Path,
         contractDataHex: String? = null,
-        methodsBlackList: Set<Int> = hashSetOf(Int.MAX_VALUE),
-        inputInfo: Map<Int, TvmInputInfo> = emptyMap(),
+        methodsBlackList: Set<BigInteger> = hashSetOf(Int.MAX_VALUE.toBigInteger()),
+        inputInfo: Map<BigInteger, TvmInputInfo> = emptyMap(),
         tvmOptions: TvmMachineOptions = TvmMachineOptions(),
     ): TvmContractSymbolicTestResult
 }
@@ -43,8 +44,8 @@ data object TactAnalyzer : TvmAnalyzer {
     override fun analyzeAllMethods(
         sourcesPath: Path,
         contractDataHex: String?,
-        methodsBlackList: Set<Int>,
-        inputInfo: Map<Int, TvmInputInfo>,
+        methodsBlackList: Set<BigInteger>,
+        inputInfo: Map<BigInteger, TvmInputInfo>,
         tvmOptions: TvmMachineOptions,
     ): TvmContractSymbolicTestResult {
         val outputDir = createTempDirectory(CONFIG_OUTPUT_PREFIX)
@@ -129,8 +130,8 @@ class FuncAnalyzer(
     override fun analyzeAllMethods(
         sourcesPath: Path,
         contractDataHex: String?,
-        methodsBlackList: Set<Int>,
-        inputInfo: Map<Int, TvmInputInfo>,
+        methodsBlackList: Set<BigInteger>,
+        inputInfo: Map<BigInteger, TvmInputInfo>,
         tvmOptions: TvmMachineOptions,
     ): TvmContractSymbolicTestResult {
         val tmpBocFile = createTempFile(suffix = ".boc")
@@ -179,8 +180,8 @@ class FiftAnalyzer(
     override fun analyzeAllMethods(
         sourcesPath: Path,
         contractDataHex: String?,
-        methodsBlackList: Set<Int>,
-        inputInfo: Map<Int, TvmInputInfo>,
+        methodsBlackList: Set<BigInteger>,
+        inputInfo: Map<BigInteger, TvmInputInfo>,
         tvmOptions: TvmMachineOptions,
     ): TvmContractSymbolicTestResult {
         val tmpBocFile = createTempFile(suffix = ".boc")
@@ -350,8 +351,8 @@ data object BocAnalyzer : TvmAnalyzer {
     override fun analyzeAllMethods(
         sourcesPath: Path,
         contractDataHex: String?,
-        methodsBlackList: Set<Int>,
-        inputInfo: Map<Int, TvmInputInfo>,
+        methodsBlackList: Set<BigInteger>,
+        inputInfo: Map<BigInteger, TvmInputInfo>,
         tvmOptions: TvmMachineOptions,
     ): TvmContractSymbolicTestResult {
         val contract = loadContractFromBoc(sourcesPath)
@@ -390,21 +391,21 @@ data object BocAnalyzer : TvmAnalyzer {
 
 fun analyzeAllMethods(
     contract: TvmContractCode,
-    methodsBlackList: Set<Int> = hashSetOf(Int.MAX_VALUE),
+    methodsBlackList: Set<BigInteger> = hashSetOf(Int.MAX_VALUE.toBigInteger()),
     contractDataHex: String? = null,
-    inputInfo: Map<Int, TvmInputInfo> = emptyMap(),
+    inputInfo: Map<BigInteger, TvmInputInfo> = emptyMap(),
     tvmOptions: TvmMachineOptions = TvmMachineOptions(),
 ): TvmContractSymbolicTestResult {
     val contractData = Cell.Companion.of(contractDataHex ?: DEFAULT_CONTRACT_DATA_HEX)
     val machine = TvmMachine(tvmOptions = tvmOptions)
-    val methodsExceptDictPushConst = contract.methods.filterKeys { it.toInt() !in methodsBlackList }
+    val methodsExceptDictPushConst = contract.methods.filterKeys { it !in methodsBlackList }
     val methodStates = methodsExceptDictPushConst.values.associateWith { method ->
         runCatching {
             machine.analyze(
                 contract,
                 contractData,
                 method.id,
-                inputInfo[method.id.toInt()] ?: TvmInputInfo()
+                inputInfo[method.id] ?: TvmInputInfo()
             )
         }.getOrElse {
             logger.error(it) {

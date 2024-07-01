@@ -34,7 +34,7 @@ class InputParameterInfoTests {
             ?: error("Cannot find resource $maybePath")
 
         val inputInfo = TvmInputInfo(mapOf(0 to TvmParameterInfo.SliceInfo(TvmParameterInfo.DataCellInfo(maybeStructure))))
-        val results = funcCompileAndAnalyzeAllMethods(resourcePath, inputInfo = mapOf(0 to inputInfo))
+        val results = funcCompileAndAnalyzeAllMethods(resourcePath, inputInfo = mapOf(0.toBigInteger() to inputInfo))
         assertEquals(1, results.testSuites.size)
         val tests = results.testSuites.first()
         assertTrue(tests.any { it.result is TvmSuccessfulExecution })
@@ -54,7 +54,7 @@ class InputParameterInfoTests {
             ?: error("Cannot find resource $maybePath")
 
         val inputInfo = TvmInputInfo(mapOf(0 to TvmParameterInfo.SliceInfo(TvmParameterInfo.DataCellInfo(int64Structure))))
-        val results = funcCompileAndAnalyzeAllMethods(resourcePath, inputInfo = mapOf(0 to inputInfo))
+        val results = funcCompileAndAnalyzeAllMethods(resourcePath, inputInfo = mapOf(0.toBigInteger() to inputInfo))
         assertEquals(1, results.testSuites.size)
         val tests = results.testSuites.first()
         assertTrue(tests.all { it.result !is TvmSuccessfulExecution })
@@ -75,7 +75,7 @@ class InputParameterInfoTests {
             ?: error("Cannot find resource $maybePath")
 
         val inputInfo = TvmInputInfo(mapOf(0 to TvmParameterInfo.SliceInfo(TvmParameterInfo.DataCellInfo(TvmDataCellStructure.Empty))))
-        val results = funcCompileAndAnalyzeAllMethods(resourcePath, inputInfo = mapOf(0 to inputInfo))
+        val results = funcCompileAndAnalyzeAllMethods(resourcePath, inputInfo = mapOf(0.toBigInteger() to inputInfo))
         assertEquals(1, results.testSuites.size)
         val tests = results.testSuites.first()
         assertTrue(tests.all { it.result !is TvmSuccessfulExecution })
@@ -97,7 +97,7 @@ class InputParameterInfoTests {
 
         val inputInfo = TvmInputInfo(mapOf(0 to TvmParameterInfo.SliceInfo(TvmParameterInfo.DataCellInfo(TvmDataCellStructure.Empty))))
         val options = TvmMachineOptions(checkDataCellContentTypes = false)
-        val results = funcCompileAndAnalyzeAllMethods(resourcePath, inputInfo = mapOf(0 to inputInfo), tvmOptions = options)
+        val results = funcCompileAndAnalyzeAllMethods(resourcePath, inputInfo = mapOf(0.toBigInteger() to inputInfo), tvmOptions = options)
         assertEquals(1, results.testSuites.size)
         val tests = results.testSuites.first()
         assertTrue(tests.any { it.result is TvmSuccessfulExecution })
@@ -110,7 +110,7 @@ class InputParameterInfoTests {
             ?: error("Cannot find resource $endOfCellPath")
 
         val inputInfo = TvmInputInfo(mapOf(0 to TvmParameterInfo.SliceInfo(TvmParameterInfo.DataCellInfo(TvmDataCellStructure.Empty))))
-        val results = funcCompileAndAnalyzeAllMethods(resourcePath, inputInfo = mapOf(0 to inputInfo))
+        val results = funcCompileAndAnalyzeAllMethods(resourcePath, inputInfo = mapOf(0.toBigInteger() to inputInfo))
         assertEquals(1, results.testSuites.size)
         val tests = results.testSuites.first()
         assertTrue(tests.any { it.result is TvmSuccessfulExecution })
@@ -123,7 +123,7 @@ class InputParameterInfoTests {
             ?: error("Cannot find resource $endOfCellPath")
 
         val inputInfo = TvmInputInfo(mapOf(0 to TvmParameterInfo.SliceInfo(TvmParameterInfo.DataCellInfo(int64Structure))))
-        val results = funcCompileAndAnalyzeAllMethods(resourcePath, inputInfo = mapOf(0 to inputInfo))
+        val results = funcCompileAndAnalyzeAllMethods(resourcePath, inputInfo = mapOf(0.toBigInteger() to inputInfo))
         assertEquals(1, results.testSuites.size)
         val tests = results.testSuites.first()
         assertTrue(tests.any { it.result !is TvmSuccessfulExecution })
@@ -142,7 +142,7 @@ class InputParameterInfoTests {
             ?: error("Cannot find resource $endOfCellPath")
 
         val inputInfo = TvmInputInfo(mapOf(0 to TvmParameterInfo.SliceInfo(TvmParameterInfo.DataCellInfo(someRefStructure))))
-        val results = funcCompileAndAnalyzeAllMethods(resourcePath, inputInfo = mapOf(0 to inputInfo))
+        val results = funcCompileAndAnalyzeAllMethods(resourcePath, inputInfo = mapOf(0.toBigInteger() to inputInfo))
         assertEquals(1, results.testSuites.size)
         val tests = results.testSuites.first()
         assertTrue(tests.any { it.result !is TvmSuccessfulExecution })
@@ -161,7 +161,7 @@ class InputParameterInfoTests {
             ?: error("Cannot find resource $simpleLoadRefPath")
 
         val inputInfo = TvmInputInfo(mapOf(0 to TvmParameterInfo.SliceInfo(TvmParameterInfo.DataCellInfo(someRefStructure))))
-        val results = funcCompileAndAnalyzeAllMethods(resourcePath, inputInfo = mapOf(0 to inputInfo))
+        val results = funcCompileAndAnalyzeAllMethods(resourcePath, inputInfo = mapOf(0.toBigInteger() to inputInfo))
         assertEquals(1, results.testSuites.size)
         val tests = results.testSuites.first()
         assertTrue(tests.any { it.result is TvmSuccessfulExecution })
@@ -174,7 +174,7 @@ class InputParameterInfoTests {
             ?: error("Cannot find resource $simpleLoadRefPath")
 
         val inputInfo = TvmInputInfo(mapOf(0 to TvmParameterInfo.SliceInfo(TvmParameterInfo.DataCellInfo(prefixInt64Structure))))
-        val results = funcCompileAndAnalyzeAllMethods(resourcePath, inputInfo = mapOf(0 to inputInfo))
+        val results = funcCompileAndAnalyzeAllMethods(resourcePath, inputInfo = mapOf(0.toBigInteger() to inputInfo))
         assertEquals(1, results.testSuites.size)
         val tests = results.testSuites.first()
         assertTrue(tests.any { it.result is TvmSuccessfulExecution })
@@ -187,7 +187,7 @@ class InputParameterInfoTests {
             ?: error("Cannot find resource $simpleLoadRefPath")
 
         val inputInfo = TvmInputInfo(mapOf(0 to TvmParameterInfo.SliceInfo(TvmParameterInfo.DataCellInfo(int64Structure))))
-        val results = funcCompileAndAnalyzeAllMethods(resourcePath, inputInfo = mapOf(0 to inputInfo))
+        val results = funcCompileAndAnalyzeAllMethods(resourcePath, inputInfo = mapOf(0.toBigInteger() to inputInfo))
         assertEquals(1, results.testSuites.size)
         val tests = results.testSuites.first()
 
@@ -205,7 +205,7 @@ class InputParameterInfoTests {
             ?: error("Cannot find resource $maybePath")
 
         val inputInfo = TvmInputInfo(mapOf(0 to TvmParameterInfo.SliceInfo(TvmParameterInfo.DataCellInfo(coinsStructure))))
-        val results = funcCompileAndAnalyzeAllMethods(resourcePath, inputInfo = mapOf(0 to inputInfo))
+        val results = funcCompileAndAnalyzeAllMethods(resourcePath, inputInfo = mapOf(0.toBigInteger() to inputInfo))
         assertEquals(1, results.testSuites.size)
         val tests = results.testSuites.first()
         assertTrue(tests.all { it.result !is TvmSuccessfulExecution })
@@ -226,7 +226,7 @@ class InputParameterInfoTests {
             ?: error("Cannot find resource $coinsPath")
 
         val inputInfo = TvmInputInfo(mapOf(0 to TvmParameterInfo.SliceInfo(TvmParameterInfo.DataCellInfo(coinsStructure))))
-        val results = funcCompileAndAnalyzeAllMethods(resourcePath, inputInfo = mapOf(0 to inputInfo))
+        val results = funcCompileAndAnalyzeAllMethods(resourcePath, inputInfo = mapOf(0.toBigInteger() to inputInfo))
         assertEquals(1, results.testSuites.size)
         val tests = results.testSuites.first()
         assertTrue(tests.any { it.result is TvmSuccessfulExecution })

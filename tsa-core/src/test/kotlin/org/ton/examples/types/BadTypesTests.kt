@@ -17,7 +17,10 @@ class BadTypesTests {
         val fiftResourcePath = this::class.java.getResource(fiftPath)?.path?.let { Path(it) }
             ?: error("Cannot find resource fift $fiftPath")
 
-        val symbolicResult = compileAndAnalyzeFift(fiftResourcePath, methodsBlackList = setOf(0, Int.MAX_VALUE))
+        val symbolicResult = compileAndAnalyzeFift(
+            fiftResourcePath,
+            methodsBlackList = setOf(0.toBigInteger(), Int.MAX_VALUE.toBigInteger())
+        )
 
         assertEquals(1, symbolicResult.testSuites.size)
 
