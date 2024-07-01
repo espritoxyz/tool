@@ -92,7 +92,7 @@ class TvmTestStateResolver(
                 stack,
             )
             is TvmReadingOfUnexpectedType -> TvmExecutionWithReadingOfUnexpectedType(
-                expectedType = exit.expectedType,
+                labelType = exit.labelType,
                 actualType = resolveCellDataType(exit.actualType),
                 lastStmt,
                 stack

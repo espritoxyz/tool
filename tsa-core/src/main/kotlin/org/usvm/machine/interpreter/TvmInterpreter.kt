@@ -347,7 +347,6 @@ class TvmInterpreter(
         val pathConstraints = UPathConstraints<TvmType>(ctx)
         val memory = UMemory<TvmType, TvmCodeBlock>(ctx, pathConstraints.typeConstraints)
         val refEmptyValue = memory.initializeEmptyRefValues()
-        val dataCellInfo = TvmDataCellInfoStorage.build(checkDataCellContentTypes, ctx, stack, inputInfo)
 
         val state = TvmState(
             ctx = ctx,
@@ -360,8 +359,10 @@ class TvmInterpreter(
             gasUsage = persistentListOf(),
             targets = UTargetsSet.from(targets),
             typeSystem = typeSystem,
-            dataCellInfoStorage = dataCellInfo,
         )
+
+        val dataCellInfoStorage = TvmDataCellInfoStorage.build(checkDataCellContentTypes, state, inputInfo)
+        state.dataCellInfoStorage = dataCellInfoStorage
 
         state.registers.c4 = C4Register(TvmCellValue(state.generateSymbolicCell()))
         state.registers.c5 = C5Register(TvmCellValue(state.allocEmptyCell()))

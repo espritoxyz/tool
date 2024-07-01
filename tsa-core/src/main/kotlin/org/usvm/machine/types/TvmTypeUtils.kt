@@ -1,17 +1,16 @@
 package org.usvm.machine.types
 
+import org.ton.TvmCoinsLabel
+import org.ton.TvmDataCellLabel
+import org.ton.TvmIntegerLabel
+import org.ton.TvmMsgAddrLabel
 import org.usvm.UBoolExpr
 import org.usvm.UConcreteHeapRef
+import org.usvm.UExpr
 import org.usvm.machine.TvmContext
+import org.usvm.machine.TvmSizeSort
 import org.usvm.machine.state.TvmState
 import org.usvm.mkSizeExpr
-import org.usvm.sizeSort
-import org.usvm.test.resolver.TvmCellDataBitArray
-import org.usvm.test.resolver.TvmCellDataCoins
-import org.usvm.test.resolver.TvmCellDataInteger
-import org.usvm.test.resolver.TvmCellDataMaybeConstructorBit
-import org.usvm.test.resolver.TvmCellDataMsgAddr
-import org.usvm.test.resolver.TvmCellDataType
 import org.usvm.types.USingleTypeStream
 
 fun <AccType> foldOnTvmType(type: TvmType, init: AccType, f: (AccType, TvmType) -> AccType): AccType {
@@ -32,41 +31,41 @@ fun TvmState.getPossibleTypes(ref: UConcreteHeapRef): Sequence<TvmType> {
 }
 
 context(TvmContext)
-fun TvmCellDataType.accepts(symbolicType: TvmSymbolicCellDataType): UBoolExpr =
+fun TvmDataCellLabel.accepts(symbolicType: TvmSymbolicCellDataType): UBoolExpr =
     when (this) {
-        is TvmCellDataInteger -> {
+        is TvmIntegerLabel -> {
             if (symbolicType !is TvmSymbolicCellDataInteger || isSigned != symbolicType.isSigned || endian != symbolicType.endian) {
                 falseExpr
             } else {
                 symbolicType.sizeBits eq mkBv(bitSize)
             }
         }
-        is TvmCellDataMaybeConstructorBit -> {
-            if (symbolicType is TvmSymbolicCellMaybeConstructorBit) {
-                trueExpr
-            } else {
-                falseExpr
-            }
-        }
-        is TvmCellDataMsgAddr -> {
+        is TvmMsgAddrLabel -> {
             if (symbolicType is TvmSymbolicCellDataMsgAddr) {
                 trueExpr
             } else {
                 falseExpr
             }
         }
-        is TvmCellDataBitArray -> {
-            if (symbolicType !is TvmSymbolicCellDataBitArray) {
-                falseExpr
+        is TvmCoinsLabel -> {
+            if (symbolicType is TvmSymbolicCellDataCoins) {
+                trueExpr
             } else {
-                symbolicType.sizeBits eq mkBv(bitSize)
+                falseExpr
             }
         }
-        is TvmCellDataCoins -> {
-            if (symbolicType !is TvmSymbolicCellDataCoins) {
-                falseExpr
-            } else {
-                symbolicType.coinsPrefix eq mkBv(coinPrefix)
-            }
+    }
+
+context(TvmContext)
+fun TvmDataCellLabel.offset(state: TvmState, address: UConcreteHeapRef, prefixSize: UExpr<TvmSizeSort>): UExpr<TvmSizeSort> =
+    when (this) {
+        is TvmIntegerLabel -> {
+            mkSizeExpr(bitSize)
+        }
+        is TvmMsgAddrLabel -> {
+            TODO()
+        }
+        is TvmCoinsLabel -> {
+            TODO()
         }
     }

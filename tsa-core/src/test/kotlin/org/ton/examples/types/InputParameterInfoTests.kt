@@ -2,12 +2,12 @@ package org.ton.examples.types
 
 import org.ton.TvmDataCellStructure
 import org.ton.TvmInputInfo
+import org.ton.TvmIntegerLabel
 import org.ton.TvmParameterInfo
 import org.ton.examples.checkInvariants
 import org.ton.examples.funcCompileAndAnalyzeAllMethods
 import org.ton.examples.propertiesFound
 import org.usvm.machine.TvmMachineOptions
-import org.usvm.test.resolver.TvmCellDataInteger
 import org.usvm.test.resolver.TvmCellDataMaybeConstructorBit
 import org.usvm.test.resolver.TvmExecutionWithReadingOfUnexpectedType
 import org.usvm.test.resolver.TvmExecutionWithStructuralError
@@ -62,7 +62,7 @@ class InputParameterInfoTests {
             tests,
             listOf { test ->
                 val exit = test.result as? TvmExecutionWithReadingOfUnexpectedType ?: return@listOf false
-                exit.actualType is TvmCellDataMaybeConstructorBit && exit.expectedType is TvmCellDataInteger
+                exit.actualType is TvmCellDataMaybeConstructorBit && exit.labelType is TvmIntegerLabel
             }
         )
     }

@@ -1,11 +1,11 @@
 package org.usvm.machine.state
 
 import kotlinx.serialization.Serializable
+import org.ton.TvmDataCellLabel
 import org.usvm.machine.state.TvmMethodResult.*
 import org.usvm.UBv32Sort
 import org.usvm.UExpr
 import org.usvm.machine.types.TvmSymbolicCellDataType
-import org.usvm.test.resolver.TvmCellDataType
 
 /**
  * Represents a result of a method invocation.
@@ -174,9 +174,9 @@ data object TvmUnexpectedEndOfReading : TvmStructuralError {
 }
 
 data class TvmReadingOfUnexpectedType(
-    val expectedType: TvmCellDataType, // TODO: this can be symbolic?
+    val labelType: TvmDataCellLabel,
     val actualType: TvmSymbolicCellDataType,
 ) : TvmStructuralError {
     override val message: String =
-        "Reading of unexpected type: expected reading of $expectedType, but read $actualType"
+        "Reading of unexpected type: expected reading of $labelType, but read $actualType"
 }

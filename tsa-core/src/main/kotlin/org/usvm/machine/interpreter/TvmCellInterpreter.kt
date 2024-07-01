@@ -1,5 +1,6 @@
 package org.usvm.machine.interpreter
 
+import org.ton.Endian
 import org.ton.bytecode.TvmAliasInst
 import org.ton.bytecode.TvmCellBuildEndcInst
 import org.ton.bytecode.TvmCellBuildInst
@@ -138,7 +139,6 @@ import org.usvm.machine.state.takeLastCell
 import org.usvm.machine.state.takeLastIntOrThrowTypeError
 import org.usvm.machine.state.takeLastSlice
 import org.usvm.machine.state.unsignedIntegerFitsBits
-import org.usvm.machine.types.Endian
 import org.usvm.machine.types.TvmBuilderType
 import org.usvm.machine.types.TvmCellType
 import org.usvm.machine.types.TvmDataCellType

@@ -21,44 +21,20 @@ import org.usvm.mkSizeGtExpr
 
 class TvmDataCellInfoStorage private constructor(
     private val ctx: TvmContext,
-    private val trees: List<TvmDataCellInfoTree>,
-    private var addressToTree: Map<UConcreteHeapRef, List<TvmDataCellInfoTree>>? = null,
-    private val checkDataCellContentTypes: Boolean = true,
+    private val addressToTree: Map<UConcreteHeapRef, List<TvmDataCellInfoTree>>,
 ) {
-    fun initialize(state: TvmState) {
-        if (addressToTree != null) {
-            return  // already initialized
-        }
-        if (!checkDataCellContentTypes) {
-            addressToTree = emptyMap()
-            return
-        }
-        val result = mutableMapOf<UConcreteHeapRef, MutableList<TvmDataCellInfoTree>>()
-        trees.forEach { tree ->
-            val address = tree.lazyAddress(state)
-            result.getOrPut(address) { mutableListOf() }.add(tree)
-        }
-        addressToTree = result
-    }
-
     private fun treesOfAddress(address: UConcreteHeapRef): List<TvmDataCellInfoTree> {
-        val cache = addressToTree
-        require(cache != null) {
-            "TvmDataCellInfoStorage was not initialized"
-        }
-        return cache[address] ?: emptyList()
+        return addressToTree[address] ?: emptyList()
     }
 
     fun getNoConflictConditionsForLoadData(
-        state: TvmState,
         loadData: TvmDataCellLoadedTypeInfo.LoadData
     ): Map<TvmStructuralError, UBoolExpr> = with(ctx) {
         val trees = treesOfAddress(loadData.address)
         val result = mutableMapOf<TvmStructuralError, UBoolExpr>()
         trees.forEach { tree ->
             tree.fold(Unit) { _, vertex ->
-                val vertexGuard = vertex.lazyGuard(state)
-                val offsetGuard = loadData.offset eq mkBv(vertex.prefixSize)
+                val offsetGuard = loadData.offset eq vertex.prefixSize
                 when (val struct = vertex.structure) {
                     is TvmDataCellStructure.Unknown,
                     is TvmDataCellStructure.SwitchPrefix,
@@ -70,17 +46,17 @@ class TvmDataCellInfoStorage private constructor(
                         val error = TvmUnexpectedReading(loadData.type)
                         val oldValue = result.getOrDefault(error, trueExpr)
                         val conflict = mkSizeGtExpr(loadData.type.sizeBits, zeroSizeExpr)
-                        result[error] = oldValue and (loadData.guard and vertexGuard and offsetGuard and conflict).not()
+                        result[error] = oldValue and (loadData.guard and vertex.guard and offsetGuard and conflict).not()
                     }
                     is TvmDataCellStructure.KnownTypePrefix -> {
                         // conflict, if types are not consistent
                         val error = TvmReadingOfUnexpectedType(
-                            expectedType = struct.typeOfPrefix,
+                            labelType = struct.typeOfPrefix,
                             actualType = loadData.type
                         )
                         val oldValue = result.getOrDefault(error, trueExpr)
                         val conflict = struct.typeOfPrefix.accepts(loadData.type).not()
-                        result[error] = oldValue and (loadData.guard and vertexGuard and offsetGuard and conflict).not()
+                        result[error] = oldValue and (loadData.guard and vertex.guard and offsetGuard and conflict).not()
                     }
                 }
             }
@@ -89,19 +65,17 @@ class TvmDataCellInfoStorage private constructor(
     }
 
     fun getNoUnexpectedEndOfReadingCondition(
-        state: TvmState,
         endOfCell: TvmDataCellLoadedTypeInfo.EndOfCell
     ): UBoolExpr = with(ctx) {
         val trees = treesOfAddress(endOfCell.address)
         var result: UBoolExpr = trueExpr
         trees.forEach { tree ->
             tree.fold(Unit) { _, vertex ->
-                val vertexGuard = vertex.lazyGuard(state)
                 // conflict, if ended cell before this vertex
-                val offsetGuard = mkBvSignedLessExpr(endOfCell.offset, mkSizeExpr(vertex.prefixSize))
+                val offsetGuard = mkBvSignedLessExpr(endOfCell.offset, vertex.prefixSize)
                 // conflict, if ended cell before loaded all refs
                 val refNumberGuard = mkBvSignedLessExpr(endOfCell.refNumber, mkSizeExpr(vertex.refNumber))
-                result = result and (endOfCell.guard and vertexGuard and (offsetGuard or refNumberGuard)).not()
+                result = result and (endOfCell.guard and vertex.guard and (offsetGuard or refNumberGuard)).not()
             }
         }
         return result
@@ -109,14 +83,12 @@ class TvmDataCellInfoStorage private constructor(
 
 
     fun getNoUnexpectedLoadRefCondition(
-        state: TvmState,
         loadRef: TvmDataCellLoadedTypeInfo.LoadRef,
     ): UBoolExpr = with(ctx) {
         val trees = treesOfAddress(loadRef.address)
         var result: UBoolExpr = trueExpr
         trees.forEach { tree ->
             tree.fold(Unit) { _, vertex ->
-                val vertexGuard = vertex.lazyGuard(state)
                 when (vertex.structure) {
                     is TvmDataCellStructure.Unknown,
                     is TvmDataCellStructure.SwitchPrefix,
@@ -126,7 +98,7 @@ class TvmDataCellInfoStorage private constructor(
                     }
                     is TvmDataCellStructure.Empty -> {
                         val conflict = mkBvSignedGreaterExpr(loadRef.refNumber, mkSizeExpr(vertex.refNumber))
-                        result = result and (vertexGuard and conflict).not()
+                        result = result and (vertex.guard and conflict).not()
                     }
                 }
             }
@@ -140,44 +112,44 @@ class TvmDataCellInfoStorage private constructor(
     companion object {
         fun build(
             checkDataCellContentTypes: Boolean,
-            ctx: TvmContext,
-            stack: TvmStack,
+            state: TvmState,
             info: TvmInputInfo,
         ): TvmDataCellInfoStorage {
             if (!checkDataCellContentTypes) {
-                return TvmDataCellInfoStorage(ctx, emptyList(), checkDataCellContentTypes = false)
+                return TvmDataCellInfoStorage(state.ctx, emptyMap())
             }
             val trees = mutableListOf<TvmDataCellInfoTree>()
             info.parameterInfos.entries.forEach { (param, paramInfo) ->
-                val entry = stack.peekStackEntry(param)
+                val entry = state.stack.peekStackEntry(param)
                 require(entry is TvmStack.TvmInputStackEntry)
-                trees += buildTreesForParameter(ctx, paramInfo, entry)
+                trees += buildTreesForParameter(state, paramInfo, entry)
             }
-            return TvmDataCellInfoStorage(ctx, trees)
+            val treeMap = mutableMapOf<UConcreteHeapRef, MutableList<TvmDataCellInfoTree>>()
+            trees.forEach { tree ->
+                val list = treeMap.getOrPut(tree.address) { mutableListOf() }
+                list.add(tree)
+            }
+            return TvmDataCellInfoStorage(state.ctx, treeMap)
         }
 
         private fun buildTreesForParameter(
-            ctx: TvmContext,
+            state: TvmState,
             paramInfo: TvmParameterInfo,
             entry: TvmStack.TvmInputStackEntry,
         ): List<TvmDataCellInfoTree> =
             when (paramInfo) {
                 is TvmParameterInfo.DataCellInfo -> {
-                    val lazyAddress = { state: TvmState ->
-                        val value = state.stack.getStackValue(entry, TvmCellType) { state.generateSymbolicCell() }
-                        value.cellValue as UConcreteHeapRef
-                    }
-                    construct(ctx, paramInfo.dataCellStructure, lazyAddress)
+                    val stackValue = state.stack.getStackValue(entry, TvmCellType) { state.generateSymbolicCell() }
+                    val address = stackValue.cellValue as UConcreteHeapRef
+                    construct(state, paramInfo.dataCellStructure, address)
                 }
                 is TvmParameterInfo.SliceInfo -> {
-                    val lazyAddress = { state: TvmState ->
-                        val value = state.stack.getStackValue(entry, TvmSliceType) { state.generateSymbolicSlice() }
-                        val sliceAddress = value.sliceValue
-                            ?: error("Could not extract slice address while building TvmDataCellInfoStorage")
-                        val res = state.memory.readField(sliceAddress, sliceCellField, ctx.addressSort)
-                        res as UConcreteHeapRef
-                    }
-                    construct(ctx, paramInfo.cellInfo.dataCellStructure, lazyAddress)
+                    val stackValue = state.stack.getStackValue(entry, TvmSliceType) { state.generateSymbolicSlice() }
+                    val sliceAddress = stackValue.sliceValue
+                        ?: error("Could not extract slice address while building TvmDataCellInfoStorage")
+                    val address =
+                        state.memory.readField(sliceAddress, sliceCellField, state.ctx.addressSort) as UConcreteHeapRef
+                    construct(state, paramInfo.cellInfo.dataCellStructure, address)
                 }
                 is TvmParameterInfo.NoInfo -> {
                     emptyList()

@@ -2,7 +2,7 @@ package org.usvm.test.resolver
 
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
-import org.usvm.machine.types.Endian
+import org.ton.Endian
 import java.math.BigInteger
 
 @Serializable

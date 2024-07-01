@@ -1,8 +1,8 @@
 package org.ton.examples.types
 
+import org.ton.Endian
 import org.ton.TvmDataCellStructure
-import org.usvm.machine.types.Endian
-import org.usvm.test.resolver.TvmCellDataInteger
+import org.ton.TvmIntegerLabel
 
 val maybeStructure = TvmDataCellStructure.SwitchPrefix(
     switchSize = 1,
@@ -16,12 +16,12 @@ val maybeStructure = TvmDataCellStructure.SwitchPrefix(
 )
 
 val int64Structure = TvmDataCellStructure.KnownTypePrefix(
-    TvmCellDataInteger(64, isSigned = true, Endian.BigEndian),
+    TvmIntegerLabel(64, isSigned = true, Endian.BigEndian),
     rest = TvmDataCellStructure.Empty
 )
 
 val prefixInt64Structure = TvmDataCellStructure.KnownTypePrefix(
-    TvmCellDataInteger(64, isSigned = true, Endian.BigEndian),
+    TvmIntegerLabel(64, isSigned = true, Endian.BigEndian),
     rest = TvmDataCellStructure.Unknown
 )
 

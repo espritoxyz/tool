@@ -47,7 +47,6 @@ class TvmState(
     targets: UTargetsSet<TvmTarget, TvmInst> = UTargetsSet.empty(),
     val dataCellLoadedTypeInfo: TvmDataCellLoadedTypeInfo = TvmDataCellLoadedTypeInfo.empty(),
     val typeSystem: TvmTypeSystem,
-    val dataCellInfoStorage: TvmDataCellInfoStorage,
 ) : UState<TvmType, TvmCodeBlock, TvmInst, TvmContext, TvmTarget, TvmState>(
     ctx,
     callStack,
@@ -60,6 +59,8 @@ class TvmState(
 ) {
     override val isExceptional: Boolean
         get() = methodResult is TvmMethodResult.TvmFailure || methodResult is TvmMethodResult.TvmStructuralError
+
+    lateinit var dataCellInfoStorage: TvmDataCellInfoStorage
 
     /**
      * All visited last instructions in all visited continuations in the LIFO order.
@@ -113,8 +114,9 @@ class TvmState(
             targets = targets.clone(),
             dataCellLoadedTypeInfo = dataCellLoadedTypeInfo.clone(),
             typeSystem = typeSystem,
-            dataCellInfoStorage = dataCellInfoStorage.clone(),
-        )
+        ).also {
+            dataCellInfoStorage = dataCellInfoStorage.clone()
+        }
     }
 
     override fun toString(): String = buildString {
@@ -138,9 +140,5 @@ class TvmState(
 
         memory.types.allocate(ref.address, referenceType)
         initializer(ref)
-    }
-
-    init {
-        dataCellInfoStorage.initialize(this)
     }
 }

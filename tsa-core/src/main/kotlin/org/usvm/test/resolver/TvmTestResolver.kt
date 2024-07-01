@@ -1,5 +1,6 @@
 package org.usvm.test.resolver
 
+import org.ton.TvmDataCellLabel
 import org.ton.bytecode.TvmInst
 import org.ton.bytecode.TvmMethod
 import org.usvm.machine.state.TvmMethodResult.TvmFailure
@@ -86,7 +87,7 @@ class TvmExecutionWithUnexpectedRefReading(
 ) : TvmExecutionWithStructuralError(lastStmt, stack)
 
 class TvmExecutionWithReadingOfUnexpectedType(
-    val expectedType: TvmCellDataType,
+    val labelType: TvmDataCellLabel,
     val actualType: TvmCellDataType,
     lastStmt: TvmInst,
     stack: List<TvmTestValue>,

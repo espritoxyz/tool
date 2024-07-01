@@ -4,6 +4,7 @@ import kotlinx.collections.immutable.PersistentList
 import kotlinx.collections.immutable.PersistentMap
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.persistentMapOf
+import org.ton.Endian
 import org.usvm.*
 import org.usvm.api.readField
 import org.usvm.machine.TvmContext
@@ -126,18 +127,13 @@ private fun TvmContext.calculateExtendedCoinsLength(coinsPrefix: UExpr<TvmSizeSo
     return mkBvAddExpr(extendedLength, mkSizeExpr(4))
 }
 
-enum class Endian {
-    LittleEndian,
-    BigEndian
-}
-
 fun TvmStepScope.makeSliceTypeLoad(slice: UHeapRef, type: TvmSymbolicCellDataType): Unit? {
     return calcOnStateCtx {
         val cellAddress = memory.readField(slice, TvmContext.sliceCellField, addressSort)
         val offset = memory.readField(slice, TvmContext.sliceDataPosField, sizeSort)
         val loadList = dataCellLoadedTypeInfo.loadData(cellAddress, offset, type)
         loadList.forEach { load ->
-            val noConflictCond = dataCellInfoStorage.getNoConflictConditionsForLoadData(this, load)
+            val noConflictCond = dataCellInfoStorage.getNoConflictConditionsForLoadData(load)
             noConflictCond.entries.forEach { (error, cond) ->
                 fork(
                     cond,
@@ -157,7 +153,7 @@ fun TvmStepScope.assertEndOfCell(slice: UHeapRef): Unit? {
         val refNumber = memory.readField(slice, TvmContext.sliceRefPosField, sizeSort)
         val actions = dataCellLoadedTypeInfo.makeEndOfCell(cellAddress, offset, refNumber)
         actions.forEach {
-            val noConflictCond = dataCellInfoStorage.getNoUnexpectedEndOfReadingCondition(this, it)
+            val noConflictCond = dataCellInfoStorage.getNoUnexpectedEndOfReadingCondition(it)
             fork(
                 noConflictCond,
                 blockOnFalseState = {
@@ -175,7 +171,7 @@ fun TvmStepScope.makeSliceRefLoad(slice: UHeapRef): Unit? {
         val refNumber = mkBvAddExpr(memory.readField(slice, TvmContext.sliceRefPosField, sizeSort), mkSizeExpr(1))
         val loadList = dataCellLoadedTypeInfo.loadRef(cellAddress, refNumber)
         loadList.forEach { load ->
-            val noConflictCond = dataCellInfoStorage.getNoUnexpectedLoadRefCondition(this, load)
+            val noConflictCond = dataCellInfoStorage.getNoUnexpectedLoadRefCondition(load)
             fork(
                 noConflictCond,
                 blockOnFalseState = {
