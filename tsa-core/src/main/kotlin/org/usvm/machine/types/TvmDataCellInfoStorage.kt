@@ -129,11 +129,7 @@ class TvmDataCellInfoStorage private constructor(
                 trees += buildTreesForParameter(state, paramInfo, entry)
             }
 
-            val treeMap = mutableMapOf<UConcreteHeapRef, MutableList<TvmDataCellInfoTree>>()
-            trees.forEach { tree ->
-                val list = treeMap.getOrPut(tree.address) { mutableListOf() }
-                list.add(tree)
-            }
+            val treeMap = trees.groupBy { it.address }
 
             return TvmDataCellInfoStorage(state.ctx, treeMap)
         }
