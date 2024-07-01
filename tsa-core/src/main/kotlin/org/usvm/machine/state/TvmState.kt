@@ -114,8 +114,8 @@ class TvmState(
             targets = targets.clone(),
             dataCellLoadedTypeInfo = dataCellLoadedTypeInfo.clone(),
             typeSystem = typeSystem,
-        ).also {
-            dataCellInfoStorage = dataCellInfoStorage.clone()
+        ).also { newState ->
+            newState.dataCellInfoStorage = dataCellInfoStorage.clone()
         }
     }
 
