@@ -113,10 +113,18 @@ class TvmDataCellLoadedTypeInfo(
 
 sealed class TvmSymbolicCellDataType(val sizeBits: UExpr<TvmSizeSort>)
 
-class TvmSymbolicCellDataInteger(sizeBits: UExpr<TvmSizeSort>, val isSigned: Boolean, val endian: Endian): TvmSymbolicCellDataType(sizeBits)
-class TvmSymbolicCellMaybeConstructorBit(ctx: TvmContext): TvmSymbolicCellDataType(ctx.mkBv(1))
-class TvmSymbolicCellDataMsgAddr(ctx: TvmContext): TvmSymbolicCellDataType(ctx.mkBv(2))
-class TvmSymbolicCellDataBitArray(sizeBits: UExpr<TvmSizeSort>): TvmSymbolicCellDataType(sizeBits)
+class TvmSymbolicCellDataInteger(
+    sizeBits: UExpr<TvmSizeSort>,
+    val isSigned: Boolean,
+    val endian: Endian
+) : TvmSymbolicCellDataType(sizeBits)
+
+class TvmSymbolicCellMaybeConstructorBit(ctx: TvmContext) : TvmSymbolicCellDataType(ctx.mkBv(1))
+
+class TvmSymbolicCellDataMsgAddr(ctx: TvmContext) : TvmSymbolicCellDataType(ctx.mkBv(2))
+
+class TvmSymbolicCellDataBitArray(sizeBits: UExpr<TvmSizeSort>) : TvmSymbolicCellDataType(sizeBits)
+
 class TvmSymbolicCellDataCoins(
     ctx: TvmContext,
     val coinsPrefix: UExpr<TvmSizeSort>  // 4-bit unsigned integer in front of coins amount
