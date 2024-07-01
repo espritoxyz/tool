@@ -70,43 +70,39 @@ class TvmDataCellInfoStorage private constructor(
         endOfCell: TvmDataCellLoadedTypeInfo.EndOfCell
     ): UBoolExpr = with(ctx) {
         val trees = treesOfAddress(endOfCell.address)
-        var result: UBoolExpr = trueExpr
-        trees.forEach { tree ->
-            tree.fold(Unit) { _, vertex ->
+        return trees.fold(trueExpr as UBoolExpr) { outerResult, tree ->
+            tree.fold(outerResult) { result, vertex ->
                 // conflict, if ended cell before this vertex
                 val offsetGuard = mkBvSignedLessExpr(endOfCell.offset, vertex.prefixSize)
                 // conflict, if ended cell before loaded all refs
                 val refNumberGuard = mkBvSignedLessExpr(endOfCell.refNumber, mkSizeExpr(vertex.refNumber))
-                result = result and (endOfCell.guard and vertex.guard and (offsetGuard or refNumberGuard)).not()
+                result and (endOfCell.guard and vertex.guard and (offsetGuard or refNumberGuard)).not()
             }
         }
-        return result
     }
-
 
     fun getNoUnexpectedLoadRefCondition(
         loadRef: TvmDataCellLoadedTypeInfo.LoadRef,
     ): UBoolExpr = with(ctx) {
         val trees = treesOfAddress(loadRef.address)
-        var result: UBoolExpr = trueExpr
-        trees.forEach { tree ->
-            tree.fold(Unit) { _, vertex ->
+        trees.fold(trueExpr as UBoolExpr) { outerResult, tree ->
+            tree.fold(outerResult) { result, vertex ->
                 when (vertex.structure) {
                     is TvmDataCellStructure.Unknown,
                     is TvmDataCellStructure.SwitchPrefix,
                     is TvmDataCellStructure.KnownTypePrefix,
                     is TvmDataCellStructure.LoadRef -> {
                         // no conflict here
+                        result
                     }
 
                     is TvmDataCellStructure.Empty -> {
                         val conflict = mkBvSignedGreaterExpr(loadRef.refNumber, mkSizeExpr(vertex.refNumber))
-                        result = result and (vertex.guard and conflict).not()
+                        result and (vertex.guard and conflict).not()
                     }
                 }
             }
         }
-        return result
     }
 
     // this behavior might be changed in the future
