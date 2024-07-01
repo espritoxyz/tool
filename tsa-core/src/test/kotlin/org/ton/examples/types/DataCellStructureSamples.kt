@@ -5,13 +5,14 @@ import org.ton.TvmCoinsLabel
 import org.ton.TvmDataCellStructure
 import org.ton.TvmIntegerLabel
 import org.ton.TvmMsgAddrLabel
+import org.ton.TvmParameterInfo
 
 val maybeStructure = TvmDataCellStructure.SwitchPrefix(
     switchSize = 1,
     variants = mapOf(
         "0" to TvmDataCellStructure.Empty,
         "1" to TvmDataCellStructure.LoadRef(
-            ref = TvmDataCellStructure.Unknown,
+            ref = TvmParameterInfo.DataCellInfo(TvmDataCellStructure.Unknown),
             selfRest = TvmDataCellStructure.Empty
         ),
     ),
@@ -29,7 +30,7 @@ val prefixInt64Structure = TvmDataCellStructure.KnownTypePrefix(
 
 val someRefStructure = TvmDataCellStructure.LoadRef(
     selfRest = TvmDataCellStructure.Empty,
-    ref = TvmDataCellStructure.Unknown,
+    ref = TvmParameterInfo.DataCellInfo(TvmDataCellStructure.Unknown),
 )
 
 val coinsStructure = TvmDataCellStructure.KnownTypePrefix(

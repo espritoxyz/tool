@@ -1,6 +1,7 @@
 package org.usvm.machine.types
 
 import org.ton.TvmDataCellStructure
+import org.ton.TvmParameterInfo
 import org.usvm.UBoolExpr
 import org.usvm.UConcreteHeapRef
 import org.usvm.UExpr
@@ -130,16 +131,24 @@ class TvmDataCellInfoTree private constructor(
             refNumber: Int,
         ): Pair<Vertex, List<TvmDataCellInfoTree>> = with(state.ctx) {
             val refAddress = state.readCellRef(address, mkSizeExpr(refNumber)) as UConcreteHeapRef
-            val other = construct(state, structure.ref, refAddress, guard)
-            val (child, childOther) = constructVertex(
-                state,
-                structure.selfRest,
-                guard,
-                address,
-                prefixSize,
-                refNumber + 1,
-            )
-            Vertex(guard, structure, prefixSize, refNumber, listOf(child)) to (childOther + other)
+            when (structure.ref) {
+                is TvmParameterInfo.DataCellInfo -> {
+                    val other = construct(state, structure.ref.dataCellStructure, refAddress, guard)
+                    val (child, childOther) = constructVertex(
+                        state,
+                        structure.selfRest,
+                        guard,
+                        address,
+                        prefixSize,
+                        refNumber + 1,
+                    )
+                    Vertex(guard, structure, prefixSize, refNumber, listOf(child)) to (childOther + other)
+                }
+
+                is TvmParameterInfo.DictCellInfo -> {
+                    TODO()
+                }
+            }
         }
     }
 }

@@ -162,6 +162,10 @@ class TvmDataCellInfoStorage private constructor(
                 is TvmParameterInfo.NoInfo -> {
                     emptyList()
                 }
+
+                is TvmParameterInfo.DictCellInfo -> {
+                    TODO()
+                }
             }
     }
 }

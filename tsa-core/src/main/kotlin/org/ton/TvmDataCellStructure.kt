@@ -11,7 +11,7 @@ sealed interface TvmDataCellStructure {
     ) : TvmDataCellStructure
 
     class LoadRef(
-        val ref: TvmDataCellStructure,
+        val ref: TvmParameterInfo.CellInfo,
         val selfRest: TvmDataCellStructure,
     ) : TvmDataCellStructure
 
