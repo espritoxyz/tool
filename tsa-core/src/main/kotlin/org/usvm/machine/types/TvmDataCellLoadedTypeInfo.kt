@@ -45,28 +45,26 @@ class TvmDataCellLoadedTypeInfo(
         val refNumber: UExpr<TvmSizeSort>,
     ) : Action
 
-    private fun <ConcreteAction: Action> registerAction(
+    private fun <ConcreteAction : Action> registerAction(
         cellAddress: UHeapRef,
         action: (GuardedExpr<UConcreteHeapRef>) -> ConcreteAction,
     ): List<ConcreteAction> {
         val ctx = cellAddress.ctx
         val actionList = mutableListOf<ConcreteAction>()
-        val blockOnConcreteAddress = {
-            map: PersistentMap<UConcreteHeapRef, PersistentList<Action>>,
-            guardedExpr: GuardedExpr<UConcreteHeapRef> ->
-            val ref = guardedExpr.expr
-            val oldList = map.getOrDefault(ref, persistentListOf())
-            val actionInstance = action(guardedExpr)
-            actionList.add(actionInstance)
-            val newList = oldList.add(actionInstance)
-            map.put(ref, newList)
-        }
         val newMap = foldHeapRef(
             ref = cellAddress,
             initial = addressToActions,
             initialGuard = ctx.trueExpr,
             collapseHeapRefs = false,
-            blockOnConcrete = blockOnConcreteAddress,
+            blockOnConcrete = { map: PersistentMap<UConcreteHeapRef, PersistentList<Action>>,
+                                guardedExpr: GuardedExpr<UConcreteHeapRef> ->
+                val ref = guardedExpr.expr
+                val oldList = map.getOrDefault(ref, persistentListOf())
+                val actionInstance = action(guardedExpr)
+                actionList.add(actionInstance)
+                val newList = oldList.add(actionInstance)
+                map.put(ref, newList)
+            },
             staticIsConcrete = true,
             blockOnSymbolic = { _, ref -> error("Unexpected symbolic ref ${ref.expr}") }
         )

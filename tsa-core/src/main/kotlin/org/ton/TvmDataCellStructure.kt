@@ -5,25 +5,25 @@ sealed interface TvmDataCellStructure {
 
     data object Empty : TvmDataCellStructure
 
-    class KnownTypePrefix(
+    data class KnownTypePrefix(
         val typeOfPrefix: TvmDataCellLabel,
         val rest: TvmDataCellStructure,
     ) : TvmDataCellStructure
 
-    class LoadRef(
+    data class LoadRef(
         val ref: TvmParameterInfo.CellInfo,
         val selfRest: TvmDataCellStructure,
     ) : TvmDataCellStructure
 
-    class SwitchPrefix(
+    data class SwitchPrefix(
         val switchSize: Int,
         val variants: Map<String, TvmDataCellStructure>
     ) : TvmDataCellStructure {
         init {
+            require(switchSize > 0) {
+                "switchSize in SwitchPrefix must be > 0"
+            }
             variants.keys.forEach {
-                require(switchSize > 0) {
-                    "switchSize in SwitchPrefix must be > 0"
-                }
                 require(it.length == switchSize) {
                     "Switch keys' lengths must be $switchSize, found key: $it"
                 }

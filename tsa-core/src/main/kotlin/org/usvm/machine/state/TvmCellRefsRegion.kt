@@ -1,15 +1,12 @@
 package org.usvm.machine.state
 
-import org.ton.bytecode.TvmCodeBlock
 import org.usvm.UAddressSort
 import org.usvm.UBoolExpr
 import org.usvm.UConcreteHeapRef
 import org.usvm.UExpr
 import org.usvm.UHeapRef
 import org.usvm.machine.TvmSizeSort
-import org.usvm.machine.types.TvmType
 import org.usvm.memory.ULValue
-import org.usvm.memory.UMemory
 import org.usvm.memory.UMemoryRegion
 import org.usvm.memory.UMemoryRegionId
 import org.usvm.memory.UReadOnlyMemory
