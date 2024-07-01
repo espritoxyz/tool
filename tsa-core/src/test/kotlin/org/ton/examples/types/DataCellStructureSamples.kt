@@ -1,8 +1,10 @@
 package org.ton.examples.types
 
 import org.ton.Endian
+import org.ton.TvmCoinsLabel
 import org.ton.TvmDataCellStructure
 import org.ton.TvmIntegerLabel
+import org.ton.TvmMsgAddrLabel
 
 val maybeStructure = TvmDataCellStructure.SwitchPrefix(
     switchSize = 1,
@@ -28,4 +30,14 @@ val prefixInt64Structure = TvmDataCellStructure.KnownTypePrefix(
 val someRefStructure = TvmDataCellStructure.LoadRef(
     selfRest = TvmDataCellStructure.Empty,
     ref = TvmDataCellStructure.Unknown,
+)
+
+val coinsStructure = TvmDataCellStructure.KnownTypePrefix(
+    TvmCoinsLabel,
+    rest = TvmDataCellStructure.Empty
+)
+
+val msgStructure = TvmDataCellStructure.KnownTypePrefix(
+    TvmMsgAddrLabel,
+    rest = TvmDataCellStructure.Empty
 )

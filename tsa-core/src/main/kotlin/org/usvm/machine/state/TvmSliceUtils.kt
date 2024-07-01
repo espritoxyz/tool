@@ -217,6 +217,17 @@ fun TvmStepScope.assertRefsLengthConstraint(
     assert(correctnessConstraint, unsatBlock = unsatBlock)
 }
 
+private fun TvmState.loadDataBitsFromCellWithoutChecks(
+    cell: UHeapRef,
+    offset: UExpr<TvmSizeSort>,
+    sizeBits: UExpr<TvmSizeSort>
+): UExpr<TvmCellDataSort> = with(ctx) {
+    val cellData = memory.readField(cell, cellDataField, cellDataSort)
+    val endOffset = mkSizeAddExpr(offset, sizeBits)
+    val offsetDataPos = mkBvSubExpr(maxDataLengthSizeExpr, endOffset)
+    mkBvLogicalShiftRightExpr(cellData, offsetDataPos.zeroExtendToSort(cellDataSort))
+}
+
 /**
  * @return bv 1023 with undefined high-order bits
  */
@@ -233,16 +244,13 @@ fun TvmStepScope.slicePreloadDataBits(
         unsatBlock = { error("Cannot ensure correctness for data length in cell $cell") }
     ) ?: return@calcOnStateCtx  null
 
-    val cellData = memory.readField(cell, cellDataField, cellDataSort)
     val dataPosition = memory.readField(slice, sliceDataPosField, sizeSort)
-    val offset = mkBvAddExpr(dataPosition, sizeBits)
-    val offsetDataPos = mkBvSubExpr(maxDataLengthSizeExpr, offset)
     val readingEnd = mkBvAddExpr(dataPosition, sizeBits)
 
     checkCellDataUnderflow(this@slicePreloadDataBits, cell, minSize = readingEnd, quietBlock = quietBlock)
         ?: return@calcOnStateCtx null
 
-    mkBvLogicalShiftRightExpr(cellData, offsetDataPos.zeroExtendToSort(cellDataSort))
+    loadDataBitsFromCellWithoutChecks(cell, dataPosition, sizeBits)
 }
 
 fun TvmStepScope.slicePreloadDataBits(
@@ -254,6 +262,32 @@ fun TvmStepScope.slicePreloadDataBits(
         ?: return null
 
     return calcOnStateCtx { mkBvExtractExpr(high = bits - 1, low = 0, data) }
+}
+
+private fun TvmState.extractIntFromShiftedData(
+    shiftedData: UExpr<TvmCellDataSort>,
+    sizeBits: UExpr<TvmInt257Sort>,
+    isSigned: Boolean,
+): UExpr<TvmInt257Sort> = with(ctx) {
+    val extractedBits = shiftedData.extractToInt257Sort()
+    val trashBits = mkBvSubExpr(intBitsValue, sizeBits)
+    val shiftedBits = mkBvShiftLeftExpr(extractedBits, trashBits)
+
+    if (!isSigned) {
+        mkBvLogicalShiftRightExpr(shiftedBits, trashBits)
+    } else {
+        mkBvArithShiftRightExpr(shiftedBits, trashBits)
+    }
+}
+
+fun TvmState.loadIntFromCellWithoutChecks(
+    cell: UHeapRef,
+    offset: UExpr<TvmSizeSort>,
+    sizeBits: UExpr<TvmInt257Sort>,
+    isSigned: Boolean
+): UExpr<TvmInt257Sort> = with(ctx) {
+    val shiftedData = loadDataBitsFromCellWithoutChecks(cell, offset, sizeBits.extractToSizeSort())
+    return extractIntFromShiftedData(shiftedData, sizeBits, isSigned)
 }
 
 /**
@@ -268,16 +302,8 @@ fun TvmStepScope.slicePreloadInt(
     val shiftedData = calcOnStateCtx { slicePreloadDataBits(slice, sizeBits.extractToSizeSort(), quietBlock) }
         ?: return null
 
-    return calcOnStateCtx {
-        val extractedBits = shiftedData.extractToInt257Sort()
-        val trashBits = mkBvSubExpr(intBitsValue, sizeBits)
-        val shiftedBits = mkBvShiftLeftExpr(extractedBits, trashBits)
-
-        if (!isSigned) {
-            mkBvLogicalShiftRightExpr(shiftedBits, trashBits)
-        } else {
-            mkBvArithShiftRightExpr(shiftedBits, trashBits)
-        }
+    return calcOnState {
+        extractIntFromShiftedData(shiftedData, sizeBits, isSigned)
     }
 }
 

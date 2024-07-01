@@ -1,5 +1,6 @@
 package org.ton.examples.types
 
+import org.ton.TvmCoinsLabel
 import org.ton.TvmDataCellStructure
 import org.ton.TvmInputInfo
 import org.ton.TvmIntegerLabel
@@ -25,6 +26,7 @@ class InputParameterInfoTests {
     private val maybePath = "/types/maybe.fc"
     private val endOfCellPath = "/types/end_of_cell.fc"
     private val simpleLoadRefPath = "/types/simple_load_ref.fc"
+    private val coinsPath = "/types/load_coins.fc"
 
     @Test
     fun testCorrectMaybe() {
@@ -193,6 +195,47 @@ class InputParameterInfoTests {
             tests,
             listOf { test ->
                 test.result is TvmExecutionWithUnexpectedRefReading
+            }
+        )
+    }
+
+    @Test
+    fun testMaybeInsteadOfCoins() {
+        val resourcePath = this::class.java.getResource(maybePath)?.path?.let { Path(it) }
+            ?: error("Cannot find resource $maybePath")
+
+        val inputInfo = TvmInputInfo(mapOf(0 to TvmParameterInfo.SliceInfo(TvmParameterInfo.DataCellInfo(coinsStructure))))
+        val results = funcCompileAndAnalyzeAllMethods(resourcePath, inputInfo = mapOf(0 to inputInfo))
+        assertEquals(1, results.testSuites.size)
+        val tests = results.testSuites.first()
+        assertTrue(tests.all { it.result !is TvmSuccessfulExecution })
+        assertTrue(tests.any { it.result is TvmMethodFailure })
+
+        propertiesFound(
+            tests,
+            listOf { test ->
+                val exit = test.result as? TvmExecutionWithReadingOfUnexpectedType ?: return@listOf false
+                exit.actualType is TvmCellDataMaybeConstructorBit && exit.labelType is TvmCoinsLabel
+            }
+        )
+    }
+
+    @Test
+    fun testCorrectCoins() {
+        val resourcePath = this::class.java.getResource(coinsPath)?.path?.let { Path(it) }
+            ?: error("Cannot find resource $coinsPath")
+
+        val inputInfo = TvmInputInfo(mapOf(0 to TvmParameterInfo.SliceInfo(TvmParameterInfo.DataCellInfo(coinsStructure))))
+        val results = funcCompileAndAnalyzeAllMethods(resourcePath, inputInfo = mapOf(0 to inputInfo))
+        assertEquals(1, results.testSuites.size)
+        val tests = results.testSuites.first()
+        assertTrue(tests.any { it.result is TvmSuccessfulExecution })
+        assertTrue(tests.any { it.result is TvmMethodFailure })
+
+        checkInvariants(
+            tests,
+            listOf { test ->
+                test.result !is TvmExecutionWithStructuralError
             }
         )
     }

@@ -10,6 +10,8 @@ import org.usvm.UExpr
 import org.usvm.machine.TvmContext
 import org.usvm.machine.TvmSizeSort
 import org.usvm.machine.state.TvmState
+import org.usvm.machine.state.loadIntFromCellWithoutChecks
+import org.usvm.mkSizeAddExpr
 import org.usvm.mkSizeExpr
 import org.usvm.types.USingleTypeStream
 
@@ -57,7 +59,11 @@ fun TvmDataCellLabel.accepts(symbolicType: TvmSymbolicCellDataType): UBoolExpr =
     }
 
 context(TvmContext)
-fun TvmDataCellLabel.offset(state: TvmState, address: UConcreteHeapRef, prefixSize: UExpr<TvmSizeSort>): UExpr<TvmSizeSort> =
+fun TvmDataCellLabel.offset(
+    state: TvmState,
+    address: UConcreteHeapRef,
+    prefixSize: UExpr<TvmSizeSort>,
+): UExpr<TvmSizeSort> =
     when (this) {
         is TvmIntegerLabel -> {
             mkSizeExpr(bitSize)
@@ -66,6 +72,14 @@ fun TvmDataCellLabel.offset(state: TvmState, address: UConcreteHeapRef, prefixSi
             TODO()
         }
         is TvmCoinsLabel -> {
-            TODO()
+            val prefix = state.loadIntFromCellWithoutChecks(
+                address,
+                prefixSize,
+                4.toBv257(),
+                isSigned = false
+            ).extractToSizeSort()
+            val length = mkBvShiftLeftExpr(prefix, shift = mkSizeExpr(3))
+
+            mkSizeAddExpr(mkSizeExpr(4), length)
         }
     }
