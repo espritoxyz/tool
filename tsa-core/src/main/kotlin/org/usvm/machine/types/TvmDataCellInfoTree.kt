@@ -9,6 +9,7 @@ import org.usvm.api.readField
 import org.usvm.machine.TvmContext.Companion.cellDataField
 import org.usvm.machine.TvmSizeSort
 import org.usvm.machine.state.TvmState
+import org.usvm.machine.state.assertType
 import org.usvm.machine.state.readCellRef
 import org.usvm.mkSizeAddExpr
 import org.usvm.mkSizeExpr
@@ -133,24 +134,27 @@ class TvmDataCellInfoTree private constructor(
             refNumber: Int,
         ): Pair<Vertex, List<TvmDataCellInfoTree>> = with(state.ctx) {
             val refAddress = state.readCellRef(address, mkSizeExpr(refNumber)) as UConcreteHeapRef
-            when (structure.ref) {
+            val other = when (structure.ref) {
                 is TvmParameterInfo.DataCellInfo -> {
-                    val other = construct(state, structure.ref.dataCellStructure, refAddress, guard)
-                    val (child, childOther) = constructVertex(
-                        state,
-                        structure.selfRest,
-                        guard,
-                        address,
-                        prefixSize,
-                        refNumber + 1,
-                    )
-                    Vertex(guard, structure, prefixSize, refNumber, listOf(child)) to (childOther + other)
+                    state.assertType(refAddress, TvmDataCellType)
+                    construct(state, structure.ref.dataCellStructure, refAddress, guard)
                 }
 
                 is TvmParameterInfo.DictCellInfo -> {
-                    TODO()
+                    state.assertType(refAddress, TvmDictCellType)
+                    emptyList()
                 }
             }
+
+            val (child, childOther) = constructVertex(
+                state,
+                structure.selfRest,
+                guard,
+                address,
+                prefixSize,
+                refNumber + 1,
+            )
+            Vertex(guard, structure, prefixSize, refNumber, listOf(child)) to (childOther + other)
         }
     }
 }

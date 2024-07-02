@@ -4,7 +4,9 @@ import org.ton.TvmCoinsLabel
 import org.ton.TvmDataCellLabel
 import org.ton.TvmIntegerLabel
 import org.ton.TvmInternalStdMsgAddrLabel
+import org.ton.TvmMaybeLabel
 import org.ton.TvmMsgAddrLabel
+import org.ton.TvmPrependingSwitchDataCellLabel
 import org.ton.TvmRealDataCellLabel
 import org.usvm.UBoolExpr
 import org.usvm.UConcreteHeapRef
@@ -15,6 +17,7 @@ import org.usvm.machine.state.TvmState
 import org.usvm.machine.state.loadIntFromCellWithoutChecks
 import org.usvm.mkSizeAddExpr
 import org.usvm.mkSizeExpr
+import org.usvm.mkSizeLeExpr
 import org.usvm.types.USingleTypeStream
 
 fun <AccType> foldOnTvmType(type: TvmType, init: AccType, f: (AccType, TvmType) -> AccType): AccType {
@@ -45,10 +48,10 @@ fun TvmRealDataCellLabel.accepts(symbolicType: TvmSymbolicCellDataType): UBoolEx
             }
         }
         is TvmMsgAddrLabel -> {
-            if (symbolicType is TvmSymbolicCellDataMsgAddr) {
-                trueExpr
-            } else {
-                falseExpr
+            when (symbolicType) {
+                is TvmSymbolicCellDataMsgAddr -> trueExpr
+                is TvmSymbolicCellDataInteger -> mkSizeLeExpr(symbolicType.sizeBits, mkSizeExpr(stdMsgAddrSize))
+                else -> falseExpr
             }
         }
         is TvmCoinsLabel -> {
@@ -56,6 +59,13 @@ fun TvmRealDataCellLabel.accepts(symbolicType: TvmSymbolicCellDataType): UBoolEx
                 trueExpr
             } else {
                 falseExpr
+            }
+        }
+        is TvmMaybeLabel -> {
+            when (symbolicType) {
+                is TvmSymbolicCellMaybeConstructorBit -> trueExpr
+                is TvmSymbolicCellDataInteger -> symbolicType.sizeBits eq mkBv(1)
+                else -> falseExpr
             }
         }
     }
@@ -67,11 +77,11 @@ fun TvmDataCellLabel.offset(
     prefixSize: UExpr<TvmSizeSort>,
 ): UExpr<TvmSizeSort> =
     when (this) {
+        is TvmPrependingSwitchDataCellLabel -> {
+            zeroSizeExpr
+        }
         is TvmIntegerLabel -> {
             mkSizeExpr(bitSize)
-        }
-        is TvmMsgAddrLabel -> {
-            zeroSizeExpr
         }
         is TvmInternalStdMsgAddrLabel -> {
             mkSizeExpr(internalStdMsgAddrSize)
