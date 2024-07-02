@@ -3,7 +3,9 @@ package org.usvm.machine.types
 import org.ton.TvmCoinsLabel
 import org.ton.TvmDataCellLabel
 import org.ton.TvmIntegerLabel
+import org.ton.TvmInternalStdMsgAddrLabel
 import org.ton.TvmMsgAddrLabel
+import org.ton.TvmRealDataCellLabel
 import org.usvm.UBoolExpr
 import org.usvm.UConcreteHeapRef
 import org.usvm.UExpr
@@ -33,7 +35,7 @@ fun TvmState.getPossibleTypes(ref: UConcreteHeapRef): Sequence<TvmType> {
 }
 
 context(TvmContext)
-fun TvmDataCellLabel.accepts(symbolicType: TvmSymbolicCellDataType): UBoolExpr =
+fun TvmRealDataCellLabel.accepts(symbolicType: TvmSymbolicCellDataType): UBoolExpr =
     when (this) {
         is TvmIntegerLabel -> {
             if (symbolicType !is TvmSymbolicCellDataInteger || isSigned != symbolicType.isSigned || endian != symbolicType.endian) {
@@ -69,7 +71,10 @@ fun TvmDataCellLabel.offset(
             mkSizeExpr(bitSize)
         }
         is TvmMsgAddrLabel -> {
-            TODO()
+            zeroSizeExpr
+        }
+        is TvmInternalStdMsgAddrLabel -> {
+            mkSizeExpr(internalStdMsgAddrSize)
         }
         is TvmCoinsLabel -> {
             val prefix = state.loadIntFromCellWithoutChecks(
@@ -83,3 +88,5 @@ fun TvmDataCellLabel.offset(
             mkSizeAddExpr(fourSizeExpr, length)
         }
     }
+
+private const val internalStdMsgAddrSize = 8 + 256

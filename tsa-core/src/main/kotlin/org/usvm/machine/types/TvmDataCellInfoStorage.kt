@@ -3,6 +3,7 @@ package org.usvm.machine.types
 import org.ton.TvmDataCellStructure
 import org.ton.TvmInputInfo
 import org.ton.TvmParameterInfo
+import org.ton.TvmRealDataCellLabel
 import org.usvm.UBoolExpr
 import org.usvm.UConcreteHeapRef
 import org.usvm.api.readField
@@ -51,6 +52,10 @@ class TvmDataCellInfoStorage private constructor(
                     }
 
                     is TvmDataCellStructure.KnownTypePrefix -> {
+                        // skip artificial labels
+                        if (struct.typeOfPrefix !is TvmRealDataCellLabel)
+                            return@fold
+
                         // conflict, if types are not consistent
                         val error = TvmReadingOfUnexpectedType(
                             labelType = struct.typeOfPrefix,

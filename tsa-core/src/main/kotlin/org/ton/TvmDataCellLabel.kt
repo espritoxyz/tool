@@ -2,11 +2,16 @@ package org.ton
 
 sealed interface TvmDataCellLabel
 
-data class TvmIntegerLabel(val bitSize: Int, val isSigned: Boolean, val endian: Endian): TvmDataCellLabel
+sealed interface TvmRealDataCellLabel : TvmDataCellLabel
 
-data object TvmMsgAddrLabel: TvmDataCellLabel
+data class TvmIntegerLabel(val bitSize: Int, val isSigned: Boolean, val endian: Endian) : TvmRealDataCellLabel
 
-data object TvmCoinsLabel: TvmDataCellLabel
+data object TvmMsgAddrLabel : TvmRealDataCellLabel
+
+// artificial label
+data object TvmInternalStdMsgAddrLabel : TvmDataCellLabel
+
+data object TvmCoinsLabel : TvmRealDataCellLabel
 
 enum class Endian {
     LittleEndian,

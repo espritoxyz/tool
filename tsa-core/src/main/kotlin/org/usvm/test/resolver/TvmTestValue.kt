@@ -3,6 +3,7 @@ package org.usvm.test.resolver
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 import org.ton.Endian
+import org.usvm.machine.types.stdMsgAddrSize
 import java.math.BigInteger
 
 @Serializable
@@ -60,9 +61,10 @@ data object TvmCellDataMaybeConstructorBit: TvmCellDataType {
     override val bitSize: Int = 1
 }
 
+// TODO: only stdAddr is supported now
 @Serializable
 data object TvmCellDataMsgAddr: TvmCellDataType {
-    override val bitSize: Int = 2
+    override val bitSize: Int = stdMsgAddrSize
 }
 
 @Serializable

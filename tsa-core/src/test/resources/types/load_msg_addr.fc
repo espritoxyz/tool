@@ -1,0 +1,12 @@
+#include "../imports/stdlib.fc";
+
+
+() recv_internal(int msg_value, cell in_msg_cell, slice in_msg) impure {
+    slice addr = in_msg~load_msg_addr();
+
+    var some_cell = begin_cell()
+        .store_slice(addr)
+        .end_cell();
+
+    some_cell~impure_touch();
+}

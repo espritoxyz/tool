@@ -116,7 +116,10 @@ class TvmSymbolicCellDataInteger(
 
 class TvmSymbolicCellMaybeConstructorBit(ctx: TvmContext) : TvmSymbolicCellDataType(ctx.mkBv(1))
 
-class TvmSymbolicCellDataMsgAddr(ctx: TvmContext) : TvmSymbolicCellDataType(ctx.mkBv(2))
+const val stdMsgAddrSize = 2 + 8 + 256
+
+// TODO: support other types of MsgAddr (now only stdMsgAddr is supported)
+class TvmSymbolicCellDataMsgAddr(ctx: TvmContext) : TvmSymbolicCellDataType(ctx.mkBv(stdMsgAddrSize))
 
 class TvmSymbolicCellDataBitArray(sizeBits: UExpr<TvmSizeSort>) : TvmSymbolicCellDataType(sizeBits)
 
