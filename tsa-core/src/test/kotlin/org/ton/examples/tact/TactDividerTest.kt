@@ -19,8 +19,7 @@ class TactDividerTest {
         val symbolicResult = tactCompileAndAnalyzeAllMethods(
             resourcePath,
             methodsBlackList = listOf(Int.MAX_VALUE, 0, 113617, 115390, 121275)
-                .map { it.toBigInteger() }
-                .toSet()
+                .mapTo(hashSetOf()) { it.toBigInteger() }
         )
 
         val allTests = symbolicResult.map { it.tests }.flatten()
