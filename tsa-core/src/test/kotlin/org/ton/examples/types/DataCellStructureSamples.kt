@@ -2,54 +2,54 @@ package org.ton.examples.types
 
 import org.ton.Endian
 import org.ton.TvmCoinsLabel
-import org.ton.TvmDataCellStructure
+import org.ton.TvmDataCellStructure.*
 import org.ton.TvmIntegerLabel
 import org.ton.TvmInternalStdMsgAddrLabel
 import org.ton.TvmMaybeLabel
 import org.ton.TvmMsgAddrLabel
-import org.ton.TvmParameterInfo
-import org.usvm.machine.types.TvmDataCellLoadedTypeInfo
+import org.ton.TvmParameterInfo.DataCellInfo
+import org.ton.TvmParameterInfo.DictCellInfo
 
-val maybeStructure = TvmDataCellStructure.SwitchPrefix(
+val maybeStructure = SwitchPrefix(
     switchSize = 1,
     variants = mapOf(
-        "0" to TvmDataCellStructure.Empty,
-        "1" to TvmDataCellStructure.LoadRef(
-            ref = TvmParameterInfo.DataCellInfo(TvmDataCellStructure.Unknown),
-            selfRest = TvmDataCellStructure.Empty
+        "0" to Empty,
+        "1" to LoadRef(
+            ref = DataCellInfo(Unknown),
+            selfRest = Empty
         ),
     ),
 )
 
-val int64Structure = TvmDataCellStructure.KnownTypePrefix(
+val int64Structure = KnownTypePrefix(
     TvmIntegerLabel(64, isSigned = true, Endian.BigEndian),
-    rest = TvmDataCellStructure.Empty
+    rest = Empty
 )
 
-val prefixInt64Structure = TvmDataCellStructure.KnownTypePrefix(
+val prefixInt64Structure = KnownTypePrefix(
     TvmIntegerLabel(64, isSigned = true, Endian.BigEndian),
-    rest = TvmDataCellStructure.Unknown
+    rest = Unknown
 )
 
-val someRefStructure = TvmDataCellStructure.LoadRef(
-    selfRest = TvmDataCellStructure.Empty,
-    ref = TvmParameterInfo.DataCellInfo(TvmDataCellStructure.Unknown),
+val someRefStructure = LoadRef(
+    selfRest = Empty,
+    ref = DataCellInfo(Unknown),
 )
 
-val coinsStructure = TvmDataCellStructure.KnownTypePrefix(
+val coinsStructure = KnownTypePrefix(
     TvmCoinsLabel,
-    rest = TvmDataCellStructure.Empty
+    rest = Empty
 )
 
 // Notice the structure!
-val msgStructure = TvmDataCellStructure.KnownTypePrefix(
+val msgStructure = KnownTypePrefix(
     TvmMsgAddrLabel,
-    rest = TvmDataCellStructure.SwitchPrefix(
+    rest = SwitchPrefix(
         switchSize = 3,
         mapOf(
-            "100" to TvmDataCellStructure.KnownTypePrefix(
+            "100" to KnownTypePrefix(
                 TvmInternalStdMsgAddrLabel,
-                rest = TvmDataCellStructure.Empty
+                rest = Empty
             )
         )
     )
@@ -57,15 +57,15 @@ val msgStructure = TvmDataCellStructure.KnownTypePrefix(
 
 // Notice the structure!
 val dict256Structure =
-    TvmDataCellStructure.KnownTypePrefix(
+    KnownTypePrefix(
         typeOfPrefix = TvmMaybeLabel,
-        rest = TvmDataCellStructure.SwitchPrefix(
+        rest = SwitchPrefix(
             switchSize = 1,
             mapOf(
-                "0" to TvmDataCellStructure.Empty,
-                "1" to TvmDataCellStructure.LoadRef(
-                    ref = TvmParameterInfo.DictCellInfo(256),
-                    selfRest = TvmDataCellStructure.Empty
+                "0" to Empty,
+                "1" to LoadRef(
+                    ref = DictCellInfo(256),
+                    selfRest = Empty
                 )
             )
         )
