@@ -64,7 +64,7 @@ fun TvmRealDataCellLabel.accepts(symbolicType: TvmSymbolicCellDataType): UBoolEx
         is TvmMaybeLabel -> {
             when (symbolicType) {
                 is TvmSymbolicCellMaybeConstructorBit -> trueExpr
-                is TvmSymbolicCellDataInteger -> symbolicType.sizeBits eq mkBv(1)
+                is TvmSymbolicCellDataInteger -> symbolicType.sizeBits eq oneSizeExpr
                 else -> falseExpr
             }
         }

@@ -21,7 +21,7 @@ sealed interface TvmDataCellStructure {
     ) : TvmDataCellStructure {
         init {
             require(switchSize > 0) {
-                "switchSize in SwitchPrefix must be > 0"
+                "switchSize in SwitchPrefix must be > 0, but got $switchSize"
             }
             variants.keys.forEach {
                 require(it.length == switchSize) {

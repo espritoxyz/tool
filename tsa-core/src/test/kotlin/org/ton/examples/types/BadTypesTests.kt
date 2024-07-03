@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test
 import org.ton.examples.compareSymbolicAndConcreteResults
 import org.ton.examples.compileAndAnalyzeFift
 import org.ton.examples.runFiftMethod
+import java.math.BigInteger
 import kotlin.io.path.Path
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -19,7 +20,7 @@ class BadTypesTests {
 
         val symbolicResult = compileAndAnalyzeFift(
             fiftResourcePath,
-            methodsBlackList = setOf(0.toBigInteger(), Int.MAX_VALUE.toBigInteger())
+            methodsBlackList = setOf(BigInteger.ZERO, Int.MAX_VALUE.toBigInteger())
         )
 
         assertEquals(1, symbolicResult.testSuites.size)

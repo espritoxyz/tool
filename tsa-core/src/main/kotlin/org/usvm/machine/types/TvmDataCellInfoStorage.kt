@@ -127,7 +127,7 @@ class TvmDataCellInfoStorage private constructor(
             info.parameterInfos.entries.forEach { (param, paramInfo) ->
                 val entry = state.stack.peekStackEntry(param)
                 check(entry is TvmStack.TvmInputStackEntry) {
-                    "During TvmDataCellInfoStorage building stack must consist only of input entries"
+                    "During TvmDataCellInfoStorage building stack must consist only of input entries, but $entry found"
                 }
                 trees += buildTreesForParameter(state, paramInfo, entry)
             }

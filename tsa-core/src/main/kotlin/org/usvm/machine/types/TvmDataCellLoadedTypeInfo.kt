@@ -56,8 +56,7 @@ class TvmDataCellLoadedTypeInfo(
             initial = addressToActions,
             initialGuard = ctx.trueExpr,
             collapseHeapRefs = false,
-            blockOnConcrete = { map: PersistentMap<UConcreteHeapRef, PersistentList<Action>>,
-                                guardedExpr: GuardedExpr<UConcreteHeapRef> ->
+            blockOnConcrete = { map, guardedExpr ->
                 val ref = guardedExpr.expr
                 val oldList = map.getOrDefault(ref, persistentListOf())
                 val actionInstance = action(guardedExpr)
