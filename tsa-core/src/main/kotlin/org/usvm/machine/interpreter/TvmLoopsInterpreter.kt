@@ -1,10 +1,7 @@
 package org.usvm.machine.interpreter
 
-import org.ton.bytecode.TvmArtificialAgainInst
-import org.ton.bytecode.TvmArtificialRepeatInst
-import org.ton.bytecode.TvmArtificialUntilInst
-import org.ton.bytecode.TvmArtificialWhileEndInst
-import org.ton.bytecode.TvmArtificialWhileStartInst
+import org.ton.bytecode.TvmAgainContinuation
+import org.ton.bytecode.TvmArtificialLoopEntranceInst
 import org.ton.bytecode.TvmContLoopsAgainInst
 import org.ton.bytecode.TvmContLoopsAgainbrkInst
 import org.ton.bytecode.TvmContLoopsAgainendInst
@@ -22,233 +19,235 @@ import org.ton.bytecode.TvmContLoopsWhileInst
 import org.ton.bytecode.TvmContLoopsWhilebrkInst
 import org.ton.bytecode.TvmContLoopsWhileendInst
 import org.ton.bytecode.TvmContLoopsWhileendbrkInst
-import org.ton.bytecode.TvmInst
+import org.ton.bytecode.TvmContinuation
+import org.ton.bytecode.TvmLoopEntranceContinuation
+import org.ton.bytecode.TvmRepeatContinuation
+import org.ton.bytecode.TvmUntilContinuation
+import org.ton.bytecode.TvmWhileContinuation
 import org.usvm.machine.TvmContext
 import org.usvm.machine.TvmStepScope
-import org.usvm.machine.interpreter.TvmLoopsInterpreter.ContinuationExtractor.CC
-import org.usvm.machine.interpreter.TvmLoopsInterpreter.ContinuationExtractor.STACK
+import org.usvm.machine.state.C0Register
+import org.usvm.machine.state.C1Register
 import org.usvm.machine.state.TvmState
+import org.usvm.machine.state.consumeDefaultGas
+import org.usvm.machine.state.defineC0
+import org.usvm.machine.state.defineC1
+import org.usvm.machine.state.extractCurrentContinuation
+import org.usvm.machine.state.jump
 import org.usvm.machine.state.newStmt
 import org.usvm.machine.state.nextStmt
-import org.usvm.machine.state.returnFromMethod
-import org.usvm.machine.state.consumeDefaultGas
 import org.usvm.machine.state.throwIntegerOutOfRangeError
 import org.usvm.machine.state.signedIntegerFitsBits
 import org.usvm.machine.state.takeLastContinuation
 import org.usvm.machine.state.takeLastIntOrThrowTypeError
 
 class TvmLoopsInterpreter(private val ctx: TvmContext) {
+    private var loopIdx = 0u
+
     fun visitTvmContLoopsInst(scope: TvmStepScope, stmt: TvmContLoopsInst) {
         scope.consumeDefaultGas(stmt)
 
         when (stmt) {
-            is TvmContLoopsRepeatInst -> visitRepeatInst(scope, stmt, continuationExtractor = STACK, executeUntilEnd = false)
-            is TvmContLoopsRepeatendInst -> visitRepeatInst(scope, stmt, continuationExtractor = CC, executeUntilEnd = true)
-            is TvmContLoopsRepeatbrkInst -> TODO()
-            is TvmContLoopsRepeatendbrkInst -> TODO()
-            is TvmContLoopsUntilInst -> visitUntilInst(scope, stmt, continuationExtractor = STACK, executeUntilEnd = false)
-            is TvmContLoopsUntilendInst -> visitUntilInst(scope, stmt, continuationExtractor = CC, executeUntilEnd = true)
-            is TvmContLoopsUntilbrkInst -> TODO()
-            is TvmContLoopsUntilendbrkInst -> TODO()
-            is TvmContLoopsWhileInst -> visitWhileInst(scope, stmt, continuationExtractor = STACK, executeUntilEnd = false)
-            is TvmContLoopsWhileendInst -> visitWhileInst(scope, stmt, continuationExtractor = CC, executeUntilEnd = true)
-            is TvmContLoopsWhilebrkInst -> TODO()
-            is TvmContLoopsWhileendbrkInst -> TODO()
-            is TvmContLoopsAgainInst -> visitAgainInst(scope, stmt, continuationExtractor = STACK, executeUntilEnd = false)
-            is TvmContLoopsAgainendInst -> visitAgainInst(scope, stmt, continuationExtractor = CC, executeUntilEnd = true)
-            is TvmContLoopsAgainbrkInst -> TODO()
-            is TvmContLoopsAgainendbrkInst -> TODO()
-            is TvmArtificialRepeatInst -> visitArtificialRepeatInst(scope, stmt)
-            is TvmArtificialUntilInst -> visitArtificialUntilInst(scope, stmt)
-            is TvmArtificialWhileStartInst -> visitArtificialWhileStartInst(scope, stmt)
-            is TvmArtificialWhileEndInst -> visitArtificialWhileEndInst(scope, stmt)
-            is TvmArtificialAgainInst -> visitArtificialAgainInst(scope, stmt)
+            is TvmContLoopsRepeatInst -> visitRepeatInst(scope, stmt, hasBreak = false)
+            is TvmContLoopsRepeatendInst -> visitRepeatEndInst(scope, stmt, hasBreak = false)
+            is TvmContLoopsRepeatbrkInst -> visitRepeatInst(scope, stmt, hasBreak = true)
+            is TvmContLoopsRepeatendbrkInst -> visitRepeatEndInst(scope, stmt, hasBreak = true)
+            is TvmContLoopsUntilInst -> visitUntilInst(scope, stmt, hasBreak = false)
+            is TvmContLoopsUntilendInst -> visitUntilEndInst(scope, stmt, hasBreak = false)
+            is TvmContLoopsUntilbrkInst -> visitUntilInst(scope, stmt, hasBreak = true)
+            is TvmContLoopsUntilendbrkInst -> visitUntilEndInst(scope, stmt, hasBreak = true)
+            is TvmContLoopsWhileInst -> visitWhileInst(scope, stmt, hasBreak = false)
+            is TvmContLoopsWhileendInst -> visitWhileEndInst(scope, stmt, hasBreak = false)
+            is TvmContLoopsWhilebrkInst -> visitWhileInst(scope, stmt, hasBreak = true)
+            is TvmContLoopsWhileendbrkInst -> visitWhileEndInst(scope, stmt, hasBreak = true)
+            is TvmContLoopsAgainInst -> visitAgainInst(scope, stmt, hasBreak = false)
+            is TvmContLoopsAgainendInst -> visitAgainEndInst(scope, stmt, hasBreak = false)
+            is TvmContLoopsAgainbrkInst -> visitAgainInst(scope, stmt, hasBreak = true)
+            is TvmContLoopsAgainendbrkInst -> visitAgainEndInst(scope, stmt, hasBreak = true)
+            is TvmArtificialLoopEntranceInst -> {
+                scope.consumeDefaultGas(stmt)
+                scope.doWithState { newStmt(stmt.nextStmt()) }
+            }
         }
+    }
+
+    /**
+     * Registers a loop breakpoint by setting the c1 register
+     */
+    private fun TvmState.registerBreakpoint(cont: TvmContinuation, hasBreak: Boolean): TvmContinuation {
+        if (!hasBreak) {
+            return cont
+        }
+
+        val newCont = cont.defineC0(registers.c0.value).defineC1(registers.c1?.value)
+
+        registers.c1 = C1Register(newCont)
+
+        return newCont
     }
 
     private fun visitRepeatInst(
         scope: TvmStepScope,
         stmt: TvmContLoopsInst,
-        continuationExtractor: ContinuationExtractor,
-        executeUntilEnd: Boolean,
-    ) {
-        with(ctx) {
-            val continuation = with(scope) { stmt.extractContinuation(continuationExtractor) }
-            val loopRepeatTimes = scope.takeLastIntOrThrowTypeError() ?: return
-            val inRangeConstraint = signedIntegerFitsBits(loopRepeatTimes, bits = 32u)
+        hasBreak: Boolean
+    ) = doRepeat(
+        scope = scope,
+        extractBody = { stack.takeLastContinuation() },
+        extractAfter = { extractCurrentContinuation(stmt, saveC0 = true) },
+        hasBreak = hasBreak
+    )
 
-            scope.fork(
-                inRangeConstraint,
-                blockOnFalseState = throwIntegerOutOfRangeError
-            ) ?: return
+    private fun visitRepeatEndInst(
+        scope: TvmStepScope,
+        stmt: TvmContLoopsInst,
+        hasBreak: Boolean
+    ) = doRepeat(
+        scope = scope,
+        extractBody = { extractCurrentContinuation(stmt) },
+        extractAfter = { registers.c0.value },
+        hasBreak = hasBreak
+    )
 
-            val artificialRepeatInst = TvmArtificialRepeatInst(stmt, continuation, loopRepeatTimes, executeUntilEnd)
-            visitArtificialRepeatInst(scope, artificialRepeatInst)
-        }
+    private inline fun doRepeat(
+        scope: TvmStepScope,
+        crossinline extractBody: TvmState.() -> TvmContinuation,
+        crossinline extractAfter: TvmState.() -> TvmContinuation,
+        hasBreak: Boolean
+    ) = with(ctx) {
+        val body = scope.calcOnState { extractBody() }
+        val wrappedBody = TvmLoopEntranceContinuation(body, loopIdx++)
+        val count = scope.takeLastIntOrThrowTypeError() ?: return
+        val inRangeConstraint = signedIntegerFitsBits(count, bits = 32u)
+
+        scope.fork(
+            inRangeConstraint,
+            blockOnFalseState = throwIntegerOutOfRangeError
+        ) ?: return
+
+        val after = scope.calcOnState { registerBreakpoint(extractAfter(), hasBreak) }
+        val repeatCont = TvmRepeatContinuation(wrappedBody, after, count)
+
+        scope.jump(repeatCont)
     }
 
     private fun visitUntilInst(
         scope: TvmStepScope,
         stmt: TvmContLoopsInst,
-        continuationExtractor: ContinuationExtractor,
-        executeUntilEnd: Boolean,
+        hasBreak: Boolean,
+    ) = doUntil(
+        scope = scope,
+        extractBody = { stack.takeLastContinuation() },
+        extractAfter = { extractCurrentContinuation(stmt, saveC0 = true) },
+        hasBreak = hasBreak
+    )
+
+    private fun visitUntilEndInst(
+        scope: TvmStepScope,
+        stmt: TvmContLoopsInst,
+        hasBreak: Boolean,
+    ) = doUntil(
+        scope = scope,
+        extractBody = { extractCurrentContinuation(stmt) },
+        extractAfter = { registers.c0.value },
+        hasBreak = hasBreak
+    )
+
+    private inline fun doUntil(
+        scope: TvmStepScope,
+        crossinline extractBody: TvmState.() -> TvmContinuation,
+        crossinline extractAfter: TvmState.() -> TvmContinuation,
+        hasBreak: Boolean
     ) {
-        val continuation = with(scope) { stmt.extractContinuation(continuationExtractor) }
+        val body = scope.calcOnState { extractBody() }
+        val wrappedBody = TvmLoopEntranceContinuation(body, loopIdx++)
 
         scope.doWithState {
-            val artificialUntilInst = TvmArtificialUntilInst(stmt, continuation, executeUntilEnd)
-            callStack.push(continuation.codeBlock, artificialUntilInst)
-
-            currentContinuation = continuation // TODO use these stack and registers?
-            newStmt(continuation.takeCurrentStmt())
+            val after = scope.calcOnState { registerBreakpoint(extractAfter(), hasBreak) }
+            val untilCont = TvmUntilContinuation(wrappedBody, after)
+            registers.c0 = C0Register(untilCont)
         }
+
+        scope.jump(wrappedBody)
     }
 
     private fun visitWhileInst(
         scope: TvmStepScope,
         stmt: TvmContLoopsInst,
-        continuationExtractor: ContinuationExtractor,
-        executeUntilEnd: Boolean,
-    ) {
-        val continuation = with(scope) { stmt.extractContinuation(continuationExtractor) }
-        val conditionContinuation = scope.calcOnState { stack.takeLastContinuation() }
+        hasBreak: Boolean,
+    ) = doWhile(
+        scope = scope,
+        extractBody = { stack.takeLastContinuation() },
+        extractAfter = { extractCurrentContinuation(stmt, saveC0 = true) },
+        hasBreak = hasBreak
+    )
 
-        val artificialWhileStartInst = TvmArtificialWhileStartInst(
-            originalInst = stmt,
-            continuationValue = continuation,
-            conditionContinuation = conditionContinuation,
-            executeUntilEnd = executeUntilEnd
-        )
-        visitArtificialWhileStartInst(scope, artificialWhileStartInst)
+    private fun visitWhileEndInst(
+        scope: TvmStepScope,
+        stmt: TvmContLoopsInst,
+        hasBreak: Boolean,
+    ) = doWhile(
+        scope = scope,
+        extractBody = { extractCurrentContinuation(stmt) },
+        extractAfter = { registers.c0.value },
+        hasBreak = hasBreak
+    )
+
+    private inline fun doWhile(
+        scope: TvmStepScope,
+        crossinline extractBody: TvmState.() -> TvmContinuation,
+        crossinline extractAfter: TvmState.() -> TvmContinuation,
+        hasBreak: Boolean
+    ) {
+        val body = scope.calcOnState { extractBody() }
+        val cond = scope.calcOnState { stack.takeLastContinuation() }
+        val wrappedCond = TvmLoopEntranceContinuation(cond, loopIdx++)
+
+        scope.doWithState {
+            val after = scope.calcOnState { registerBreakpoint(extractAfter(), hasBreak) }
+            val whileCond = TvmWhileContinuation(wrappedCond, body, after, isCondition = true)
+            registers.c0 = C0Register(whileCond)
+        }
+
+        scope.jump(wrappedCond)
     }
 
     private fun visitAgainInst(
         scope: TvmStepScope,
         stmt: TvmContLoopsInst,
-        continuationExtractor: ContinuationExtractor,
-        executeUntilEnd: Boolean,
+        hasBreak: Boolean,
     ) {
-        val continuation = with(scope) { stmt.extractContinuation(continuationExtractor) }
+        val body = scope.calcOnState { stack.takeLastContinuation() }
+        val wrappedBody = TvmLoopEntranceContinuation(body, loopIdx++)
 
-        val artificialAgainInst = TvmArtificialAgainInst(stmt, continuation, executeUntilEnd)
-        visitArtificialAgainInst(scope, artificialAgainInst)
-    }
-
-    private fun visitArtificialAgainInst(scope: TvmStepScope, stmt: TvmArtificialAgainInst) {
-        val continuation = stmt.continuationValue
-
-        scope.doWithState {
-            // AGAIN executes the loop infinitely many times,
-            // and can be exited only by an exception, or a RETALT (or an explicit JMPX)
-            callStack.push(continuation.codeBlock, stmt)
-
-            currentContinuation = continuation // TODO use these stack and registers?
-            newStmt(continuation.takeCurrentStmt())
-        }
-    }
-
-    private fun visitArtificialRepeatInst(scope: TvmStepScope, stmt: TvmArtificialRepeatInst) {
-        with(ctx) {
-            val loopRepeatTimes = stmt.loopRepeats
-
-            val isPositive = mkBvSignedLessExpr(zeroValue, loopRepeatTimes)
-            scope.fork(
-                isPositive,
-                blockOnFalseState = { lastIteration(stmt, stmt.executeUntilEnd) }
-            ) ?: return
-
-            val decreasedLoopRepeatTimes = mkBvSubExpr(loopRepeatTimes, oneValue)
+        if (hasBreak) {
             scope.doWithState {
-                val continuationValue = stmt.continuationValue
-                val updatedArtificialRepeatInst = stmt.copy(loopRepeats = decreasedLoopRepeatTimes)
-                callStack.push(continuationValue.codeBlock, updatedArtificialRepeatInst)
-
-                currentContinuation = continuationValue // TODO use these stack and registers?
-                newStmt(continuationValue.takeCurrentStmt())
+                registers.c1 = C1Register(extractCurrentContinuation(stmt, saveC0 = true, saveC1 = true))
             }
         }
+
+        val cont = TvmAgainContinuation(wrappedBody)
+
+        scope.jump(cont)
     }
 
-    private fun visitArtificialUntilInst(scope: TvmStepScope, stmt: TvmArtificialUntilInst) {
-        val x = scope.takeLastIntOrThrowTypeError() ?: return
-        val continueLoopCondition = ctx.mkEq(x, ctx.zeroValue)
+    private fun visitAgainEndInst(
+        scope: TvmStepScope,
+        stmt: TvmContLoopsInst,
+        hasBreak: Boolean,
+    ) {
+        val body = scope.calcOnState { extractCurrentContinuation(stmt) }
+        val wrappedBody = TvmLoopEntranceContinuation(body, loopIdx++)
 
-        scope.fork(
-            continueLoopCondition,
-            blockOnFalseState = { lastIteration(stmt, stmt.executeUntilEnd) }
-        ) ?: return
-
-        val continuation = stmt.continuationValue
-
-        scope.doWithState {
-            callStack.push(continuation.codeBlock, stmt)
-
-            currentContinuation = continuation // TODO use these stack and registers?
-            newStmt(continuation.takeCurrentStmt())
-        }
-    }
-
-    private fun visitArtificialWhileStartInst(scope: TvmStepScope, stmt: TvmArtificialWhileStartInst) {
-        scope.doWithState {
-            val continuationValue = stmt.continuationValue
-            val conditionContinuation = stmt.conditionContinuation
-            val artificialWhileEndInst = TvmArtificialWhileEndInst(
-                originalInst = stmt.originalInst,
-                continuationValue = continuationValue,
-                conditionContinuation = conditionContinuation,
-                executeUntilEnd = stmt.executeUntilEnd
-            )
-            callStack.push(conditionContinuation.codeBlock, artificialWhileEndInst)
-
-            currentContinuation = conditionContinuation // TODO use these stack and registers?
-            newStmt(conditionContinuation.takeCurrentStmt())
-        }
-    }
-
-    private fun visitArtificialWhileEndInst(scope: TvmStepScope, stmt: TvmArtificialWhileEndInst) {
-        val x = scope.takeLastIntOrThrowTypeError() ?: return
-        val continueLoopCondition = with(ctx) {
-            mkEq(x, zeroValue).not()
+        if (hasBreak) {
+            scope.doWithState {
+                val newC0 = registers.c0.value.defineC1(registers.c1?.value)
+                registers.c0 = C0Register(newC0)
+                registers.c1 = C1Register(registers.c0.value)
+            }
         }
 
-        scope.fork(
-            continueLoopCondition,
-            blockOnFalseState = { lastIteration(stmt, stmt.executeUntilEnd) }
-        ) ?: return
+        val cont = TvmAgainContinuation(wrappedBody)
 
-        val continuationValue = stmt.continuationValue
-        val conditionContinuation = stmt.conditionContinuation
-        scope.doWithState {
-            val artificialWhileStartInst = TvmArtificialWhileStartInst(
-                originalInst = stmt.originalInst,
-                continuationValue = continuationValue,
-                conditionContinuation = conditionContinuation,
-                executeUntilEnd = stmt.executeUntilEnd
-            )
-            callStack.push(continuationValue.codeBlock, artificialWhileStartInst)
-
-            currentContinuation = continuationValue // TODO use these stack and registers?
-            newStmt(continuationValue.takeCurrentStmt())
-        }
-    }
-
-    private enum class ContinuationExtractor {
-        STACK,
-        CC
-    }
-
-    private fun TvmState.lastIteration(stmt: TvmInst, executeUntilEnd: Boolean) =
-        if (executeUntilEnd) {
-            returnFromMethod()
-        } else {
-            newStmt(stmt.nextStmt())
-        }
-
-    context(TvmStepScope)
-    private fun TvmInst.extractContinuation(continuationExtractor: ContinuationExtractor) = calcOnState {
-        when (continuationExtractor) {
-            STACK -> stack.takeLastContinuation()
-            CC -> currentContinuation.copy(currentInstIndex = location.index + 1)
-        }
+        scope.jump(cont)
     }
 }

@@ -22,6 +22,8 @@ class GasTest {
     fun testGasUsage() {
         val (fiftFiles, fiftWorkDir) = findFiftTestFiles()
         val codeBlocks = fiftFiles.flatMap { fiftFunctions(it) }.distinct()
+            // filter out the blocks that call other blocks, as each block is executed separately
+            .filterNot { it.contains("CALLDICT") }
 
         val concreteResults = codeBlocks.map { runFiftCodeBlock(fiftWorkDir, it) }
         val contract = compileFiftCodeBlocksContract(fiftWorkDir, codeBlocks)

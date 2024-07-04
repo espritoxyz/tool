@@ -5,7 +5,6 @@ import kotlinx.collections.immutable.PersistentSet
 import kotlinx.collections.immutable.persistentHashSetOf
 import kotlinx.collections.immutable.persistentListOf
 import org.ton.bytecode.TvmCodeBlock
-import org.ton.bytecode.TvmContinuationValue
 import org.ton.bytecode.TvmInst
 import org.ton.targets.TvmTarget
 import org.usvm.PathNode
@@ -31,7 +30,6 @@ class TvmState(
     ctx: TvmContext,
     override val entrypoint: TvmCodeBlock,
 //    val registers: TvmRegisters, // TODO do we really need keep the registers this way?
-    var currentContinuation: TvmContinuationValue,
     var stack: TvmStack = TvmStack(ctx, persistentListOf()),
     var registers: TvmRegisters,
     val emptyRefValue: TvmRefEmptyValue,
@@ -98,9 +96,8 @@ class TvmState(
         return TvmState(
             ctx = ctx,
             entrypoint = entrypoint,
-            currentContinuation = currentContinuation, // TODO clone?
-            stack = stack.clone(), // TODO clone?
-            registers = registers.copy(),
+            stack = stack.clone(),
+            registers = registers.clone(),
             emptyRefValue = emptyRefValue,
             symbolicRefs = symbolicRefs,
             gasUsage = gasUsage,

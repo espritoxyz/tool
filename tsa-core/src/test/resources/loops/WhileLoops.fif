@@ -5,6 +5,9 @@ PROGRAM{
   0 DECLMETHOD f_while
   1 DECLMETHOD f_while_with_arg
   2 DECLMETHOD f_whileend
+  3 DECLMETHOD f_while_brk
+  4 DECLMETHOD f_while_complex
+  5 DECLMETHOD f_while_call
   f_while PROC:<{
     0 PUSHINT
     1 PUSHINT
@@ -22,7 +25,7 @@ PROGRAM{
     WHILE
     // 5 32
   }>
-f_while_with_arg PROC:<{
+  f_while_with_arg PROC:<{
     0 PUSHINT
     1 PUSHINT
     WHILE:<{
@@ -51,5 +54,66 @@ f_while_with_arg PROC:<{
       INC
       SWAP
     // 5 32
+  }>
+  f_while_brk PROC:<{
+    0 PUSHINT
+    1 PUSHINT
+    CONT:<{
+      OVER
+      5 NEQINT
+    }>
+    CONT:<{
+      2 PUSHINT
+      MUL
+      SWAP
+      INC
+      DUP
+      2 EQINT
+      IF:<{
+        RETALT
+      }>
+      SWAP
+    }>
+    WHILEBRK
+  }>
+  f_while_complex PROC:<{
+    0 PUSHINT
+    1 PUSHINT
+    WHILE:<{
+      OVER
+      5 NEQINT
+    }>DO<{
+      1 LSHIFT#
+      SWAP
+      INC
+      0 PUSHINT
+      WHILE:<{
+        DUP
+        2 NEQINT
+      }>DO<{
+        s0 s2 XCHG
+        INC
+        s0 s2 XCHG
+        INC
+      }>
+      DROP
+      SWAP
+    }>
+    NIP
+  }>
+  f_while_call PROC:<{
+    0 PUSHINT
+    DUP
+    WHILE:<{
+      OVER
+      2 NEQINT
+    }>DO<{
+      f_while_complex CALLDICT
+      ADD
+      SWAP
+      INC
+      SWAP
+    }>
+    NIP
   }>
 }END>c

@@ -1,0 +1,41 @@
+"Fift.fif" include
+"Asm.fif" include
+
+PROGRAM{
+  0 DECLMETHOD savelist
+  1 DECLMETHOD loop_savelist
+  savelist PROC:<{
+    CONT:<{
+      1 PUSHINT
+      CONT:<{
+        2 PUSHINT
+      }>
+      c0 POPCTR
+    }>
+    EXECUTE
+    3 PUSHINT
+    // 1 2
+  }>
+  loop_savelist PROC:<{
+    CONT:<{
+      4 PUSHINT
+    }>
+    c1 POPCTR
+    5 PUSHINT
+    CONT:<{
+      1 PUSHINT
+    }>
+    CONT:<{
+      c1 PUSHCTR
+      EXECUTE
+      CONT:<{
+        4 PUSHINT
+      }>
+      c1 POPCTR
+    }>
+    c1 SETCONTCTR
+    REPEAT
+    10 PUSHINT
+    // 1 1 1 1 1 10
+  }>
+}END>c

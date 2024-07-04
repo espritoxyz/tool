@@ -5,6 +5,7 @@ PROGRAM{
   0 DECLMETHOD f_again
   1 DECLMETHOD f_again_with_arg
   2 DECLMETHOD f_againend
+  3 DECLMETHOD f_again_brk
   f_again PROC:<{
     243 PUSHINT
     3 PUSHINT
@@ -37,5 +38,22 @@ PROGRAM{
     DIV
     SWAP
     // Div by 0
+  }>
+  f_again_brk PROC:<{
+    243 PUSHINT
+    3 PUSHINT
+    CONT:<{
+      DEC
+      DUP
+      0 EQINT
+      IF:<{
+        RETALT
+      }>
+      TUCK
+      DIV
+      SWAP
+    }>
+    AGAINBRK
+    // 121
   }>
 }END>c

@@ -6,6 +6,9 @@ PROGRAM{
   1 DECLMETHOD f_repeat_with_arg
   2 DECLMETHOD f_repeatend
   3 DECLMETHOD f_repeatend_empty
+  4 DECLMETHOD f_repeat_brk
+  5 DECLMETHOD f_repeat_complex
+  6 DECLMETHOD f_repeat_call
   f_repeat PROC:<{
     1 PUSHINT
     5 PUSHINT
@@ -36,5 +39,38 @@ PROGRAM{
       REPEAT:
           2 PUSHINT
           MUL
+  }>
+  f_repeat_brk PROC:<{
+    1 PUSHINT
+    5 PUSHINT
+    CONT:<{
+        2 PUSHINT
+        MUL
+        DUP
+        4 EQINT
+        IF:<{
+          RETALT
+        }>
+    }>
+    REPEATBRK
+  }>
+  f_repeat_complex PROC:<{
+    1 PUSHINT
+    3 PUSHINT
+    REPEAT:<{
+      3 MULCONST
+      2 PUSHINT
+      REPEAT:<{
+        INC
+      }>
+    }>
+  }>
+  f_repeat_call PROC:<{
+    1 PUSHINT
+    3 PUSHINT
+    REPEAT:<{
+      f_repeat_complex CALLDICT
+      ADD
+    }>
   }>
 }END>c

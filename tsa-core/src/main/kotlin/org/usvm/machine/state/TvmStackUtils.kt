@@ -3,7 +3,7 @@ package org.usvm.machine.state
 import org.usvm.machine.types.TvmBuilderType
 import org.usvm.machine.types.TvmCellType
 import org.usvm.machine.types.TvmContinuationType
-import org.ton.bytecode.TvmContinuationValue
+import org.ton.bytecode.TvmContinuation
 import org.usvm.UAddressSort
 import org.usvm.machine.types.TvmIntegerType
 import org.usvm.machine.types.TvmRealReferenceType
@@ -47,7 +47,7 @@ fun TvmStack.addInt(value: UExpr<TvmInt257Sort>) {
     add(value, TvmIntegerType)
 }
 
-fun TvmStack.addContinuation(value: TvmContinuationValue) {
+fun TvmStack.addContinuation(value: TvmContinuation) {
     addStackEntry(TvmStack.TvmStackContinuationValue(value).toStackEntry())
 }
 
@@ -130,7 +130,7 @@ fun TvmStepScope.takeLastTuple(): TvmStackTupleValue? = calcOnStateCtx {
     }
 }
 
-fun TvmStack.takeLastContinuation(): TvmContinuationValue {
+fun TvmStack.takeLastContinuation(): TvmContinuation {
     val continuationStackValue = takeLast(TvmContinuationType) { _ ->
         error("Unexpected continuation as an input")
     }

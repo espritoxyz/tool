@@ -20,7 +20,7 @@ class WhileLoopTest {
 
         val symbolicResult = compileAndAnalyzeFift(fiftResourcePath)
 
-        val methodIds = (0..2).toSet()
+        val methodIds = (0..5).toSet()
         compareSymbolicAndConcreteResults(methodIds, symbolicResult) { methodId ->
             runFiftMethod(fiftResourcePath, methodId)
         }

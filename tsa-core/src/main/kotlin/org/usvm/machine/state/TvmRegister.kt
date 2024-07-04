@@ -2,8 +2,9 @@ package org.usvm.machine.state
 
 import kotlinx.collections.immutable.PersistentList
 import kotlinx.collections.immutable.persistentListOf
+import org.ton.bytecode.TvmQuitContinuation
 import org.ton.bytecode.TvmCellValue
-import org.ton.bytecode.TvmContinuationValue
+import org.ton.bytecode.TvmContinuation
 import org.usvm.UExpr
 import org.usvm.UHeapRef
 import org.usvm.machine.TvmContext
@@ -15,12 +16,13 @@ import org.usvm.machine.state.TvmStack.TvmStackTupleValueConcreteNew
 interface TvmRegister
 
 // TODO registers should contain symbolic values, not concrete?
-data class C0Register(var value: TvmContinuationValue) : TvmRegister
-data class C1Register(var value: TvmContinuationValue) : TvmRegister
-data class C2Register(var value: TvmContinuationValue) : TvmRegister
-data class C3Register(var value: TvmContinuationValue) : TvmRegister
-data class C4Register(var value: TvmCellValue) : TvmRegister
-data class C5Register(var value: TvmCellValue) : TvmRegister
+// TODO make all registers immutable
+data class C0Register(val value: TvmContinuation) : TvmRegister
+data class C1Register(val value: TvmContinuation) : TvmRegister
+data class C2Register(val value: TvmContinuation) : TvmRegister
+data class C3Register(val value: TvmContinuation) : TvmRegister
+data class C4Register(val value: TvmCellValue) : TvmRegister
+data class C5Register(val value: TvmCellValue) : TvmRegister
 data class C7Register(
     private val ctx: TvmContext,
     /**
@@ -49,10 +51,14 @@ data class C7Register(
      */
     var addr: UHeapRef? = null,
     /**
+     * The Maybe Cell D with the current global configuration dictionary. 9 GETPARAM.
+     */
+    var configRoot: UHeapRef,
+    /**
      * The code of the smart-contract. 10 GETPARAM.
      */
     // TODO is it just Int.MAX_VALUE method? Or all methods?
-    var code: TvmContinuationValue? = null,
+    var code: TvmContinuation? = null,
     /**
      * The value of incoming message. 11 GETPARAM.
      */
@@ -70,11 +76,6 @@ data class C7Register(
     var prevBlocksInfo: UHeapRef? = null,
     var globalVariables: TvmStackTupleValueConcreteNew? = null
 ) {
-    /**
-     * The Maybe Cell D with the current global configuration dictionary. 9 GETPARAM.
-     */
-    lateinit var configRoot: UHeapRef
-
     operator fun get(idx: Int, stack: TvmStack): TvmStack.TvmStackValue {
         if (idx == 0) {
             TODO("Support getting tuple with blockchain specific data")
@@ -120,12 +121,37 @@ data class C7Register(
 // TODO make them not-null?
 data class TvmRegisters(
     private val ctx: TvmContext,
-    var c0: C0Register? = null,
+    var c0: C0Register = C0Register(TvmQuitContinuation),
     var c1: C1Register? = null,
     var c2: C2Register? = null,
     var c3: C3Register? = null,
     var c4: C4Register? = null,
-    var c7: C7Register = C7Register(ctx)
 ) {
     lateinit var c5: C5Register
+    lateinit var c7: C7Register
+
+    constructor(
+        ctx: TvmContext,
+        c0: C0Register,
+        c1: C1Register?,
+        c2: C2Register?,
+        c3: C3Register?,
+        c4: C4Register?,
+        c5: C5Register,
+        c7: C7Register,
+    ) : this(ctx, c0, c1, c2, c3, c4) {
+        this.c5 = c5
+        this.c7 = c7
+    }
+
+    fun clone(): TvmRegisters = TvmRegisters(
+        ctx,
+        c0,
+        c1,
+        c2,
+        c3,
+        c4,
+        c5,
+        c7.copy(),
+    )
 }

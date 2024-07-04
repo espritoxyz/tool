@@ -1,4 +1,4 @@
-package org.ton.examples.loops
+package org.ton.examples.continuations
 
 import org.ton.examples.compareSymbolicAndConcreteResults
 import org.ton.examples.compileAndAnalyzeFift
@@ -8,19 +8,19 @@ import org.usvm.machine.TvmContext
 import kotlin.io.path.Path
 import kotlin.test.Test
 
-class AgainLoopTest {
+class SavelistTest {
     private val ctx = TvmContext(TvmComponents())
 
-    private val againLoopsFiftPath: String = "/loops/AgainLoops.fif"
+    private val savelistFiftPath: String = "/continuations/Savelist.fif"
 
     @Test
-    fun testAgainLoops(): Unit = with(ctx) {
-        val fiftResourcePath = this::class.java.getResource(againLoopsFiftPath)?.path?.let { Path(it) }
-            ?: error("Cannot find resource fift $againLoopsFiftPath")
+    fun testSavelist(): Unit = with(ctx) {
+        val fiftResourcePath = this::class.java.getResource(savelistFiftPath)?.path?.let { Path(it) }
+            ?: error("Cannot find resource fift $savelistFiftPath")
 
         val symbolicResult = compileAndAnalyzeFift(fiftResourcePath)
 
-        val methodIds = (0..3).toSet()
+        val methodIds = (0..1).toSet()
         compareSymbolicAndConcreteResults(methodIds, symbolicResult) { methodId ->
             runFiftMethod(fiftResourcePath, methodId)
         }

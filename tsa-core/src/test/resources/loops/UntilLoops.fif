@@ -5,6 +5,9 @@ PROGRAM{
   0 DECLMETHOD f_until
   1 DECLMETHOD f_until_with_arg
   2 DECLMETHOD f_untilend
+  3 DECLMETHOD f_until_brk
+  4 DECLMETHOD f_until_complex
+  5 DECLMETHOD f_until_call
   f_until PROC:<{
     0 PUSHINT
     1 PUSHINT
@@ -46,5 +49,64 @@ PROGRAM{
         5 EQINT
         s1 s2 XCHG
     // 5 32
+  }>
+  f_until_brk PROC:<{
+    0 PUSHINT
+    1 PUSHINT
+    CONT:<{
+        2 PUSHINT
+        MUL
+        SWAP
+        INC
+        DUP
+        2 EQINT
+        IF:<{
+          RETALT
+        }>
+        DUP
+        5 EQINT
+        s1 s2 XCHG
+    }>
+    UNTILBRK
+    // 4 2
+  }>
+  f_until_complex PROC:<{
+    0 PUSHINT
+    1 PUSHINT
+    UNTIL:<{
+      3 MULCONST
+      0 PUSHINT
+      UNTIL:<{
+        SWAP
+        INC
+        SWAP
+        INC
+        DUP
+        2 EQINT
+      }>
+      DROP
+      SWAP
+      INC
+      DUP
+      5 EQINT
+      s1 s2 XCHG
+    }>
+    NIP
+    // 485
+  }>
+  f_until_call PROC:<{
+    0 PUSHINT
+    DUP
+    UNTIL:<{
+      INC
+      f_until_complex CALLDICT
+      s1 s2 XCHG
+      ADD
+      OVER
+      2 EQINT
+      s1 s2 XCHG
+    }>
+    DROP
+    // 970
   }>
 }END>c

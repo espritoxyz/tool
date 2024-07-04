@@ -98,9 +98,8 @@ class TvmMachine(private val options: UMachineOptions = defaultOptions) : UMachi
         return statesCollector.collectedStates
     }
 
-    private fun isStateTerminated(state: TvmState): Boolean {
-        return state.callStack.isEmpty() || state.methodResult is TvmMethodResult.TvmFailure
-    }
+    private fun isStateTerminated(state: TvmState): Boolean =
+        state.methodResult !is TvmMethodResult.NoCall
 
     companion object {
         private val logger = object : KLogging() {}.logger

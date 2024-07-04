@@ -106,7 +106,7 @@ import org.ton.bytecode.TvmContLoopsInst
 import org.ton.bytecode.TvmContRegistersInst
 import org.ton.bytecode.TvmContRegistersPopctrInst
 import org.ton.bytecode.TvmContRegistersPushctrInst
-import org.ton.bytecode.TvmContinuationValue
+import org.ton.bytecode.TvmContinuation
 import org.ton.bytecode.TvmContractCode
 import org.ton.bytecode.TvmDebugInst
 import org.ton.bytecode.TvmDictInst
@@ -192,7 +192,6 @@ import org.usvm.machine.TvmContext.Companion.sliceDataPosField
 import org.usvm.machine.TvmContext.Companion.sliceRefPosField
 import org.usvm.machine.TvmContext.TvmInt257Sort
 import org.usvm.machine.intValue
-import org.usvm.machine.state.C3Register
 import org.usvm.machine.state.C4Register
 import org.usvm.machine.state.TvmRefEmptyValue
 import org.usvm.machine.state.TvmRegisters
@@ -212,11 +211,9 @@ import org.usvm.machine.state.doXchg
 import org.usvm.machine.state.doXchg2
 import org.usvm.machine.state.doXchg3
 import org.usvm.machine.state.generateSymbolicCell
-import org.usvm.machine.state.lastStmt
 import org.usvm.machine.state.allocSliceFromData
 import org.usvm.machine.state.newStmt
 import org.usvm.machine.state.nextStmt
-import org.usvm.machine.state.returnFromMethod
 import org.usvm.machine.state.signedIntegerFitsBits
 import org.usvm.machine.state.takeLastCell
 import org.usvm.machine.state.takeLastContinuation
@@ -234,10 +231,13 @@ import org.usvm.sizeSort
 import org.usvm.solver.USatResult
 import org.usvm.targets.UTargetsSet
 import java.math.BigInteger
+import org.ton.bytecode.TvmArtificialExecuteContInst
+import org.ton.bytecode.TvmArtificialJmpToContInst
 import org.ton.bytecode.TvmCompareOtherSdemptyInst
 import org.ton.bytecode.TvmCompareOtherSdeqInst
 import org.ton.bytecode.TvmConstDataPushrefInst
 import org.ton.bytecode.TvmConstDataPushrefsliceInst
+import org.ton.bytecode.TvmContBasicRetaltInst
 import org.ton.bytecode.TvmContConditionalIfelserefInst
 import org.ton.bytecode.TvmContConditionalIfjmprefInst
 import org.ton.bytecode.TvmContConditionalIfnotInst
@@ -245,20 +245,34 @@ import org.ton.bytecode.TvmContConditionalIfnotjmpInst
 import org.ton.bytecode.TvmContConditionalIfnotjmprefInst
 import org.ton.bytecode.TvmContConditionalIfnotrefInst
 import org.ton.bytecode.TvmContConditionalIfrefelserefInst
+import org.ton.bytecode.TvmContRegistersSamealtInst
 import org.ton.bytecode.TvmContRegistersSamealtsaveInst
 import org.ton.bytecode.TvmContRegistersSaveInst
+import org.ton.bytecode.TvmContRegistersSetcontctrInst
 import org.ton.bytecode.TvmInstList
+import org.ton.bytecode.TvmOrdContinuation
 import org.usvm.machine.TvmStepScope
 import org.usvm.machine.bigIntValue
+import org.usvm.machine.state.C0Register
+import org.usvm.machine.state.C1Register
+import org.usvm.machine.state.C2Register
 import org.usvm.machine.state.C5Register
+import org.usvm.machine.state.C7Register
 import org.usvm.machine.state.addInt
 import org.usvm.machine.state.addContinuation
 import org.usvm.machine.state.addOnStack
 import org.usvm.machine.state.allocEmptyCell
 import org.usvm.machine.state.allocSliceFromCell
 import org.usvm.machine.state.allocateCell
+import org.usvm.machine.state.defineC0
+import org.usvm.machine.state.defineC1
+import org.usvm.machine.state.defineC2
 import org.usvm.machine.state.getSliceRemainingBitsCount
 import org.usvm.machine.state.initConfigRoot
+import org.usvm.machine.state.jump
+import org.usvm.machine.state.lastStmt
+import org.usvm.machine.state.switchToContinuation
+import org.usvm.machine.state.returnFromContinuation
 import org.usvm.machine.state.slicePreloadDataBits
 import org.usvm.machine.types.TvmTypeSystem
 
@@ -313,12 +327,6 @@ class TvmInterpreter(
         return state*/
         val method = contractCode.methods[methodId] ?: error("Unknown method $methodId")
         val registers = TvmRegisters(ctx)
-        val currentContinuation = TvmContinuationValue(
-            method,
-            TvmStack(ctx),
-            registers
-        )
-        registers.c3 = C3Register(currentContinuation)
         // TODO for now, ignore contract data value
 //        registers.c4 = C4Register(TvmCellValue(contractData))
 
@@ -330,7 +338,6 @@ class TvmInterpreter(
         val state = TvmState(
             ctx = ctx,
             entrypoint = method,
-            currentContinuation = currentContinuation,
             stack = stack,
             registers = registers,
             memory = memory,
@@ -342,7 +349,7 @@ class TvmInterpreter(
         )
 
         state.registers.c5 = C5Register(TvmCellValue(state.allocEmptyCell()))
-        state.registers.c7.configRoot = state.initConfigRoot()
+        state.registers.c7 = C7Register(ctx, configRoot = state.initConfigRoot())
 
         val solver = ctx.solver<TvmType>()
 
@@ -698,7 +705,7 @@ class TvmInterpreter(
                 }
             }
             is TvmConstDataPushcontInst -> scope.doWithStateCtx {
-                val continuationValue = TvmContinuationValue(TvmLambda(stmt.s.toMutableList()), stack, registers)
+                val continuationValue = TvmOrdContinuation(TvmLambda(stmt.s.toMutableList()))
                 stack.addContinuation(continuationValue)
 
                 newStmt(stmt.nextStmt())
@@ -710,7 +717,7 @@ class TvmInterpreter(
     private fun visitPushContShortInst(scope: TvmStepScope, stmt: TvmConstDataPushcontShortInst) {
         scope.doWithState {
             val lambda = TvmLambda(stmt.s.toMutableList())
-            val continuationValue = TvmContinuationValue(lambda, stack, registers)
+            val continuationValue = TvmOrdContinuation(lambda)
 
             stack.addContinuation(continuationValue)
             newStmt(stmt.nextStmt())
@@ -1319,36 +1326,108 @@ class TvmInterpreter(
         scope: TvmStepScope,
         stmt: TvmContRegistersInst
     ) {
-        scope.consumeDefaultGas(stmt)
-
         when (stmt) {
             is TvmContRegistersPushctrInst -> visitTvmPushCtrInst(scope, stmt)
-            is TvmContRegistersSamealtsaveInst -> {
-                // TODO make a real implementation
+            is TvmContRegistersPopctrInst -> visitTvmPopCtrInst(scope, stmt)
+            is TvmContRegistersSetcontctrInst -> visitSetContCtr(scope, stmt)
+            is TvmContRegistersSaveInst -> visitSaveInst(scope, stmt)
+            is TvmContRegistersSamealtInst -> {
+                scope.consumeDefaultGas(stmt)
 
-                scope.doWithState { newStmt(stmt.nextStmt()) }
-            }
-            is TvmContRegistersSaveInst -> {
-                // TODO make a real implementation
-
-                scope.doWithState { newStmt(stmt.nextStmt()) }
-            }
-            is TvmContRegistersPopctrInst -> {
                 scope.doWithState {
-                    val registerIndex = stmt.i
-                    // TODO for now, assume we always use c4
-                    require(registerIndex == 4) {
-                        "POPCTR is supported only for c4 but got $registerIndex register"
-                    }
-                    stack.takeLastCell()
-
+                    registers.c1 = C1Register(registers.c0.value)
                     newStmt(stmt.nextStmt())
+                }
+            }
+            is TvmContRegistersSamealtsaveInst -> {
+                scope.consumeDefaultGas(stmt)
 
-                    // TODO save to the correct register
+                scope.doWithState {
+                    val c1 = registers.c1?.value
+                        ?: error("No register to save")
+
+                    registers.c0 = C0Register(registers.c0.value.defineC1(c1))
+                    registers.c1 = C1Register(registers.c0.value)
+                    newStmt(stmt.nextStmt())
                 }
             }
             else -> TODO("$stmt")
         }
+    }
+
+    private fun visitSaveInst(scope: TvmStepScope, stmt: TvmContRegistersSaveInst) = scope.doWithState {
+        scope.consumeDefaultGas(stmt)
+
+        val c0 = registers.c0.value
+        val registerIndex = stmt.i
+
+        val updatedC0 = when (registerIndex) {
+            0 -> {
+                c0.defineC0(c0)
+            }
+            1 -> {
+                val c1 = registers.c1?.value
+                    ?: error("No register to save")
+
+                c0.defineC1(c1)
+            }
+            2 -> {
+                val c2 = registers.c2?.value
+                    ?: error("No register to save")
+
+                c0.defineC2(c2)
+            }
+            else -> TODO("Not yet implemented: $stmt")
+        }
+
+        registers.c0 = C0Register(updatedC0)
+        newStmt(stmt.nextStmt())
+    }
+
+    private fun visitSetContCtr(scope: TvmStepScope, stmt: TvmContRegistersSetcontctrInst) = scope.doWithState {
+        scope.consumeDefaultGas(stmt)
+
+        val cont = stack.takeLastContinuation()
+        val contToSave = stack.takeLastContinuation()
+
+        val updatedCont = when (stmt.i) {
+            0 -> cont.defineC0(contToSave)
+            1 -> cont.defineC1(contToSave)
+            2 -> cont.defineC2(contToSave)
+            else -> TODO("Not yet implemented: $stmt")
+        }
+
+        stack.addContinuation(updatedCont)
+        newStmt(stmt.nextStmt())
+    }
+
+    private fun visitTvmPopCtrInst(scope: TvmStepScope, stmt: TvmContRegistersPopctrInst) = scope.doWithState {
+        scope.consumeDefaultGas(stmt)
+
+        val registerIndex = stmt.i
+
+        when (registerIndex) {
+            0 -> {
+                val cont = stack.takeLastContinuation()
+                registers.c0 = C0Register(cont)
+            }
+            1 -> {
+                val cont = stack.takeLastContinuation()
+                registers.c1 = C1Register(cont)
+            }
+            2 -> {
+                val cont = stack.takeLastContinuation()
+                registers.c2 = C2Register(cont)
+            }
+            4 -> {
+                stack.takeLastCell()
+
+                // TODO save to the correct register
+            }
+            else -> TODO("Not yet implemented: $stmt")
+        }
+
+        newStmt(stmt.nextStmt())
     }
 
     private fun visitTvmPushCtrInst(scope: TvmStepScope, stmt: TvmContRegistersPushctrInst) {
@@ -1361,6 +1440,24 @@ class TvmInterpreter(
             // TODO should we use real persistent or always consider it fully symbolic?
 //            val data = registers.c4?.value?.value?.toSymbolic(scope) ?: mkSymbolicCell(scope)
             when (registerIndex) {
+                0 -> {
+                    stack.addContinuation(registers.c0.value)
+                    newStmt(stmt.nextStmt())
+                }
+                1 -> {
+                    val c1 = registers.c1
+                        ?: error("No register to push")
+
+                    stack.addContinuation(c1.value)
+                    newStmt(stmt.nextStmt())
+                }
+                2 -> {
+                    val c2 = registers.c2
+                        ?: error("No register to push")
+
+                    stack.addContinuation(c2.value)
+                    newStmt(stmt.nextStmt())
+                }
                 4 -> {
                     val data = registers.c4?.value?.value ?: run {
                         val symbolicCell = generateSymbolicCell()
@@ -1373,7 +1470,7 @@ class TvmInterpreter(
                 3 -> {
                     val mainMethod = contractCode.methods[Int.MAX_VALUE.toBigInteger()]
                         ?: error("No main method found")
-                    val continuationValue = TvmContinuationValue(mainMethod, stack, registers)
+                    val continuationValue = TvmOrdContinuation(mainMethod)
                     stack.addContinuation(continuationValue)
                     newStmt(stmt.nextStmt())
                 }
@@ -1397,27 +1494,41 @@ class TvmInterpreter(
             is TvmContBasicExecuteInst -> {
                 scope.consumeDefaultGas(stmt)
 
-                scope.doWithState {
-                    val continuationValue = stack.takeLastContinuation()
-
-                    jumpToContinuation(continuationValue, from = stmt, returnToTheNextStmt = true)
-                }
+                val continuationValue = scope.calcOnState { stack.takeLastContinuation() }
+                scope.switchToContinuation(stmt, continuationValue, returnToTheNextStmt = true)
             }
             is TvmContBasicRetInst, is TvmArtificialImplicitRetInst -> {
                 scope.consumeDefaultGas(stmt)
 
-                scope.doWithState {
-                    returnFromMethod()
+                scope.returnFromContinuation()
+            }
+            is TvmContBasicRetaltInst -> {
+                scope.consumeDefaultGas(stmt)
+
+                val c1 = scope.calcOnState { registers.c1 }
+                requireNotNull(c1) {
+                    "No continuation to return to"
                 }
+
+                // TODO set c1 to continuation that returns with 1 exit code
+                scope.jump(c1.value)
             }
             is TvmContBasicCallrefInst -> {
                 scope.doWithState { consumeGas(126) } // TODO complex gas 126/51
 
-                scope.doWithState {
-                    val continuationValue = TvmContinuationValue(TvmLambda(stmt.c.list.toMutableList()), stack, registers)
+                val continuationValue = TvmOrdContinuation(TvmLambda(stmt.c.list.toMutableList()))
 
-                    jumpToContinuation(continuationValue, from = stmt, returnToTheNextStmt = true)
-                }
+                scope.switchToContinuation(stmt, continuationValue, returnToTheNextStmt = true)
+            }
+            is TvmArtificialJmpToContInst -> {
+                scope.consumeDefaultGas(stmt)
+
+                scope.jump(stmt.cont)
+            }
+            is TvmArtificialExecuteContInst -> {
+                scope.consumeDefaultGas(stmt)
+
+                scope.switchToContinuation(stmt, stmt.cont, returnToTheNextStmt = true)
             }
             else -> TODO("$stmt")
         }
@@ -1432,18 +1543,16 @@ class TvmInterpreter(
                 scope.consumeDefaultGas(stmt)
 
                 val operand = scope.takeLastIntOrThrowTypeError() ?: return
-                scope.doWithState {
-                    with(ctx) {
-                        val neqZero = mkEq(operand, zeroValue).not()
-                        scope.fork(
-                            neqZero,
-                            blockOnFalseState = { newStmt(stmt.nextStmt()) }
-                        ) ?: return@with
+                with(ctx) {
+                    val neqZero = mkEq(operand, zeroValue).not()
+                    scope.fork(
+                        neqZero,
+                        blockOnFalseState = { newStmt(stmt.nextStmt()) }
+                    ) ?: return@with
 
-                        // TODO check NaN for integer overflow exception
+                    // TODO check NaN for integer overflow exception
 
-                        scope.doWithState { returnFromMethod() }
-                    }
+                    scope.returnFromContinuation()
                 }
             }
 
@@ -1474,7 +1583,7 @@ class TvmInterpreter(
         val continuation = scope.calcOnState {
             consumeGas(26) // TODO complex gas "26/126/51"
 
-            TvmContinuationValue(TvmLambda(ref.list.toMutableList()), stack, registers)
+            TvmOrdContinuation(TvmLambda(ref.list.toMutableList()))
         }
         return scope.doIf(continuation, stmt, invertCondition, isJmp = false)
     }
@@ -1494,8 +1603,8 @@ class TvmInterpreter(
         scope.doWithState {
             consumeGas(51) // TODO complex gas "126/51"
 
-            val firstContinuation = TvmContinuationValue(TvmLambda(stmt.c1.list.toMutableList()), stack, registers)
-            val secondContinuation = TvmContinuationValue(TvmLambda(stmt.c2.list.toMutableList()), stack, registers)
+            val firstContinuation = TvmOrdContinuation(TvmLambda(stmt.c1.list.toMutableList()))
+            val secondContinuation = TvmOrdContinuation(TvmLambda(stmt.c2.list.toMutableList()))
 
             scope.doIfElse(firstContinuation, secondContinuation, stmt)
         }
@@ -1505,7 +1614,7 @@ class TvmInterpreter(
         scope.doWithState {
             consumeGas(26) // TODO complex gas "26/126/51"
 
-            val firstContinuation = TvmContinuationValue(TvmLambda(stmt.c.list.toMutableList()), stack, registers)
+            val firstContinuation = TvmOrdContinuation(TvmLambda(stmt.c.list.toMutableList()))
             val secondContinuation = stack.takeLastContinuation()
 
             scope.doIfElse(firstContinuation, secondContinuation, stmt)
@@ -1517,36 +1626,36 @@ class TvmInterpreter(
             consumeGas(26) // TODO complex gas "26/126/51"
 
             val firstContinuation = stack.takeLastContinuation()
-            val secondContinuation = TvmContinuationValue(TvmLambda(stmt.c.list.toMutableList()), stack, registers)
+            val secondContinuation = TvmOrdContinuation(TvmLambda(stmt.c.list.toMutableList()))
 
             scope.doIfElse(firstContinuation, secondContinuation, stmt)
         }
     }
 
     private fun TvmStepScope.doIf(
-        continuation: TvmContinuationValue,
+        continuation: TvmContinuation,
         stmt: TvmInst,
         invertCondition: Boolean,
         isJmp: Boolean,
     ) = with(ctx) {
         val flag = takeLastIntOrThrowTypeError() ?: return
-        val cond = (flag eq zeroValue).let {
-            if (invertCondition) it.not() else it
+        val invertCondition = (flag eq zeroValue).let {
+            if (invertCondition) it else it.not()
         }
 
         fork(
-            cond,
+            invertCondition,
             blockOnFalseState = {
-                jumpToContinuation(continuation, stmt, returnToTheNextStmt = !isJmp)
+                newStmt(stmt.nextStmt())
             }
         ) ?: return@with
 
-        doWithState { newStmt(stmt.nextStmt()) }
+        switchToContinuation(stmt, continuation, returnToTheNextStmt = !isJmp)
     }
 
     private fun TvmStepScope.doIfElse(
-        firstContinuation: TvmContinuationValue,
-        secondContinuation: TvmContinuationValue,
+        firstContinuation: TvmContinuation,
+        secondContinuation: TvmContinuation,
         stmt: TvmInst
     ) {
         val flag = takeLastIntOrThrowTypeError() ?: return
@@ -1560,14 +1669,14 @@ class TvmInterpreter(
 //                        registers = continuation.registers
 //                        stack = continuation.stack
 
-                    jumpToContinuation(firstContinuation, stmt, returnToTheNextStmt = true)
+                    newStmt(TvmArtificialExecuteContInst(firstContinuation, stmt.location))
                 },
                 blockOnFalseState = {
                     // TODO really?
 //                        registers = continuation.registers
 //                        stack = continuation.stack
 
-                    jumpToContinuation(secondContinuation, stmt, returnToTheNextStmt = true)
+                    newStmt(TvmArtificialExecuteContInst(secondContinuation, stmt.location))
                 }
             )
         }
@@ -1592,7 +1701,7 @@ class TvmInterpreter(
         }
 
         val continuation = scope.calcOnState {
-            TvmContinuationValue(TvmLambda(ref.list.toMutableList()), stack, registers)
+            TvmOrdContinuation(TvmLambda(ref.list.toMutableList()))
         }
         scope.doIf(continuation, stmt, invertCondition, isJmp = true)
     }
@@ -1604,7 +1713,6 @@ class TvmInterpreter(
             is TvmContDictCalldictInst -> {
                 val methodId = stmt.n.toBigInteger()
 
-                scope.doWithState {
 //                    stack += argument.toBv257()
 ////                    val c3Continuation = registers.c3!!.value
 //                    val contractMethod = contractCode.methods[0]!!
@@ -1615,11 +1723,10 @@ class TvmInterpreter(
 //                    callStack.push(contractCode.methods[continuationStmt.location.methodId]!!, nextStmt)
 //                    newStmt(continuationStmt)
 
-                    val nextMethod = contractCode.methods[methodId]
-                        ?: error("Unknown method with id $methodId")
+                val nextMethod = contractCode.methods[methodId]
+                    ?: error("Unknown method with id $methodId")
 
-                    jumpToContinuation(TvmContinuationValue(nextMethod, stack, registers), stmt, returnToTheNextStmt = true) // TODO use these stack and registers?
-                }
+                scope.switchToContinuation(stmt, TvmOrdContinuation(nextMethod), returnToTheNextStmt = true)
             }
             else -> TODO("Unknown stmt: $stmt")
         }
@@ -1637,15 +1744,13 @@ class TvmInterpreter(
                     ?: return
                 val method = contractCode.methods[methodId]!!
 
-                scope.doWithState {
-                    // The remainder of the previous current continuation cc is discarded.
-                    jumpToContinuation(TvmContinuationValue(method, stack, registers), stmt, returnToTheNextStmt = false) // TODO use these stack and registers?
-                }
+                // The remainder of the previous current continuation cc is discarded.
+                scope.switchToContinuation(stmt, TvmOrdContinuation(method), returnToTheNextStmt = false)
             }
 
             is TvmDictSpecialDictpushconstInst -> {
                 val keyLength = stmt.n
-                val currentContinuation = scope.calcOnState { currentContinuation }
+//                val currentContinuation = scope.calcOnState { currentContinuation }
 //                val nextRef = currentContinuation.slice.loadRef()
 
                 scope.calcOnState {
@@ -1655,22 +1760,6 @@ class TvmInterpreter(
                 scope.doWithState { newStmt(stmt.nextStmt()) }
             }
             else -> TODO("$stmt")
-        }
-    }
-
-    /**
-     * Executes (or jumps to, depending on the value of [returnToTheNextStmt]) the [continuation].
-     */
-    private fun TvmState.jumpToContinuation(
-        continuation: TvmContinuationValue,
-        from: TvmInst,
-        returnToTheNextStmt: Boolean
-    ) {
-        currentContinuation = continuation
-        newStmt(continuation.codeBlock.instList.first())
-
-        if (returnToTheNextStmt) {
-            callStack.push(continuation.codeBlock, from.nextStmt())
         }
     }
 

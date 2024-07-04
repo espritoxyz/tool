@@ -20,7 +20,7 @@ class RepeatLoopTest {
 
         val symbolicResult = compileAndAnalyzeFift(fiftResourcePath)
 
-        val methodIds = (0..3).toSet()
+        val methodIds = (0..6).toSet()
         compareSymbolicAndConcreteResults(methodIds, symbolicResult) { methodId ->
             runFiftMethod(fiftResourcePath, methodId)
         }

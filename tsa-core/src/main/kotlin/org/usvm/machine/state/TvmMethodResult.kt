@@ -19,7 +19,6 @@ sealed interface TvmMethodResult {
      * A [method] successfully returned.
      */
     class TvmSuccess(
-        val method: TvmCodeBlock,
         val stack: TvmStack,
     ) : TvmMethodResult
 

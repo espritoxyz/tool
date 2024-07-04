@@ -1,7 +1,6 @@
 package org.usvm.machine.state
 
 import io.ksmt.utils.powerOfTwo
-import org.ton.bytecode.TvmContinuationValue
 import org.ton.bytecode.TvmInst
 import org.usvm.NULL_ADDRESS
 import org.usvm.UBoolExpr
@@ -61,25 +60,6 @@ val throwStructuralCellUnderflowError: (TvmState) -> Unit =
 val throwSymbolicStructuralCellUnderflowError: (TvmState) -> Unit =
     setFailure(TvmCellUnderflowError, TvmFailureType.SymbolicStructuralError)
 val throwRealCellUnderflowError: (TvmState) -> Unit = setFailure(TvmCellUnderflowError, TvmFailureType.RealError)
-
-// TODO support RETALT
-fun TvmState.returnFromMethod() {
-    val returnFromMethod = callStack.lastMethod()
-    // TODO: think about it later
-    val returnSite = callStack.pop()
-
-    // TODO do we need it?
-//    if (callStack.isNotEmpty()) {
-//        memory.stack.pop()
-//    }
-
-    methodResult = TvmMethodResult.TvmSuccess(returnFromMethod, stack)
-
-    if (returnSite != null) {
-        currentContinuation = TvmContinuationValue(returnFromMethod, stack, registers)
-        newStmt(returnSite)
-    }
-}
 
 fun <R> TvmStepScope.calcOnStateCtx(block: context(TvmContext) TvmState.() -> R): R = calcOnState {
     block(ctx, this)

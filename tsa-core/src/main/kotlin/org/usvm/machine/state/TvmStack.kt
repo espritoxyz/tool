@@ -10,7 +10,7 @@ import org.usvm.machine.types.TvmBuilderType
 import org.usvm.machine.types.TvmCellType
 import org.usvm.machine.types.TvmRealType
 import org.usvm.machine.types.TvmContinuationType
-import org.ton.bytecode.TvmContinuationValue
+import org.ton.bytecode.TvmContinuation
 import org.usvm.machine.types.TvmIntegerType
 import org.usvm.machine.types.TvmNullType
 import org.usvm.machine.types.TvmSliceType
@@ -157,7 +157,7 @@ class TvmStack(
 
     // TODO continuations
     sealed interface TvmStackValue {
-        val continuationValue: TvmContinuationValue get() = error("Cannot extract continuation from stack value $this")
+        val continuationValue: TvmContinuation get() = error("Cannot extract continuation from stack value $this")
         val intValue: UExpr<TvmInt257Sort> get() = error("Cannot extract int from stack value $this")
         val tupleValue: TvmStackTupleValue get() = error("Cannot extract tuple from stack value $this")
         val cellValue: UHeapRef? get() = error("Cannot extract cell from stack value $this")
@@ -165,7 +165,7 @@ class TvmStack(
         val builderValue: UHeapRef? get() = error("Cannot extract builder from stack value $this")
         val isNull: Boolean get() = false
     }
-    data class TvmStackContinuationValue(override val continuationValue: TvmContinuationValue) : TvmStackValue
+    data class TvmStackContinuationValue(override val continuationValue: TvmContinuation) : TvmStackValue
     data class TvmStackIntValue(override val intValue: UExpr<TvmInt257Sort>): TvmStackValue
 
     sealed interface TvmStackTupleValue : TvmStackValue {
