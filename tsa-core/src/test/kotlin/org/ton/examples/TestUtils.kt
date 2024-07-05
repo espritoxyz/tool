@@ -93,10 +93,7 @@ internal fun TvmStack.loadIntegers(n: Int) = List(n) {
     takeLast(TvmIntegerType) { error("Impossible") }.intValue.intValue()
 }.reversed()
 
-internal fun TvmSymbolicTest.executionCode(): Int = when (val it = result) {
-    is TvmMethodFailure -> it.failure.exit.exitCode.toInt()
-    is TvmSuccessfulExecution -> 0
-}
+internal fun TvmSymbolicTest.executionCode(): Int = result.exitCode.toInt()
 
 internal fun compareSymbolicAndConcreteResults(
     methodIds: Set<Int>,

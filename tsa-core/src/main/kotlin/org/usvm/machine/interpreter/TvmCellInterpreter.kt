@@ -121,8 +121,6 @@ import org.usvm.machine.state.takeLastBuilder
 import org.usvm.machine.state.takeLastCell
 import org.usvm.machine.state.takeLastIntOrThrowTypeError
 import org.usvm.machine.state.takeLastSlice
-import org.usvm.machine.state.throwIntegerOutOfRangeError
-import org.usvm.machine.state.throwTypeCheckError
 import org.usvm.machine.state.unsignedIntegerFitsBits
 import org.usvm.machine.types.Endian
 import org.usvm.machine.types.TvmBuilderType
@@ -282,7 +280,7 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
 
     private fun checkOutOfRange(notOutOfRangeExpr: UBoolExpr, scope: TvmStepScope): Unit? = scope.fork(
         condition = notOutOfRangeExpr,
-        blockOnFalseState = throwIntegerOutOfRangeError
+        blockOnFalseState = ctx.throwIntegerOutOfRangeError
     )
 
     private fun visitLoadRefInst(scope: TvmStepScope, stmt: TvmCellParseLdrefInst) {
@@ -290,7 +288,7 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
 
         val slice = scope.calcOnState { stack.takeLastSlice() }
         if (slice == null) {
-            scope.doWithState(throwTypeCheckError)
+            scope.doWithState(ctx.throwTypeCheckError)
             return
         }
 
@@ -565,7 +563,7 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
     ) {
         val cell = scope.takeLastCell()
         if (cell == null) {
-            scope.doWithState(throwTypeCheckError)
+            scope.doWithState(ctx.throwTypeCheckError)
             return
         }
 
@@ -744,7 +742,7 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
 
         val builder = scope.calcOnState { stack.takeLastBuilder() }
         if (builder == null) {
-            scope.doWithState(throwTypeCheckError)
+            scope.doWithState(ctx.throwTypeCheckError)
             return
         }
 
@@ -764,13 +762,13 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
 
         val builder = scope.calcOnState { stack.takeLastBuilder() }
         if (builder == null) {
-            scope.doWithState(throwTypeCheckError)
+            scope.doWithState(ctx.throwTypeCheckError)
             return
         }
 
         val cell = scope.takeLastCell()
         if (cell == null) {
-            scope.doWithState(throwTypeCheckError)
+            scope.doWithState(ctx.throwTypeCheckError)
             return
         }
 

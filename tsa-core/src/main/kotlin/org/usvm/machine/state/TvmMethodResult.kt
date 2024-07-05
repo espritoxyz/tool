@@ -2,7 +2,6 @@ package org.usvm.machine.state
 
 import kotlinx.serialization.Serializable
 import org.usvm.machine.state.TvmMethodResult.*
-import org.ton.bytecode.TvmCodeBlock
 import org.usvm.UBv32Sort
 import org.usvm.UExpr
 
@@ -18,7 +17,8 @@ sealed interface TvmMethodResult {
     /**
      * A [method] successfully returned.
      */
-    class TvmSuccess(
+    data class TvmSuccess(
+        val exit: TvmSuccessfulExit,
         val stack: TvmStack,
     ) : TvmMethodResult
 
@@ -27,15 +27,34 @@ sealed interface TvmMethodResult {
      */
     @Serializable
     data class TvmFailure(
-        val exit: TvmExit,
+        val exit: TvmErrorExit,
         val type: TvmFailureType
     ) : TvmMethodResult
 
     @Serializable
     sealed interface TvmExit {
         val exitCode: UInt
+    }
+
+    interface TvmSuccessfulExit : TvmExit
+
+    interface TvmErrorExit : TvmExit {
         val ruleName: String
     }
+}
+
+object TvmNormalExit : TvmSuccessfulExit {
+    override val exitCode: UInt
+        get() = 0u
+
+    override fun toString(): String = "Successful termination, exit code: $exitCode"
+}
+
+object TvmAlternativeExit : TvmSuccessfulExit {
+    override val exitCode: UInt
+        get() = 1u
+
+    override fun toString(): String = "Successful termination, exit code: $exitCode"
 }
 
 /**
@@ -73,7 +92,7 @@ enum class TvmFailureType {
 // TODO standard exit code should be placed in codepage 0?
 // TODO add integer underflow?
 @Serializable
-object TvmIntegerOverflowError : TvmExit {
+object TvmIntegerOverflowError : TvmErrorExit {
     override val exitCode: UInt = 4u
     override val ruleName: String = "integer-overflow"
 
@@ -81,7 +100,7 @@ object TvmIntegerOverflowError : TvmExit {
 }
 
 @Serializable
-object TvmIntegerOutOfRangeError : TvmExit {
+object TvmIntegerOutOfRangeError : TvmErrorExit {
     override val exitCode: UInt = 5u
     override val ruleName: String = "integer-out-of-range"
 
@@ -90,7 +109,7 @@ object TvmIntegerOutOfRangeError : TvmExit {
 
 // TODO add expected type
 @Serializable
-object TvmTypeCheckError : TvmExit {
+object TvmTypeCheckError : TvmErrorExit {
     override val exitCode: UInt = 7u
     override val ruleName: String = "wrong-type"
 
@@ -98,7 +117,7 @@ object TvmTypeCheckError : TvmExit {
 }
 
 @Serializable
-object TvmCellOverflowError : TvmExit {
+object TvmCellOverflowError : TvmErrorExit {
     override val exitCode: UInt = 8u
     override val ruleName: String = "cell-overflow"
 
@@ -106,14 +125,14 @@ object TvmCellOverflowError : TvmExit {
 }
 
 @Serializable
-object TvmCellUnderflowError : TvmExit {
+object TvmCellUnderflowError : TvmErrorExit {
     override val exitCode: UInt = 9u
     override val ruleName: String = "cell-underflow"
 
     override fun toString(): String = "TVM cell underflow, exit code: $exitCode"
 }
 
-data class TvmOutOfGas(val consumedGas: UExpr<UBv32Sort>, val gasLimit: UExpr<UBv32Sort>) : TvmExit {
+data class TvmOutOfGas(val consumedGas: UExpr<UBv32Sort>, val gasLimit: UExpr<UBv32Sort>) : TvmErrorExit {
     override val exitCode: UInt = 13u
     override val ruleName: String = "out-of-gas"
 
@@ -122,7 +141,7 @@ data class TvmOutOfGas(val consumedGas: UExpr<UBv32Sort>, val gasLimit: UExpr<UB
 }
 
 @Serializable
-data class TvmUnknownFailure(override val exitCode: UInt): TvmExit {
+data class TvmUnknownFailure(override val exitCode: UInt): TvmErrorExit {
     override val ruleName: String = "user-defined-error"
 
     override fun toString(): String = "TVM user defined error with exit code $exitCode"

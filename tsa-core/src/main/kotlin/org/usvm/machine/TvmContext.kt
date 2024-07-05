@@ -11,6 +11,7 @@ import io.ksmt.utils.toBigInteger
 import org.usvm.machine.types.TvmCellType
 import org.ton.bytecode.TvmField
 import org.ton.bytecode.TvmFieldImpl
+import org.ton.bytecode.TvmQuitContinuation
 import org.usvm.machine.types.TvmSliceType
 import org.usvm.machine.types.TvmType
 import org.usvm.NULL_ADDRESS
@@ -21,8 +22,16 @@ import org.usvm.UComponents
 import org.usvm.UConcreteHeapRef
 import org.usvm.UContext
 import org.usvm.UExpr
+import org.usvm.machine.state.TvmCellOverflowError
+import org.usvm.machine.state.TvmCellUnderflowError
+import org.usvm.machine.state.TvmFailureType
+import org.usvm.machine.state.TvmIntegerOutOfRangeError
+import org.usvm.machine.state.TvmIntegerOverflowError
+import org.usvm.machine.state.TvmState
+import org.usvm.machine.state.TvmTypeCheckError
 import org.usvm.machine.state.bvMaxValueSignedExtended
 import org.usvm.machine.state.bvMinValueSignedExtended
+import org.usvm.machine.state.setFailure
 import org.usvm.mkSizeExpr
 import org.usvm.sizeSort
 
@@ -62,6 +71,20 @@ class TvmContext(components: UComponents<TvmType, TvmSizeSort>) : UContext<TvmSi
     fun nextInputStackEntryId(): Int = inputStackEntryCounter++
 
     val nullValue: UConcreteHeapRef = mkConcreteHeapRef(NULL_ADDRESS)
+
+    val quit0Cont = TvmQuitContinuation(0u)
+    val quit1Cont = TvmQuitContinuation(1u)
+
+    val throwTypeCheckError: (TvmState) -> Unit = setFailure(TvmTypeCheckError)
+    val throwIntegerOverflowError: (TvmState) -> Unit = setFailure(TvmIntegerOverflowError)
+    val throwIntegerOutOfRangeError: (TvmState) -> Unit = setFailure(TvmIntegerOutOfRangeError)
+    val throwCellOverflowError: (TvmState) -> Unit = setFailure(TvmCellOverflowError)
+    val throwUnknownCellUnderflowError: (TvmState) -> Unit = setFailure(TvmCellUnderflowError, TvmFailureType.UnknownError)
+    val throwStructuralCellUnderflowError: (TvmState) -> Unit =
+        setFailure(TvmCellUnderflowError, TvmFailureType.FixedStructuralError)
+    val throwSymbolicStructuralCellUnderflowError: (TvmState) -> Unit =
+        setFailure(TvmCellUnderflowError, TvmFailureType.SymbolicStructuralError)
+    val throwRealCellUnderflowError: (TvmState) -> Unit = setFailure(TvmCellUnderflowError, TvmFailureType.RealError)
 
     fun UBoolExpr.toBv257Bool(): UExpr<TvmInt257Sort> = with(ctx) {
         mkIte(

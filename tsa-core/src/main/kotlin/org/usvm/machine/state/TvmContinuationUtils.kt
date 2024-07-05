@@ -2,7 +2,9 @@ package org.usvm.machine.state
 
 import org.ton.bytecode.TvmAgainContinuation
 import org.ton.bytecode.TvmArtificialJmpToContInst
+import org.ton.bytecode.TvmCellValue
 import org.ton.bytecode.TvmContinuation
+import org.ton.bytecode.TvmExceptionContinuation
 import org.ton.bytecode.TvmInst
 import org.ton.bytecode.TvmLoopEntranceContinuation
 import org.ton.bytecode.TvmOrdContinuation
@@ -11,29 +13,40 @@ import org.ton.bytecode.TvmRegisterSavelist
 import org.ton.bytecode.TvmRepeatContinuation
 import org.ton.bytecode.TvmUntilContinuation
 import org.ton.bytecode.TvmWhileContinuation
+import org.usvm.UHeapRef
 import org.usvm.machine.TvmStepScope
+import org.usvm.utils.intValueOrNull
 
 
 fun TvmState.extractCurrentContinuation(
     stmt: TvmInst,
     saveC0: Boolean = false,
-    saveC1: Boolean = false
-): TvmContinuation {
+    saveC1: Boolean = false,
+    saveC2: Boolean = false,
+): TvmContinuation = with(ctx) {
     var c0: C0Register? = null
     var c1: C1Register? = null
+    var c2: C2Register? = null
 
     if (saveC0) {
-        c0 = C0Register(registers.c0.value)
-        registers.c0 = C0Register(TvmQuitContinuation)
+        c0 = registers.c0
+        registers.c0 = C0Register(quit0Cont)
     }
 
     if (saveC1) {
         c1 = registers.c1
-        // TODO set failure continuation
-        registers.c1 = C1Register(TvmQuitContinuation)
+        registers.c1 = C1Register(quit1Cont)
     }
 
-    return TvmOrdContinuation(stmt.nextStmt(), TvmRegisterSavelist(c0, c1))
+    if (saveC2) {
+        c2 = registers.c2
+
+        // this line is commented in the tvm interpreter
+        // https://github.com/ton-blockchain/ton/blob/5c392e0f2d946877bb79a09ed35068f7b0bd333a/crypto/vm/vm.cpp#L382
+        // registers.c2 = C2Register(TvmExceptionContinuation)
+    }
+
+    TvmOrdContinuation(stmt.nextStmt(), TvmRegisterSavelist(c0, c1, c2))
 }
 
 /**
@@ -57,37 +70,55 @@ fun TvmStepScope.switchToContinuation(
 }
 
 fun TvmStepScope.returnFromContinuation() {
-    val c0 = calcOnState { registers.c0 }
+    val c0 = calcOnState { registers.c0.value }
 
-    doWithState {
-        registers.c0 = C0Register(TvmQuitContinuation)
+    doWithStateCtx {
+        registers.c0 = C0Register(quit0Cont)
     }
 
-    jump(c0.value)
+    jump(c0)
 }
 
-fun TvmContinuation.defineC0(cont: TvmContinuation?): TvmContinuation {
-    if (savelist.c0 != null || cont == null) {
+fun TvmStepScope.returnAltFromContinuation() {
+    val c1 = calcOnState { registers.c1.value }
+
+    doWithStateCtx {
+        registers.c1 = C1Register(quit1Cont)
+    }
+
+    jump(c1)
+}
+
+fun TvmContinuation.defineC0(cont: TvmContinuation): TvmContinuation {
+    if (savelist.c0 != null) {
         return this
     }
 
     return updateSavelist(savelist.copy(c0 = C0Register(cont)))
 }
 
-fun TvmContinuation.defineC1(cont: TvmContinuation?): TvmContinuation {
-    if (savelist.c1 != null || cont == null) {
+fun TvmContinuation.defineC1(cont: TvmContinuation): TvmContinuation {
+    if (savelist.c1 != null) {
         return this
     }
 
     return updateSavelist(savelist.copy(c1 = C1Register(cont)))
 }
 
-fun TvmContinuation.defineC2(cont: TvmContinuation?): TvmContinuation {
-    if (savelist.c1 != null || cont == null) {
+fun TvmContinuation.defineC2(cont: TvmContinuation): TvmContinuation {
+    if (savelist.c2 != null) {
         return this
     }
 
     return updateSavelist(savelist.copy(c2 = C2Register(cont)))
+}
+
+fun TvmContinuation.defineC4(cell: UHeapRef): TvmContinuation {
+    if (savelist.c4 != null) {
+        return this
+    }
+
+    return updateSavelist(savelist.copy(c4 = C4Register(TvmCellValue(cell))))
 }
 
 fun TvmStepScope.jump(cont: TvmContinuation) {
@@ -99,6 +130,7 @@ fun TvmStepScope.jump(cont: TvmContinuation) {
         is TvmRepeatContinuation -> doRepeatJump(cont)
         is TvmWhileContinuation -> doWhileJump(cont)
         is TvmAgainContinuation -> doAgainJump(cont)
+        is TvmExceptionContinuation -> doExceptionJump(cont)
     }
 }
 
@@ -119,7 +151,14 @@ private fun TvmStepScope.doOrdJump(cont: TvmOrdContinuation) = doWithState {
 }
 
 private fun TvmStepScope.doQuitJump(cont: TvmQuitContinuation) = doWithState {
-    methodResult = TvmMethodResult.TvmSuccess(stack)
+    val exit = when (cont.exitCode) {
+        0u -> TvmNormalExit
+        1u -> TvmAlternativeExit
+        else -> error("Unexpected exit code ${cont.exitCode}")
+    }
+
+
+    methodResult = TvmMethodResult.TvmSuccess(exit, stack)
 }
 
 private fun TvmStepScope.doLoopEntranceJump(cont: TvmLoopEntranceContinuation) {
@@ -200,4 +239,16 @@ private fun TvmStepScope.doAgainJump(cont: TvmAgainContinuation) {
     }
 
     jump(cont.body)
+}
+
+private fun TvmStepScope.doExceptionJump(cont: TvmExceptionContinuation) {
+    val exitCode = takeLastIntOrThrowTypeError() ?: return
+    val exitCodeValue = exitCode.intValueOrNull ?: error("Cannot extract concrete code exception")
+    val failure = TvmUnknownFailure(exitCodeValue.toUInt())
+
+    doWithState {
+        stack.addInt(exitCode)
+
+        methodResult = TvmMethodResult.TvmFailure(failure, TvmFailureType.UnknownError)
+    }
 }

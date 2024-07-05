@@ -28,6 +28,8 @@ import org.usvm.mkSizeLeExpr
 import org.usvm.sizeSort
 import org.usvm.types.USingleTypeStream
 import java.math.BigInteger
+import org.ton.bytecode.TvmArtificialJmpToContInst
+import org.ton.bytecode.TvmExceptionContinuation
 
 val TvmState.lastStmt get() = pathNode.statement
 fun TvmState.newStmt(stmt: TvmInst) {
@@ -37,29 +39,30 @@ fun TvmState.newStmt(stmt: TvmInst) {
 fun TvmInst.nextStmt(): TvmInst = location.codeBlock.instList.getOrNull(location.index + 1)
     ?: error("Unexpected end of the code block ${location.codeBlock}")
 
-fun setFailure(failure: TvmMethodResult.TvmExit, level: TvmFailureType = TvmFailureType.UnknownError): (TvmState) -> Unit = { state ->
-    state.consumeGas(IMPLICIT_EXCEPTION_THROW_GAS)
-    state.methodResult = TvmMethodResult.TvmFailure(failure, level)
+fun TvmContext.setFailure(
+    failure: TvmMethodResult.TvmErrorExit,
+    level: TvmFailureType = TvmFailureType.UnknownError,
+    param: UExpr<TvmInt257Sort> = zeroValue,
+    implicitThrow: Boolean = true,
+): (TvmState) -> Unit = { state ->
+    if (implicitThrow) {
+        state.consumeGas(IMPLICIT_EXCEPTION_THROW_GAS)
+    }
 
     // Throwing exception clears the current stack and pushes its parameter and exit code
     state.stack.clear()
-    // TODO push the real parameter, not always 0
-    state.stack.addInt(state.ctx.zeroValue)
+    state.stack.addInt(param)
     with(state.ctx) {
         state.stack.addInt(failure.exitCode.toInt().toBv257())
     }
-}
 
-val throwTypeCheckError: (TvmState) -> Unit = setFailure(TvmTypeCheckError)
-val throwIntegerOverflowError: (TvmState) -> Unit = setFailure(TvmIntegerOverflowError)
-val throwIntegerOutOfRangeError: (TvmState) -> Unit = setFailure(TvmIntegerOutOfRangeError)
-val throwCellOverflowError: (TvmState) -> Unit = setFailure(TvmCellOverflowError)
-val throwUnknownCellUnderflowError: (TvmState) -> Unit = setFailure(TvmCellUnderflowError, TvmFailureType.UnknownError)
-val throwStructuralCellUnderflowError: (TvmState) -> Unit =
-    setFailure(TvmCellUnderflowError, TvmFailureType.FixedStructuralError)
-val throwSymbolicStructuralCellUnderflowError: (TvmState) -> Unit =
-    setFailure(TvmCellUnderflowError, TvmFailureType.SymbolicStructuralError)
-val throwRealCellUnderflowError: (TvmState) -> Unit = setFailure(TvmCellUnderflowError, TvmFailureType.RealError)
+    val c2 = state.registers.c2.value
+    if (c2 == TvmExceptionContinuation) {
+        state.methodResult = TvmMethodResult.TvmFailure(failure, level)
+    } else {
+        state.newStmt(TvmArtificialJmpToContInst(c2, state.lastStmt.location))
+    }
+}
 
 fun <R> TvmStepScope.calcOnStateCtx(block: context(TvmContext) TvmState.() -> R): R = calcOnState {
     block(ctx, this)

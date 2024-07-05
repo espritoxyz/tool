@@ -33,12 +33,23 @@ sealed interface TvmContinuation {
 }
 
 /**
- * A continuation used to mark the end of a program execution
+ * A continuation used to mark the end of a successful program execution with exit code [exitCode]
  */
-data object TvmQuitContinuation : TvmContinuation {
+data class TvmQuitContinuation(
+    val exitCode: UInt
+) : TvmContinuation {
     override val savelist = TvmRegisterSavelist()
 
-    override fun updateSavelist(newSavelist: TvmRegisterSavelist): TvmQuitContinuation = TvmQuitContinuation
+    override fun updateSavelist(newSavelist: TvmRegisterSavelist): TvmQuitContinuation = this
+}
+
+/**
+ * Default exception handler
+ */
+data object TvmExceptionContinuation : TvmContinuation {
+    override val savelist: TvmRegisterSavelist = TvmRegisterSavelist()
+
+    override fun updateSavelist(newSavelist: TvmRegisterSavelist): TvmExceptionContinuation = this
 }
 
 data class TvmOrdContinuation(

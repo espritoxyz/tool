@@ -57,8 +57,6 @@ import org.usvm.machine.state.newStmt
 import org.usvm.machine.state.nextStmt
 import org.usvm.machine.state.takeLastIntOrThrowTypeError
 import org.usvm.machine.state.takeLastTuple
-import org.usvm.machine.state.throwIntegerOutOfRangeError
-import org.usvm.machine.state.throwTypeCheckError
 
 class TvmTupleInterpreter(private val ctx: TvmContext) {
     fun visitTvmTupleInst(scope: TvmStepScope, stmt: TvmTupleInst) {
@@ -148,14 +146,14 @@ class TvmTupleInterpreter(private val ctx: TvmContext) {
 
         val tuple = scope.takeLastTuple()
         if (tuple == null) {
-            scope.doWithState(throwTypeCheckError)
+            scope.doWithState(ctx.throwTypeCheckError)
             return
         }
 
         when (tuple) {
             is TvmStackTupleValueConcreteNew -> {
                 if (size != tuple.concreteSize) {
-                    scope.doWithState(throwTypeCheckError)
+                    scope.doWithState(ctx.throwTypeCheckError)
                     return
                 }
 
@@ -191,7 +189,7 @@ class TvmTupleInterpreter(private val ctx: TvmContext) {
         val tuple = scope.takeLastTuple()
         if (tuple == null) {
             if (!quiet) {
-                scope.doWithState(throwTypeCheckError)
+                scope.doWithState(ctx.throwTypeCheckError)
             } else {
                 scope.doWithStateCtx {
                     stack.addInt(minusOneValue)
@@ -216,7 +214,7 @@ class TvmTupleInterpreter(private val ctx: TvmContext) {
         val lastIsNull = scope.calcOnState { stack.lastIsNull() }
         if (lastIsNull) {
             if (!quiet) {
-                scope.doWithState(throwTypeCheckError)
+                scope.doWithState(ctx.throwTypeCheckError)
                 return null
             }
 
@@ -225,7 +223,7 @@ class TvmTupleInterpreter(private val ctx: TvmContext) {
 
         val tuple = scope.takeLastTuple()
         if (tuple == null) {
-            scope.doWithState(throwTypeCheckError)
+            scope.doWithState(ctx.throwTypeCheckError)
             return null
         }
 
@@ -238,7 +236,7 @@ class TvmTupleInterpreter(private val ctx: TvmContext) {
                     addOnStack(ctx.nullValue, TvmNullType)
                     newStmt(stmt.nextStmt())
                 } else {
-                    throwIntegerOutOfRangeError(this)
+                    ctx.throwIntegerOutOfRangeError(this)
                 }
             }
         ) ?: return null
@@ -263,7 +261,7 @@ class TvmTupleInterpreter(private val ctx: TvmContext) {
         val (isValueNull, value) = scope.calcOnState { stack.lastIsNull() to stack.takeLastEntry() }
         val lastIsNull = scope.calcOnState { stack.lastIsNull() }
         if (lastIsNull) {
-            scope.doWithState {
+            scope.doWithStateCtx {
                 if (quiet) {
                     stack.pop(0)
                     TvmStackTupleValueConcreteNew(ctx, persistentListOf())
@@ -277,7 +275,7 @@ class TvmTupleInterpreter(private val ctx: TvmContext) {
 
         val tuple = scope.takeLastTuple()
         if (tuple == null) {
-            scope.doWithState(throwTypeCheckError)
+            scope.doWithState(ctx.throwTypeCheckError)
             return
         }
 
@@ -289,7 +287,7 @@ class TvmTupleInterpreter(private val ctx: TvmContext) {
                 if (quiet) {
                     TODO("How to extend tuple with symbolic number of null values?")
                 } else {
-                    throwIntegerOutOfRangeError(this)
+                    ctx.throwIntegerOutOfRangeError(this)
                 }
             }
         ) ?: return

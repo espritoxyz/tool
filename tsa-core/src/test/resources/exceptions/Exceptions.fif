@@ -1,0 +1,112 @@
+"Fift.fif" include
+"Asm.fif" include
+
+PROGRAM{
+  0 DECLMETHOD default_handler
+  1 DECLMETHOD custom_handler
+  2 DECLMETHOD try_catch
+  3 DECLMETHOD try_catch_complex_1
+  4 DECLMETHOD try_catch_complex_2
+  5 DECLMETHOD try_catch_complex_3
+  default_handler PROC:<{
+    4 PUSHINT
+    10 THROW
+    // 0 10
+  }>
+  custom_handler PROC:<{
+    CONT:<{
+      1 PUSHINT
+    }>
+    CONT:<{
+      13 PUSHINT
+    }>
+    c0 SETCONTCTR
+    c2 POPCTR
+    13 PUSHINT
+    10 THROW
+    // 0 10 13 1 0
+  }>
+  try_catch PROC:<{
+    11 PUSHINT
+    CONT:<{
+      3 THROW
+    }>
+    CONT:<{
+      POW2
+    }>
+    TRY
+    // 0 8 0
+  }>
+  try_catch_complex_1 PROC:<{
+    CONT:<{
+      1 THROW
+    }>
+    CONT:<{
+      CONT:<{
+        NIP
+        DUP
+        1 EQINT
+        THROWANYIFNOT
+        10 PUSHINT
+      }>
+      CONT:<{
+        NIP
+        DUP
+        2 EQINT
+        THROWANYIFNOT
+        11 PUSHINT
+      }>
+      TRY
+    }>
+    TRY
+    // 10 0
+  }>
+  try_catch_complex_2 PROC:<{
+    CONT:<{
+      2 THROW
+    }>
+    CONT:<{
+      CONT:<{
+        NIP
+        DUP
+        1 EQINT
+        THROWANYIFNOT
+        10 PUSHINT
+      }>
+      CONT:<{
+        NIP
+        DUP
+        2 EQINT
+        THROWANYIFNOT
+        11 PUSHINT
+      }>
+      TRY
+    }>
+    TRY
+    // 11 0
+  }>
+  try_catch_complex_3 PROC:<{
+    CONT:<{
+      3 THROW
+    }>
+    CONT:<{
+      CONT:<{
+        NIP
+        DUP
+        1 EQINT
+        THROWANYIFNOT
+        10 PUSHINT
+      }>
+      CONT:<{
+        NIP
+        DUP
+        2 EQINT
+        THROWANYIFNOT
+        11 PUSHINT
+      }>
+      TRY
+    }>
+    TRY
+    // 0 3
+  }>
+}END>c

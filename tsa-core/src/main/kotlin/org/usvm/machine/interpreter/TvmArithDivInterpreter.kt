@@ -105,8 +105,6 @@ import org.usvm.machine.state.consumeDefaultGas
 import org.usvm.machine.state.newStmt
 import org.usvm.machine.state.nextStmt
 import org.usvm.machine.state.takeLastIntOrThrowTypeError
-import org.usvm.machine.state.throwIntegerOutOfRangeError
-import org.usvm.machine.state.throwIntegerOverflowError
 
 class TvmArithDivInterpreter(private val ctx: TvmContext) {
 
@@ -836,7 +834,7 @@ class TvmArithDivInterpreter(private val ctx: TvmContext) {
 
     private fun checkOverflow(noOverflowExpr: UBoolExpr, scope: TvmStepScope): Unit? = scope.fork(
         noOverflowExpr,
-        blockOnFalseState = throwIntegerOverflowError
+        blockOnFalseState = ctx.throwIntegerOverflowError
     )
 
     private fun checkInRange(expr: UExpr<TvmInt257Sort>, scope: TvmStepScope, min: Int, max: Int) = with(ctx) {

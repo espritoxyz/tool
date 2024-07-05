@@ -36,7 +36,6 @@ import org.usvm.machine.state.extractCurrentContinuation
 import org.usvm.machine.state.jump
 import org.usvm.machine.state.newStmt
 import org.usvm.machine.state.nextStmt
-import org.usvm.machine.state.throwIntegerOutOfRangeError
 import org.usvm.machine.state.signedIntegerFitsBits
 import org.usvm.machine.state.takeLastContinuation
 import org.usvm.machine.state.takeLastIntOrThrowTypeError
@@ -79,7 +78,7 @@ class TvmLoopsInterpreter(private val ctx: TvmContext) {
             return cont
         }
 
-        val newCont = cont.defineC0(registers.c0.value).defineC1(registers.c1?.value)
+        val newCont = cont.defineC0(registers.c0.value).defineC1(registers.c1.value)
 
         registers.c1 = C1Register(newCont)
 
@@ -240,7 +239,7 @@ class TvmLoopsInterpreter(private val ctx: TvmContext) {
 
         if (hasBreak) {
             scope.doWithState {
-                val newC0 = registers.c0.value.defineC1(registers.c1?.value)
+                val newC0 = registers.c0.value.defineC1(registers.c1.value)
                 registers.c0 = C0Register(newC0)
                 registers.c1 = C1Register(registers.c0.value)
             }

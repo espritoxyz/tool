@@ -4,6 +4,8 @@
 PROGRAM{
   0 DECLMETHOD savelist
   1 DECLMETHOD loop_savelist
+  2 DECLMETHOD retalt
+  3 DECLMETHOD retalt_savelist
   savelist PROC:<{
     CONT:<{
       1 PUSHINT
@@ -37,5 +39,15 @@ PROGRAM{
     REPEAT
     10 PUSHINT
     // 1 1 1 1 1 10
+  }>
+  retalt PROC:<{
+    RETALT
+  }>
+  retalt_savelist PROC:<{
+    CONT:<{
+      4 PUSHINT
+    }>
+    c1 POPCTR
+    RETALT
   }>
 }END>c

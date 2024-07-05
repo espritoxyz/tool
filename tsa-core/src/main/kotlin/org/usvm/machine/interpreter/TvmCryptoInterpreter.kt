@@ -16,6 +16,7 @@ import org.usvm.machine.state.TvmStack
 import org.usvm.machine.state.TvmState
 import org.usvm.machine.state.addInt
 import org.usvm.machine.state.consumeDefaultGas
+import org.usvm.machine.state.doWithStateCtx
 import org.usvm.machine.state.newStmt
 import org.usvm.machine.state.nextStmt
 import org.usvm.machine.state.slicePreloadDataBits
@@ -23,8 +24,6 @@ import org.usvm.machine.state.takeLastBuilder
 import org.usvm.machine.state.takeLastCell
 import org.usvm.machine.state.takeLastIntOrThrowTypeError
 import org.usvm.machine.state.takeLastSlice
-import org.usvm.machine.state.throwUnknownCellUnderflowError
-import org.usvm.machine.state.throwTypeCheckError
 import org.usvm.machine.state.unsignedIntegerFitsBits
 
 class TvmCryptoInterpreter(private val ctx: TvmContext) {
@@ -67,7 +66,7 @@ class TvmCryptoInterpreter(private val ctx: TvmContext) {
         val key = scope.takeLastIntOrThrowTypeError()
         val signature = scope.calcOnState { stack.takeLastSlice() }
         if (signature == null) {
-            scope.doWithState(throwTypeCheckError)
+            scope.doWithState(ctx.throwTypeCheckError)
             return
         }
 
@@ -76,7 +75,7 @@ class TvmCryptoInterpreter(private val ctx: TvmContext) {
         // Check that signature is correct - it contains at least 512 bits
         val bits = scope.slicePreloadDataBits(signature, bits = 512)
         if (bits == null) {
-            scope.doWithState {
+            scope.doWithStateCtx {
                 throwUnknownCellUnderflowError(this)
             }
 

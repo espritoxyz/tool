@@ -22,7 +22,6 @@ import org.usvm.machine.state.slicePreloadInt
 import org.usvm.machine.state.takeLastBuilder
 import org.usvm.machine.state.takeLastIntOrNull
 import org.usvm.machine.state.takeLastSlice
-import org.usvm.machine.state.throwTypeCheckError
 import org.usvm.machine.types.TvmSymbolicCellDataCoins
 import org.usvm.machine.types.makeSliceTypeLoad
 import org.usvm.mkSizeExpr

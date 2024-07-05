@@ -108,7 +108,7 @@ private fun splitSizeExpr(
  * This is function is used to set cellUnderflow error and to set its type
  * (StructuralError, SymbolicStructuralError, RealError or Unknown).
  */
-private fun processCellUnderflowCheck(
+private fun TvmContext.processCellUnderflowCheck(
     size: UExpr<TvmSizeSort>,
     scope: TvmStepScope,
     minSize: UExpr<TvmSizeSort>? = null,
@@ -160,7 +160,7 @@ private fun processCellUnderflowCheck(
     )
 }
 
-fun checkCellDataUnderflow(
+fun TvmContext.checkCellDataUnderflow(
     scope: TvmStepScope,
     cellRef: UHeapRef,
     minSize: UExpr<TvmSizeSort>? = null,
@@ -171,7 +171,7 @@ fun checkCellDataUnderflow(
     return processCellUnderflowCheck(cellSize, scope, minSize, maxSize, quietBlock)
 }
 
-fun checkCellRefsUnderflow(
+fun TvmContext.checkCellRefsUnderflow(
     scope: TvmStepScope,
     cellRef: UHeapRef,
     minSize: UExpr<TvmSizeSort>? = null,
@@ -190,7 +190,7 @@ fun checkCellOverflow(
     noOverflowExpr,
     blockOnFalseState = {
         quietBlock?.invoke(this)
-            ?: throwCellOverflowError(this)
+            ?: ctx.throwCellOverflowError(this)
     }
 )
 

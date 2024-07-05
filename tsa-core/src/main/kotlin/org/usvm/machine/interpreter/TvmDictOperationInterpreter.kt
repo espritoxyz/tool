@@ -168,7 +168,6 @@ import org.usvm.machine.state.takeLastBuilder
 import org.usvm.machine.state.takeLastCell
 import org.usvm.machine.state.takeLastIntOrThrowTypeError
 import org.usvm.machine.state.takeLastSlice
-import org.usvm.machine.state.throwTypeCheckError
 import org.usvm.machine.types.TvmBuilderType
 import org.usvm.machine.types.TvmCellType
 import org.usvm.machine.types.TvmDictCellType
@@ -353,7 +352,7 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
     private fun doLoadDict(inst: TvmDictSerialInst, scope: TvmStepScope, returnUpdatedSlice: Boolean) {
         val slice = scope.calcOnStateCtx { stack.takeLastSlice() }
         if (slice == null) {
-            scope.doWithState(throwTypeCheckError)
+            scope.doWithState(ctx.throwTypeCheckError)
             return
         }
 
@@ -395,7 +394,7 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
     private fun doStoreDictToBuilder(inst: TvmDictSerialInst, scope: TvmStepScope) {
         val builder = scope.calcOnStateCtx { stack.takeLastBuilder() }
         if (builder == null) {
-            scope.doWithState(throwTypeCheckError)
+            scope.doWithState(ctx.throwTypeCheckError)
             return
         }
 
@@ -433,7 +432,7 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
         val key = loadKey(scope, keyType, keyLength) ?: return
         val value = loadValue(scope, valueType, isSetBuilder)
         if (value == null) {
-            scope.doWithState(throwTypeCheckError)
+            scope.doWithState(ctx.throwTypeCheckError)
             return
         }
 

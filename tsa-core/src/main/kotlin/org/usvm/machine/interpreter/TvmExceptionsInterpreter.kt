@@ -11,17 +11,26 @@ import org.ton.bytecode.TvmExceptionsThrowifInst
 import org.ton.bytecode.TvmExceptionsThrowifShortInst
 import org.ton.bytecode.TvmExceptionsThrowifnotInst
 import org.ton.bytecode.TvmExceptionsThrowifnotShortInst
+import org.ton.bytecode.TvmExceptionsTryInst
+import org.usvm.UExpr
 import org.usvm.machine.TvmContext
+import org.usvm.machine.TvmContext.TvmInt257Sort
 import org.usvm.machine.TvmStepScope
+import org.usvm.machine.state.C0Register
+import org.usvm.machine.state.C2Register
 import org.usvm.machine.state.TvmFailureType
-import org.usvm.machine.state.TvmMethodResult
 import org.usvm.machine.state.TvmState
 import org.usvm.machine.state.TvmUnknownFailure
 import org.usvm.machine.state.consumeDefaultGas
 import org.usvm.machine.state.consumeGas
+import org.usvm.machine.state.defineC0
+import org.usvm.machine.state.defineC2
+import org.usvm.machine.state.extractCurrentContinuation
+import org.usvm.machine.state.jump
 import org.usvm.machine.state.newStmt
 import org.usvm.machine.state.nextStmt
 import org.usvm.machine.state.setFailure
+import org.usvm.machine.state.takeLastContinuation
 import org.usvm.machine.state.takeLastIntOrNull
 import org.usvm.machine.state.takeLastIntOrThrowTypeError
 import org.usvm.utils.intValueOrNull
@@ -32,14 +41,13 @@ class TvmExceptionsInterpreter(private val ctx: TvmContext) {
             is TvmExceptionsThrowargInst -> scope.doWithState {
                 scope.consumeDefaultGas(stmt)
 
-                // TODO push parameter to the stack
-                methodResult = TvmMethodResult.TvmFailure(TvmUnknownFailure(stmt.n.toUInt()), TvmFailureType.UnknownError)
+                val param = stack.takeLastIntOrNull() ?: return@doWithState
+                throwException(code = stmt.n, param = param)
             }
             is TvmExceptionsThrowShortInst -> scope.doWithState {
                 scope.consumeDefaultGas(stmt)
 
-                // TODO push parameter to the stack
-                methodResult = TvmMethodResult.TvmFailure(TvmUnknownFailure(stmt.n.toUInt()), TvmFailureType.UnknownError)
+                throwException(code = stmt.n)
             }
             is TvmExceptionsThrowifInst -> {
                 scope.doWithState { consumeGas(34) }
@@ -75,8 +83,7 @@ class TvmExceptionsInterpreter(private val ctx: TvmContext) {
                 scope.consumeDefaultGas(stmt)
 
                 scope.doWithState {
-                    // TODO push parameter to the stack
-                    methodResult = TvmMethodResult.TvmFailure(TvmUnknownFailure(stmt.n.toUInt()), TvmFailureType.UnknownError)
+                    throwException(stmt.n)
                 }
             }
             is TvmExceptionsThrowanyInst -> {
@@ -86,13 +93,34 @@ class TvmExceptionsInterpreter(private val ctx: TvmContext) {
                     val code = stack.takeLastIntOrNull()?.intValueOrNull
                         ?: error("Cannot extract concrete code exception from the stack")
 
-                    // TODO push parameter to the stack
-                    methodResult = TvmMethodResult.TvmFailure(TvmUnknownFailure(code.toUInt()), TvmFailureType.UnknownError)
+                    throwException(code)
                 }
+            }
+            is TvmExceptionsTryInst -> {
+                scope.consumeDefaultGas(stmt)
+
+                val body = scope.calcOnState {
+                    val oldC2 = registers.c2.value
+                    val cc = extractCurrentContinuation(stmt, saveC0 = true, saveC1 = true, saveC2 = true)
+                    val handler = stack.takeLastContinuation().defineC2(oldC2).defineC0(cc)
+
+                    registers.c0 = C0Register(cc)
+                    registers.c2 = C2Register(handler)
+
+                    stack.takeLastContinuation()
+                }
+
+                scope.jump(body)
             }
             else -> TODO("Unknown stmt: $stmt")
         }
     }
+
+    private fun TvmState.throwException(
+        code: Int,
+        level: TvmFailureType = TvmFailureType.UnknownError,
+        param: UExpr<TvmInt257Sort> = ctx.zeroValue,
+    ) = ctx.setFailure(TvmUnknownFailure(code.toUInt()), level, param, implicitThrow = false)(this)
 
     private fun doThrowIfInst(
         scope: TvmStepScope,
@@ -110,7 +138,7 @@ class TvmExceptionsInterpreter(private val ctx: TvmContext) {
             scope.fork(
                 throwCondition,
                 blockOnFalseState = {
-                    setFailure(TvmUnknownFailure(exceptionCode.toUInt()))(this)
+                    throwException(exceptionCode)
                     consumeGas(50)
                 }
             ) ?: return

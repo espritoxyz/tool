@@ -8,19 +8,19 @@ import org.usvm.machine.TvmContext
 import kotlin.io.path.Path
 import kotlin.test.Test
 
-class SavelistTest {
+class ContinuationTest {
     private val ctx = TvmContext(TvmComponents())
 
-    private val savelistFiftPath: String = "/continuations/Savelist.fif"
+    private val continuationsFiftPath: String = "/continuations/Continuations.fif"
 
     @Test
-    fun testSavelist(): Unit = with(ctx) {
-        val fiftResourcePath = this::class.java.getResource(savelistFiftPath)?.path?.let { Path(it) }
-            ?: error("Cannot find resource fift $savelistFiftPath")
+    fun testContinuations(): Unit = with(ctx) {
+        val fiftResourcePath = this::class.java.getResource(continuationsFiftPath)?.path?.let { Path(it) }
+            ?: error("Cannot find resource fift $continuationsFiftPath")
 
         val symbolicResult = compileAndAnalyzeFift(fiftResourcePath)
 
-        val methodIds = (0..1).toSet()
+        val methodIds = (0..3).toSet()
         compareSymbolicAndConcreteResults(methodIds, symbolicResult) { methodId ->
             runFiftMethod(fiftResourcePath, methodId)
         }

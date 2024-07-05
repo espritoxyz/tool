@@ -71,7 +71,7 @@ fun TvmStack.takeLastIntOrNull(): UExpr<TvmInt257Sort>? {
 
 fun TvmState.takeLastIntOrThrowTypeError(): UExpr<TvmInt257Sort>? =
     stack.takeLastIntOrNull() ?: run {
-        throwTypeCheckError(this)
+        ctx.throwTypeCheckError(this)
         null
     }
 
