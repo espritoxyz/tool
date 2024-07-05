@@ -6,7 +6,7 @@ import org.ton.TvmIntegerLabel
 import org.ton.TvmInternalStdMsgAddrLabel
 import org.ton.TvmMaybeLabel
 import org.ton.TvmMsgAddrLabel
-import org.ton.TvmPrependingSwitchDataCellLabel
+import org.ton.TvmCompositeDataCellLabel
 import org.ton.TvmRealDataCellLabel
 import org.usvm.UBoolExpr
 import org.usvm.UConcreteHeapRef
@@ -77,7 +77,7 @@ fun TvmDataCellLabel.offset(
     prefixSize: UExpr<TvmSizeSort>,
 ): UExpr<TvmSizeSort> =
     when (this) {
-        is TvmPrependingSwitchDataCellLabel -> {
+        is TvmCompositeDataCellLabel -> {
             zeroSizeExpr
         }
         is TvmIntegerLabel -> {
