@@ -8,7 +8,8 @@ import kotlin.test.Test
 
 class ContractsTest {
     private val nftItemPath: String = "/contracts/nft-item/nft-item.fc"
-    private val walletPath: String = "/contracts/wallet-v4/wallet-v4-code.fc"
+    private val walletV4Path: String = "/contracts/wallet-v4/wallet-v4-code.fc"
+    private val walletV5Path: String = "/contracts/wallet-v5/wallet_v5.fc"
     private val subscriptionPluginPath: String = "/contracts/wallet-v4/simple-subscription-plugin.fc"
     private val jettonMinterPath: String = "/contracts/modern-jetton/jetton-minter.func"
     private val jettonWalletPath: String = "/contracts/modern-jetton/jetton-wallet.func"
@@ -31,8 +32,13 @@ class ContractsTest {
     }
 
     @Test
-    fun testWallet() {
-        analyzeContract(walletPath, methodsNumber = 7)
+    fun testWalletV4() {
+        analyzeContract(walletV4Path, methodsNumber = 7)
+    }
+
+    @Test
+    fun testWalletV5() {
+        analyzeContract(walletV5Path, methodsNumber = 7)
     }
 
     @Test

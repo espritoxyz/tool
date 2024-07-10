@@ -13,12 +13,12 @@ class CellParseTest {
     private val loadGramsFiftPath: String = "/cell/load_grams.fif"
 
     @Test
-    fun cellLoadIntTest() {
+    fun cellParseTest() {
         val fiftResourcePath = this::class.java.getResource(cellParseFiftPath)?.path?.let { Path(it) }
             ?: error("Cannot find resource fift $cellParseFiftPath")
 
         val symbolicResult = compileAndAnalyzeFift(fiftResourcePath)
-        val methodIds = (0..6).toSet()
+        val methodIds = (0..11).toSet()
 
         compareSymbolicAndConcreteResults(methodIds, symbolicResult) { methodId ->
             runFiftMethod(fiftResourcePath, methodId)

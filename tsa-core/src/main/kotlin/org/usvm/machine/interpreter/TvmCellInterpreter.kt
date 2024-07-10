@@ -70,16 +70,28 @@ import org.ton.bytecode.TvmCellParsePlduxInst
 import org.ton.bytecode.TvmCellParsePlduxqInst
 import org.ton.bytecode.TvmCellParseSbitrefsInst
 import org.ton.bytecode.TvmCellParseSbitsInst
+import org.ton.bytecode.TvmCellParseScutlastInst
+import org.ton.bytecode.TvmCellParseSdbeginsInst
+import org.ton.bytecode.TvmCellParseSdbeginsqInst
+import org.ton.bytecode.TvmCellParseSdbeginsxInst
+import org.ton.bytecode.TvmCellParseSdbeginsxqInst
 import org.ton.bytecode.TvmCellParseSdcutfirstInst
+import org.ton.bytecode.TvmCellParseSdcutlastInst
 import org.ton.bytecode.TvmCellParseSdskipfirstInst
+import org.ton.bytecode.TvmCellParseSdskiplastInst
 import org.ton.bytecode.TvmCellParseSrefsInst
+import org.ton.bytecode.TvmCellParseSskiplastInst
 import org.ton.bytecode.TvmCellParseXctosInst
 import org.ton.bytecode.TvmInst
+import org.ton.bytecode.TvmSubSliceSerializedLoader
 import org.usvm.UBoolExpr
 import org.usvm.UExpr
 import org.usvm.UHeapRef
 import org.usvm.api.readField
+import org.usvm.api.writeField
 import org.usvm.machine.TvmContext
+import org.usvm.machine.TvmContext.Companion.MAX_DATA_LENGTH
+import org.usvm.machine.TvmContext.Companion.cellDataLengthField
 import org.usvm.machine.TvmContext.Companion.cellRefsLengthField
 import org.usvm.machine.TvmContext.Companion.sliceCellField
 import org.usvm.machine.TvmContext.Companion.sliceDataPosField
@@ -91,7 +103,11 @@ import org.usvm.machine.state.addInt
 import org.usvm.machine.state.addOnStack
 import org.usvm.machine.state.allocEmptyCell
 import org.usvm.machine.state.allocSliceFromCell
+import org.usvm.machine.state.allocSliceFromData
+import org.usvm.machine.state.assertDataLengthConstraint
+import org.usvm.machine.state.assertRefsLengthConstraint
 import org.usvm.machine.state.assertType
+import org.usvm.machine.state.bitsToBv
 import org.usvm.machine.state.builderCopy
 import org.usvm.machine.state.builderStoreDataBits
 import org.usvm.machine.state.builderStoreInt
@@ -131,8 +147,11 @@ import org.usvm.machine.types.TvmSliceType
 import org.usvm.machine.types.TvmSymbolicCellDataBitArray
 import org.usvm.machine.types.TvmSymbolicCellDataInteger
 import org.usvm.machine.types.makeSliceTypeLoad
+import org.usvm.mkSizeAddExpr
 import org.usvm.mkSizeExpr
+import org.usvm.mkSizeLeExpr
 import org.usvm.mkSizeLtExpr
+import org.usvm.mkSizeSubExpr
 import org.usvm.sizeSort
 
 class TvmCellInterpreter(private val ctx: TvmContext) {
@@ -197,6 +216,30 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
                 visitLoadSliceXInst(scope, stmt, preload = false, quiet = false)
                     ?: return
                 doPop(scope, 1)
+            }
+            is TvmCellParseSdcutlastInst -> {
+                visitCutLastInst(scope, stmt, skipAllRefs = true)
+            }
+            is TvmCellParseScutlastInst -> {
+                visitCutLastInst(scope, stmt, skipAllRefs = false)
+            }
+            is TvmCellParseSdskiplastInst -> {
+                visitSkipLastInst(scope, stmt, keepAllRefs = true)
+            }
+            is TvmCellParseSskiplastInst -> {
+                visitSkipLastInst(scope, stmt, keepAllRefs = false)
+            }
+            is TvmCellParseSdbeginsInst -> {
+                visitBeginsInst(scope, stmt, stmt.s, quiet = false)
+            }
+            is TvmCellParseSdbeginsqInst -> {
+                visitBeginsInst(scope, stmt, stmt.s, quiet = true)
+            }
+            is TvmCellParseSdbeginsxInst -> {
+                visitBeginsXInst(scope, stmt, quiet = false)
+            }
+            is TvmCellParseSdbeginsxqInst -> {
+                visitBeginsXInst(scope, stmt, quiet = true)
             }
             is TvmAliasInst -> visitCellParseInst(scope, stmt.resolveAlias() as TvmCellParseInst)
             else -> TODO("Unknown stmt: $stmt")
@@ -554,6 +597,241 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
         scope.doWithState {
             addOnStack(resultSlice, TvmSliceType)
             visitLoadDataInstEnd(stmt, slice, sizeBits.extractToSizeSort(), preload, quiet)
+        }
+    }
+
+    private fun visitCutLastInst(scope: TvmStepScope, stmt: TvmCellParseInst, skipAllRefs: Boolean) = with(ctx) {
+        scope.consumeDefaultGas(stmt)
+
+        val refsToRemain = if (skipAllRefs) {
+            zeroSizeExpr
+        } else {
+            scope.takeLastIntOrThrowTypeError()?.extractToSizeSort()
+                ?: return
+        }
+
+        val bitsToRemain = scope.takeLastIntOrThrowTypeError()?.extractToSizeSort()
+            ?: return
+
+        val slice = scope.calcOnState { stack.takeLastSlice() }
+        if (slice == null) {
+            scope.doWithState(throwTypeCheckError)
+            return
+        }
+
+        val cell = scope.calcOnState { memory.readField(slice, sliceCellField, addressSort) }
+
+        val cellDataLength = scope.calcOnState { memory.readField(cell, cellDataLengthField, sizeSort) }
+        scope.assertDataLengthConstraint(
+            cellDataLength,
+            unsatBlock = { error("Cannot ensure correctness for data length in cell $cell") }
+        ) ?: return
+
+        val cellRefsLength = scope.calcOnState { memory.readField(cell, cellRefsLengthField, sizeSort) }
+        scope.assertRefsLengthConstraint(
+            cellRefsLength,
+            unsatBlock = { error("Cannot ensure correctness for number of refs in cell $cell") }
+        ) ?: return
+
+        val dataPos = scope.calcOnState { memory.readField(slice, sliceDataPosField, sizeSort) }
+        val refsPos = scope.calcOnState { memory.readField(slice, sliceRefPosField, sizeSort) }
+
+        val requiredBitsInCell = mkSizeAddExpr(bitsToRemain, dataPos)
+        checkCellDataUnderflow(scope, cell, minSize = requiredBitsInCell)
+            ?: return
+
+        if (!skipAllRefs) {
+            val requiredRefsInCell = mkSizeAddExpr(refsToRemain, refsPos)
+            checkCellRefsUnderflow(scope, cell, minSize = requiredRefsInCell)
+                ?: return
+        }
+
+        val allExceptRemainingBits = mkSizeSubExpr(cellDataLength, bitsToRemain)
+        val bitsToSkip = mkSizeSubExpr(allExceptRemainingBits, dataPos)
+
+        val allExceptRemainingRefs = mkSizeSubExpr(cellRefsLength, refsToRemain)
+        val refsToSkip = mkSizeSubExpr(allExceptRemainingRefs, refsPos)
+
+        scope.doWithState {
+            val sliceToReturn = memory.allocConcrete(TvmSliceType).also { sliceCopy(slice, it) }
+            sliceMoveDataPtr(sliceToReturn, bitsToSkip)
+            sliceMoveRefPtr(sliceToReturn, refsToSkip)
+
+            addOnStack(sliceToReturn, TvmSliceType)
+            newStmt(stmt.nextStmt())
+        }
+    }
+
+    private fun visitSkipLastInst(scope: TvmStepScope, stmt: TvmCellParseInst, keepAllRefs: Boolean) = with(ctx) {
+        scope.consumeDefaultGas(stmt)
+
+        val refsToCut = if (keepAllRefs) {
+            zeroSizeExpr
+        } else {
+            scope.takeLastIntOrThrowTypeError()?.extractToSizeSort()
+                ?: return
+        }
+
+        val bitsToCut = scope.takeLastIntOrThrowTypeError()?.extractToSizeSort()
+            ?: return
+
+        val slice = scope.calcOnState { stack.takeLastSlice() }
+        if (slice == null) {
+            scope.doWithState(throwTypeCheckError)
+            return
+        }
+
+        val cell = scope.calcOnState { memory.readField(slice, sliceCellField, addressSort) }
+
+        val cellDataLength = scope.calcOnState { memory.readField(cell, cellDataLengthField, sizeSort) }
+        scope.assertDataLengthConstraint(
+            cellDataLength,
+            unsatBlock = { error("Cannot ensure correctness for data length in cell $cell") }
+        ) ?: return
+
+        val cellRefsLength = scope.calcOnState { memory.readField(cell, cellRefsLengthField, sizeSort) }
+        scope.assertRefsLengthConstraint(
+            cellRefsLength,
+            unsatBlock = { error("Cannot ensure correctness for number of refs in cell $cell") }
+        ) ?: return
+
+        val dataPos = scope.calcOnState { memory.readField(slice, sliceDataPosField, sizeSort) }
+        val refsPos = scope.calcOnState { memory.readField(slice, sliceRefPosField, sizeSort) }
+
+        val requiredBitsInCell = mkSizeAddExpr(bitsToCut, dataPos)
+        checkCellDataUnderflow(scope, cell, minSize = requiredBitsInCell)
+            ?: return
+
+        if (!keepAllRefs) {
+            val requiredRefsInCell = mkSizeAddExpr(refsToCut, refsPos)
+            checkCellRefsUnderflow(scope, cell, minSize = requiredRefsInCell)
+                ?: return
+        }
+
+        scope.doWithState {
+            val cutCell = memory.allocConcrete(TvmCellType).also { builderCopy(cell, it) }
+
+            val cutCellDataLength = mkSizeSubExpr(cellDataLength, bitsToCut)
+            val cutCellRefsLength = mkSizeSubExpr(cellRefsLength, refsToCut)
+
+            memory.writeField(cutCell, cellDataLengthField, sizeSort, cutCellDataLength, guard = trueExpr)
+            memory.writeField(cutCell, cellRefsLengthField, sizeSort, cutCellRefsLength, guard = trueExpr)
+
+            val cutSlice = allocSliceFromCell(cutCell)
+
+            addOnStack(cutSlice, TvmSliceType)
+            newStmt(stmt.nextStmt())
+        }
+    }
+
+    private fun visitBeginsInst(
+        scope: TvmStepScope,
+        stmt: TvmCellParseInst,
+        s: TvmSubSliceSerializedLoader,
+        quiet: Boolean
+    ) = with(ctx) {
+        doBeginsInst(scope, stmt, quiet) {
+            check(s.refs.isEmpty()) {
+                "Unexpected refs in $stmt"
+            }
+
+            val prefixData = s.bitsToBv()
+            scope.calcOnState { allocSliceFromData(prefixData) }
+        }
+    }
+
+    private fun visitBeginsXInst(
+        scope: TvmStepScope,
+        stmt: TvmCellParseInst,
+        quiet: Boolean
+    ) = doBeginsInst(scope, stmt, quiet) {
+        scope.calcOnState { stack.takeLastSlice() }
+    }
+
+    private fun doBeginsInst(
+        scope: TvmStepScope,
+        stmt: TvmCellParseInst,
+        quiet: Boolean,
+        prefixSliceLoader: () -> UHeapRef?
+    ) = with(ctx) {
+        scope.consumeDefaultGas(stmt)
+
+        val prefixSlice = prefixSliceLoader()
+        if (prefixSlice == null) {
+            scope.doWithState(throwTypeCheckError)
+            return
+        }
+
+        val slice = scope.calcOnState { stack.takeLastSlice() }
+        if (slice == null) {
+            scope.doWithState(throwTypeCheckError)
+            return
+        }
+
+        val remainingPrefixBitsLength = scope.calcOnState { getSliceRemainingBitsCount(prefixSlice) }
+        val prefixBits = scope.slicePreloadDataBits(prefixSlice, remainingPrefixBitsLength)
+            ?: return@with
+
+
+        val remainingDataBitsLength = scope.calcOnState { getSliceRemainingBitsCount(slice) }
+        val dataBits = scope.slicePreloadDataBits(slice, remainingDataBitsLength)
+            ?: return@with
+
+        val blockOnFalseState: TvmState.() -> Unit = {
+            if (quiet) {
+                addOnStack(slice, TvmSliceType)
+                stack.addInt(zeroValue)
+                newStmt(stmt.nextStmt())
+            } else {
+                throwStructuralCellUnderflowError(this)
+            }
+        }
+
+        val dataCell = scope.calcOnState { memory.readField(slice, sliceCellField, addressSort) }
+        val cellDataLength = scope.calcOnState { memory.readField(dataCell, cellDataLengthField, sizeSort) }
+        scope.assertDataLengthConstraint(
+            cellDataLength,
+            unsatBlock = { error("Cannot ensure correctness for data length in cell $dataCell") }
+        ) ?: return
+
+        val dataPos = scope.calcOnState { memory.readField(slice, sliceDataPosField, sizeSort) }
+        val requiredBitsInDataCell = mkSizeAddExpr(dataPos, remainingPrefixBitsLength)
+
+        // Check that we have no less than prefix length bits in the data cell
+        checkCellDataUnderflow(scope, dataCell, minSize = requiredBitsInDataCell, quietBlock = blockOnFalseState)
+            ?: return@with
+
+        // xxxxxxxxxxxxx[prefix]
+        // yyyyyy[prefix|suffix]
+        val prefixShift = mkBvSubExpr(mkSizeExpr(MAX_DATA_LENGTH), remainingPrefixBitsLength)
+            .zeroExtendToSort(cellDataSort)
+        val shiftedPrefix = mkBvShiftLeftExpr(prefixBits, prefixShift)
+
+        val suffixShift = mkSizeSubExpr(remainingDataBitsLength, remainingPrefixBitsLength)
+            .zeroExtendToSort(cellDataSort)
+        // Firstly, shift data bits right to remove suffix and get 00000000000yyyyyyyy[prefix]
+        val dataWithoutSuffix = mkBvLogicalShiftRightExpr(dataBits, suffixShift)
+        // Then, shift it left to get only prefix [prefix]00000000000000
+        val shiftedData = mkBvShiftLeftExpr(dataWithoutSuffix, prefixShift)
+
+        scope.fork(
+            shiftedPrefix eq shiftedData,
+            blockOnFalseState = blockOnFalseState
+        ) ?: return@with
+
+        val suffixSlice = scope.calcOnState {
+            memory.allocConcrete(TvmSliceType).also { sliceCopy(slice, it) }
+        }
+
+        scope.doWithState {
+            sliceMoveDataPtr(suffixSlice, remainingPrefixBitsLength)
+            addOnStack(suffixSlice, TvmSliceType)
+
+            if (quiet) {
+                stack.addInt(minusOneValue)
+            }
+
+            newStmt(stmt.nextStmt())
         }
     }
 

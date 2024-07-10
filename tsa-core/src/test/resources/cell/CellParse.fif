@@ -9,6 +9,11 @@ PROGRAM{
   4  DECLMETHOD load_slice
   5  DECLMETHOD load_slicex
   6  DECLMETHOD load_long_slicex
+  7  DECLMETHOD sd_cut_last
+  8  DECLMETHOD s_cut_last
+  9  DECLMETHOD sd_skip_last
+  10  DECLMETHOD s_skip_last
+  11  DECLMETHOD sd_beginsx
   load_int PROC:<{
     192 PUSHINT
     65472 PUSHINT
@@ -162,5 +167,181 @@ PROGRAM{
     PLDSLICEX
     253 LDU
     255 PLDU
+  }>
+  sd_cut_last PROC:<{
+    117 PUSHINT // 1110101
+    NEWC
+    7 STU
+    NEWC
+    ENDC
+    SWAP
+    STREF
+    ENDC // Now we have a cell with 7 bits equal to 1110101 and one empty ref
+
+    CTOS
+    6 PUSHINT
+    SDCUTLAST // Expect slice with 6 bits equal to 110101 and no refs, [s]
+
+    DUP // [s s]
+
+    53 PUSHINT
+    NEWC
+    6 STU
+    ENDC
+    CTOS
+
+    SDEQ
+    SWAP
+    SREMPTY
+  }>
+  s_cut_last PROC:<{
+    117 PUSHINT // 1110101
+    NEWC
+    7 STU
+
+    NEWC
+    ENDC
+    SWAP
+    STREF
+
+    42 PUSHINT
+    NEWC
+    7 STU
+    ENDC
+    SWAP
+    STREF
+
+    ENDC // Now we have a cell with 7 bits equal to 1110101 and two refs - empty and containing number 42
+
+    CTOS
+    6 PUSHINT
+    1 PUSHINT
+    SCUTLAST // Expect slice with 6 bits equal to 110101 and one ref containing 42
+
+    DUP // [s s]
+
+    53 PUSHINT
+    NEWC
+    6 STU
+    ENDC
+    CTOS
+
+    SDEQ
+    SWAP
+
+    LDREF // [-1 C{42} s]
+    SWAP
+    CTOS // [-1 s {42}]
+    SWAP
+    SREMPTY // [-1 {42} -1]
+    SWAP // [-1 -1 {42}]
+
+    7 LDU // [-1 -1 42 {}]
+    SWAP  // [-1 -1 {} 42]
+    42 PUSHINT // [-1 -1 {} 42 42]
+    EQUAL // [-1 -1 {} -1]
+    SWAP // [-1 -1 -1 {}]
+    SEMPTY // [-1 -1 -1 -1]
+  }>
+  sd_skip_last PROC:<{
+    117 PUSHINT // 1110101
+    NEWC
+    7 STU
+    NEWC
+    ENDC
+    SWAP
+    STREF
+    ENDC // Now we have a cell with 7 bits equal to 1110101 and one empty ref
+
+    CTOS
+    3 PUSHINT
+    SDSKIPLAST // Expect slice with 4 bits equal to 1110 and one empty ref, [s]
+
+    DUP // [s s]
+
+    14 PUSHINT
+    NEWC
+    4 STU
+    ENDC
+    CTOS
+
+    SDEQ
+    SWAP
+
+    LDREF
+    SWAP
+    CTOS
+    SEMPTY
+    SWAP
+    SREMPTY
+  }>
+  s_skip_last PROC:<{
+    117 PUSHINT // 1110101
+    NEWC
+    7 STU
+
+    NEWC
+    ENDC
+    SWAP
+    STREF
+
+    42 PUSHINT
+    NEWC
+    7 STU
+    ENDC
+    SWAP
+    STREF
+
+    ENDC // Now we have a cell with 7 bits equal to 1110101 and two refs - empty and containing number 42
+
+    CTOS
+    3 PUSHINT
+    1 PUSHINT
+    SSKIPLAST // Expect slice with 4 bits equal to 1110 and one empty ref
+
+    DUP // [s s]
+
+    14 PUSHINT
+    NEWC
+    4 STU
+    ENDC
+    CTOS
+
+    SDEQ
+    SWAP
+
+    LDREF // [-1 C{} s]
+    SWAP
+    CTOS // [-1 s {}]
+    SWAP
+    SREMPTY // [-1 {} -1]
+    SWAP // [-1 -1 {}]
+
+    SEMPTY // [-1 -1 -1]
+  }>
+  sd_beginsx PROC:<{
+    117 PUSHINT // 1110101
+    NEWC
+    7 STU
+    ENDC // Now we have a cell with 7 bits 1110101
+    CTOS
+
+    7 PUSHINT // 111
+    NEWC
+    3 STU
+    ENDC
+    CTOS
+
+    // [{1110101} {111}]
+    SDBEGINSX // [{0101}]
+
+    5 PUSHINT
+    NEWC
+    4 STU
+    ENDC
+    CTOS
+    DUMPSTK
+
+    SDEQ
   }>
 }END>c

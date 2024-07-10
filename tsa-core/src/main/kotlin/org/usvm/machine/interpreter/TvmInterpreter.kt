@@ -1,6 +1,5 @@
 package org.usvm.machine.interpreter
 
-import io.ksmt.expr.KBitVecValue
 import io.ksmt.expr.KInterpretedValue
 import io.ksmt.utils.BvUtils.bvMaxValueSigned
 import io.ksmt.utils.BvUtils.bvMinValueSigned
@@ -167,14 +166,12 @@ import org.ton.bytecode.TvmStackComplexXchgxInst
 import org.ton.bytecode.TvmStackComplexXcpu2Inst
 import org.ton.bytecode.TvmStackComplexXcpuInst
 import org.ton.bytecode.TvmStackComplexXcpuxcInst
-import org.ton.bytecode.TvmSubSliceSerializedLoader
 import org.ton.bytecode.TvmTupleInst
 import org.usvm.machine.types.TvmType
 import org.ton.cell.Cell
 import org.ton.targets.TvmTarget
 import org.usvm.StepResult
 import org.usvm.UBoolExpr
-import org.usvm.UBvSort
 import org.usvm.UExpr
 import org.usvm.UInterpreter
 import org.usvm.api.makeSymbolicPrimitive
@@ -230,8 +227,10 @@ import org.usvm.targets.UTargetsSet
 import java.math.BigInteger
 import org.ton.bytecode.TvmArtificialExecuteContInst
 import org.ton.bytecode.TvmArtificialJmpToContInst
+import org.ton.bytecode.TvmCompareOtherSdcnttrail0Inst
 import org.ton.bytecode.TvmCompareOtherSdemptyInst
 import org.ton.bytecode.TvmCompareOtherSdeqInst
+import org.ton.bytecode.TvmCompareOtherSremptyInst
 import org.ton.bytecode.TvmConstDataPushrefInst
 import org.ton.bytecode.TvmConstDataPushrefsliceInst
 import org.ton.bytecode.TvmContBasicRetaltInst
@@ -265,11 +264,13 @@ import org.usvm.machine.state.addOnStack
 import org.usvm.machine.state.allocEmptyCell
 import org.usvm.machine.state.allocSliceFromCell
 import org.usvm.machine.state.allocateCell
+import org.usvm.machine.state.bitsToBv
 import org.usvm.machine.state.defineC0
 import org.usvm.machine.state.defineC1
 import org.usvm.machine.state.defineC2
 import org.usvm.machine.state.defineC4
 import org.usvm.machine.state.getSliceRemainingBitsCount
+import org.usvm.machine.state.getSliceRemainingRefsCount
 import org.usvm.machine.state.initConfigRoot
 import org.usvm.machine.state.jump
 import org.usvm.machine.state.lastStmt
@@ -1275,6 +1276,24 @@ class TvmInterpreter(
                     newStmt(stmt.nextStmt())
                 }
             }
+            is TvmCompareOtherSremptyInst -> {
+                scope.consumeDefaultGas(stmt)
+
+                val slice = scope.calcOnState { stack.takeLastSlice() }
+                if (slice == null) {
+                    scope.doWithState(throwTypeCheckError)
+                    return
+                }
+
+                val remainingRefs = scope.calcOnState { getSliceRemainingRefsCount(slice) }
+                val isEmpty = remainingRefs eq zeroSizeExpr
+                val result = isEmpty.toBv257Bool()
+
+                scope.doWithState {
+                    stack.addInt(result)
+                    newStmt(stmt.nextStmt())
+                }
+            }
             is TvmCompareOtherSemptyInst -> {
                 scope.consumeDefaultGas(stmt)
 
@@ -1296,6 +1315,28 @@ class TvmInterpreter(
 
                 scope.doWithState {
                     stack.addInt(result)
+                    newStmt(stmt.nextStmt())
+                }
+            }
+            is TvmCompareOtherSdcnttrail0Inst -> {
+                scope.consumeDefaultGas(stmt)
+
+                val slice = scope.calcOnState { stack.takeLastSlice() }
+                if (slice == null) {
+                    scope.doWithState(throwTypeCheckError)
+                    return
+                }
+
+                // TODO make a real implementation
+                val trailingZeroes = scope.calcOnState { makeSymbolicPrimitive(int257sort) }
+
+                scope.doWithState {
+                    scope.assert(
+                        mkBvSignedGreaterOrEqualExpr(trailingZeroes, zeroValue),
+                        unsatBlock = { error("Cannot make trailing zeroes >= 0") }
+                    ) ?: return@doWithState
+
+                    stack.addInt(trailingZeroes)
                     newStmt(stmt.nextStmt())
                 }
             }
@@ -1465,6 +1506,13 @@ class TvmInterpreter(
                     ?: return@doWithStateCtx throwTypeCheckError(this)
 
                 registers.c4 = C4Register(TvmCellValue(newData))
+            }
+            5 -> {
+                // TODO is it a correct implementation?
+                val newData = stack.takeLastCell()
+                    ?: return@doWithStateCtx throwTypeCheckError(this)
+
+                registers.c5 = C5Register(TvmCellValue(newData))
             }
             else -> TODO("Not yet implemented: $stmt")
         }
@@ -1667,12 +1715,12 @@ class TvmInterpreter(
         isJmp: Boolean,
     ) = with(ctx) {
         val flag = takeLastIntOrThrowTypeError() ?: return
-        val invertCondition = (flag eq zeroValue).let {
+        val invertedCondition = (flag eq zeroValue).let {
             if (invertCondition) it else it.not()
         }
 
         fork(
-            invertCondition,
+            invertedCondition,
             blockOnFalseState = {
                 newStmt(stmt.nextStmt())
             }
@@ -1803,12 +1851,6 @@ class TvmInterpreter(
 
         // Do nothing
         scope.doWithState { newStmt(stmt.nextStmt()) }
-    }
-
-    context(TvmContext)
-    private fun TvmSubSliceSerializedLoader.bitsToBv(): KBitVecValue<UBvSort> {
-        // todo: check bits order
-        return mkBv(bits.joinToString(""), bits.size.toUInt())
     }
 
     private fun UExpr<TvmInt257Sort>.extractConcrete(inst: TvmInst): Int {
