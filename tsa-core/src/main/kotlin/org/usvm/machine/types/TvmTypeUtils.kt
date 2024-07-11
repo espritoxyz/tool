@@ -1,13 +1,12 @@
 package org.usvm.machine.types
 
+import org.ton.TvmAtomicDataCellLabel
 import org.ton.TvmCoinsLabel
-import org.ton.TvmDataCellLabel
 import org.ton.TvmIntegerLabel
 import org.ton.TvmInternalStdMsgAddrLabel
-import org.ton.TvmMaybeLabel
+import org.ton.TvmMaybeRefLabel
 import org.ton.TvmMsgAddrLabel
-import org.ton.TvmCompositeDataCellLabel
-import org.ton.TvmRealDataCellLabel
+import org.ton.TvmBuiltinDataCellLabel
 import org.usvm.UBoolExpr
 import org.usvm.UConcreteHeapRef
 import org.usvm.UExpr
@@ -38,7 +37,7 @@ fun TvmState.getPossibleTypes(ref: UConcreteHeapRef): Sequence<TvmType> {
 }
 
 context(TvmContext)
-fun TvmRealDataCellLabel.accepts(symbolicType: TvmSymbolicCellDataType): UBoolExpr =
+fun TvmBuiltinDataCellLabel.accepts(symbolicType: TvmSymbolicCellDataType): UBoolExpr =
     when (this) {
         is TvmIntegerLabel -> {
             if (symbolicType !is TvmSymbolicCellDataInteger || isSigned != symbolicType.isSigned || endian != symbolicType.endian) {
@@ -61,7 +60,7 @@ fun TvmRealDataCellLabel.accepts(symbolicType: TvmSymbolicCellDataType): UBoolEx
                 falseExpr
             }
         }
-        is TvmMaybeLabel -> {
+        is TvmMaybeRefLabel -> {
             when (symbolicType) {
                 is TvmSymbolicCellMaybeConstructorBit -> trueExpr
                 is TvmSymbolicCellDataInteger -> symbolicType.sizeBits eq oneSizeExpr
@@ -71,15 +70,12 @@ fun TvmRealDataCellLabel.accepts(symbolicType: TvmSymbolicCellDataType): UBoolEx
     }
 
 context(TvmContext)
-fun TvmDataCellLabel.offset(
+fun TvmAtomicDataCellLabel.offset(
     state: TvmState,
     address: UConcreteHeapRef,
     prefixSize: UExpr<TvmSizeSort>,
 ): UExpr<TvmSizeSort> =
     when (this) {
-        is TvmCompositeDataCellLabel -> {
-            zeroSizeExpr
-        }
         is TvmIntegerLabel -> {
             mkSizeExpr(bitSize)
         }

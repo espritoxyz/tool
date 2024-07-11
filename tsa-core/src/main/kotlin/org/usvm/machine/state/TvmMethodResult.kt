@@ -1,7 +1,7 @@
 package org.usvm.machine.state
 
 import kotlinx.serialization.Serializable
-import org.ton.TvmRealDataCellLabel
+import org.ton.TvmBuiltinDataCellLabel
 import org.usvm.UBv32Sort
 import org.usvm.UExpr
 import org.usvm.machine.state.TvmMethodResult.*
@@ -163,6 +163,13 @@ data class TvmUnexpectedReading(
         "Unexpected reading of $readingType: expected end of cell"
 }
 
+data class TvmReadingOutOfSwitchBounds(
+    val readingType: TvmSymbolicCellDataType,
+) : TvmStructuralError {
+    override val message: String =
+        "Reading of $readingType is out of switch bounds"
+}
+
 data object TvmUnexpectedRefReading : TvmStructuralError {
     override val message: String =
         "Unexpected reading of a reference: slice should have no references left."
@@ -174,7 +181,7 @@ data object TvmUnexpectedEndOfReading : TvmStructuralError {
 }
 
 data class TvmReadingOfUnexpectedType(
-    val labelType: TvmRealDataCellLabel,
+    val labelType: TvmBuiltinDataCellLabel,
     val actualType: TvmSymbolicCellDataType,
 ) : TvmStructuralError {
     override val message: String =

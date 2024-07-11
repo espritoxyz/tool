@@ -4,7 +4,7 @@ import org.ton.TvmCoinsLabel
 import org.ton.TvmDataCellStructure
 import org.ton.TvmInputInfo
 import org.ton.TvmIntegerLabel
-import org.ton.TvmMaybeLabel
+import org.ton.TvmMaybeRefLabel
 import org.ton.TvmMsgAddrLabel
 import org.ton.TvmParameterInfo.DataCellInfo
 import org.ton.TvmParameterInfo.SliceInfo
@@ -344,7 +344,7 @@ class InputParameterInfoTests {
             tests,
             listOf { test ->
                 val exit = test.result as? TvmExecutionWithReadingOfUnexpectedType ?: return@listOf false
-                exit.actualType is TvmCellDataCoins && exit.labelType is TvmMaybeLabel
+                exit.actualType is TvmCellDataCoins && exit.labelType is TvmMaybeRefLabel
             }
         )
     }

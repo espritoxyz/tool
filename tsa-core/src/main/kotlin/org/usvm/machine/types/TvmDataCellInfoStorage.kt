@@ -3,7 +3,7 @@ package org.usvm.machine.types
 import org.ton.TvmDataCellStructure
 import org.ton.TvmInputInfo
 import org.ton.TvmParameterInfo
-import org.ton.TvmRealDataCellLabel
+import org.ton.TvmBuiltinDataCellLabel
 import org.usvm.UBoolExpr
 import org.usvm.UConcreteHeapRef
 import org.usvm.api.readField
@@ -34,8 +34,8 @@ class TvmDataCellInfoStorage private constructor(
         val trees = treesOfAddress(loadData.address)
         val result = mutableMapOf<TvmStructuralError, UBoolExpr>()
         trees.forEach { tree ->
-            tree.fold(Unit) { _, vertex ->
-                val offsetGuard = loadData.offset eq vertex.prefixSize
+            tree.onEachVertex { vertex ->
+                val exactOffsetGuard = loadData.offset eq vertex.prefixSize
                 when (val struct = vertex.structure) {
                     is TvmDataCellStructure.Unknown,
                     is TvmDataCellStructure.SwitchPrefix,
@@ -48,13 +48,13 @@ class TvmDataCellInfoStorage private constructor(
                         val error = TvmUnexpectedReading(loadData.type)
                         val oldValue = result.getOrDefault(error, trueExpr)
                         val conflict = mkSizeGtExpr(loadData.type.sizeBits, zeroSizeExpr)
-                        result[error] = oldValue and (loadData.guard and vertex.guard and offsetGuard and conflict).not()
+                        result[error] = oldValue and (loadData.guard and vertex.guard and exactOffsetGuard and conflict).not()
                     }
 
                     is TvmDataCellStructure.KnownTypePrefix -> {
                         // skip artificial labels
-                        if (struct.typeOfPrefix !is TvmRealDataCellLabel)
-                            return@fold
+                        if (struct.typeOfPrefix !is TvmBuiltinDataCellLabel)
+                            return@onEachVertex
 
                         // conflict, if types are not consistent
                         val error = TvmReadingOfUnexpectedType(
@@ -63,7 +63,7 @@ class TvmDataCellInfoStorage private constructor(
                         )
                         val oldValue = result.getOrDefault(error, trueExpr)
                         val conflict = struct.typeOfPrefix.accepts(loadData.type).not()
-                        result[error] = oldValue and (loadData.guard and vertex.guard and offsetGuard and conflict).not()
+                        result[error] = oldValue and (loadData.guard and vertex.guard and exactOffsetGuard and conflict).not()
                     }
                 }
             }

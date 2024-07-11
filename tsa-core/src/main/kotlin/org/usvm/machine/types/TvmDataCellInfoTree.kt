@@ -1,5 +1,7 @@
 package org.usvm.machine.types
 
+import org.ton.TvmAtomicDataCellLabel
+import org.ton.TvmCompositeDataCellLabel
 import org.ton.TvmDataCellStructure
 import org.ton.TvmParameterInfo
 import org.usvm.UBoolExpr
@@ -17,20 +19,53 @@ import org.usvm.mkSizeExpr
 class TvmDataCellInfoTree private constructor(
     val address: UConcreteHeapRef,
     private val root: Vertex,
+    val initialOffset: UExpr<TvmSizeSort>,
+    val initialRefNumber: UExpr<TvmSizeSort>,
 ) {
     fun <Acc> fold(init: Acc, f: (Acc, Vertex) -> Acc): Acc =
         root.fold(init, f)
+
+    fun onEachVertex(f: (Vertex) -> Unit) {
+        fold(Unit) { _, vertex -> f(vertex) }
+    }
 
     class Vertex(
         val guard: UBoolExpr,
         val structure: TvmDataCellStructure,
         val prefixSize: UExpr<TvmSizeSort>,
-        val refNumber: Int,
+        val refNumber: UExpr<TvmSizeSort>,
         private val children: List<Vertex>,
+        val internalTree: TvmDataCellInfoTree? = null,
     ) {
         internal fun <Acc> fold(init: Acc, f: (Acc, Vertex) -> Acc): Acc {
             return children.fold(f(init, this)) { acc, child -> child.fold(acc, f) }
         }
+
+        init {
+            val isCompositeNode = structure is TvmDataCellStructure.KnownTypePrefix &&
+                    structure.typeOfPrefix is TvmCompositeDataCellLabel
+            require((internalTree != null) == isCompositeNode) {
+                "internalTree of vertex must be non-null if and only if this is a composite node."
+            }
+        }
+    }
+
+    fun hasUnknownLeaves(): Boolean =
+        fold(false) { acc, vertex -> acc || vertex.structure is TvmDataCellStructure.Unknown }
+
+    fun getTreeSize(): Map<UBoolExpr, UExpr<TvmSizeSort>> {
+        val result = mutableMapOf<UBoolExpr, UExpr<TvmSizeSort>>()
+        onEachVertex { vertex ->
+            when (vertex.structure) {
+                is TvmDataCellStructure.Empty -> {
+                    result[vertex.guard] = vertex.prefixSize
+                }
+                else -> {
+                    // do nothing
+                }
+            }
+        }
+        return result
     }
 
     companion object {
@@ -39,16 +74,18 @@ class TvmDataCellInfoTree private constructor(
             structure: TvmDataCellStructure,
             address: UConcreteHeapRef,
             guard: UBoolExpr = state.ctx.trueExpr,
+            initialOffset: UExpr<TvmSizeSort> = state.ctx.zeroSizeExpr,
+            initialRefNumber: UExpr<TvmSizeSort> = state.ctx.zeroSizeExpr,
         ): List<TvmDataCellInfoTree> {
             val (root, other) = constructVertex(
                 state,
                 structure,
                 guard,
                 address,
-                prefixSize = state.ctx.zeroSizeExpr,
-                refNumber = 0,
+                prefixSize = initialOffset,
+                refNumber = initialRefNumber,
             )
-            val result = TvmDataCellInfoTree(address, root)
+            val result = TvmDataCellInfoTree(address, root, initialOffset, initialRefNumber)
             return listOf(result) + other
         }
 
@@ -58,7 +95,7 @@ class TvmDataCellInfoTree private constructor(
             guard: UBoolExpr,
             address: UConcreteHeapRef,
             prefixSize: UExpr<TvmSizeSort>,
-            refNumber: Int,
+            refNumber: UExpr<TvmSizeSort>,
         ): Pair<Vertex, List<TvmDataCellInfoTree>> =
             when (structure) {
                 is TvmDataCellStructure.Empty, TvmDataCellStructure.Unknown -> {
@@ -81,14 +118,31 @@ class TvmDataCellInfoTree private constructor(
             guard: UBoolExpr,
             address: UConcreteHeapRef,
             prefixSize: UExpr<TvmSizeSort>,
-            refNumber: Int,
+            refNumber: UExpr<TvmSizeSort>,
         ): Pair<Vertex, List<TvmDataCellInfoTree>> = with(state.ctx) {
+            val (offsets, internalTree) = when (structure.typeOfPrefix) {
+                is TvmAtomicDataCellLabel -> {
+                    (structure.typeOfPrefix.offset(state, address, prefixSize) to zeroSizeExpr) to null
+                }
+                is TvmCompositeDataCellLabel -> {
+                    val internalTree = construct(
+                        state,
+                        structure.typeOfPrefix.internalStructure,
+                        address,
+                        guard,
+                        initialOffset = prefixSize,
+                        initialRefNumber = refNumber,
+                    )
+                    TODO()
+                }
+            }
+            val (dataOffset, refOffset) = offsets
             val (child, other) = constructVertex(
                 state,
                 structure.rest,
                 guard,
                 address,
-                mkSizeAddExpr(prefixSize, structure.typeOfPrefix.offset(state, address, prefixSize)),
+                mkSizeAddExpr(prefixSize, dataOffset),
                 refNumber,
             )
             Vertex(guard, structure, prefixSize, refNumber, listOf(child)) to other
@@ -100,13 +154,14 @@ class TvmDataCellInfoTree private constructor(
             guard: UBoolExpr,
             address: UConcreteHeapRef,
             prefixSize: UExpr<TvmSizeSort>,
-            refNumber: Int,
+            refNumber: UExpr<TvmSizeSort>,
         ): Pair<Vertex, List<TvmDataCellInfoTree>> = with(state.ctx) {
             val other = mutableListOf<TvmDataCellInfoTree>()
             val cellContent = state.memory.readField(address, cellDataField, cellDataSort)
             val prefix = mkBvExtractExpr(high = structure.switchSize - 1, low = 0, cellContent)
             val switchSize = structure.switchSize.toUInt()
             val newPrefixSize = mkSizeAddExpr(prefixSize, mkSizeExpr(structure.switchSize))
+
             val children = structure.variants.entries.map { (key, selfRestVariant) ->
                 val expectedPrefix = mkBv(key, switchSize)
                 val prefixGuard = prefix eq expectedPrefix
@@ -122,6 +177,7 @@ class TvmDataCellInfoTree private constructor(
                 other += childOther
                 child
             }
+
             Vertex(guard, structure, prefixSize, refNumber, children) to other
         }
 
@@ -131,9 +187,10 @@ class TvmDataCellInfoTree private constructor(
             guard: UBoolExpr,
             address: UConcreteHeapRef,
             prefixSize: UExpr<TvmSizeSort>,
-            refNumber: Int,
+            refNumber: UExpr<TvmSizeSort>,
         ): Pair<Vertex, List<TvmDataCellInfoTree>> = with(state.ctx) {
-            val refAddress = state.readCellRef(address, mkSizeExpr(refNumber)) as UConcreteHeapRef
+            val refAddress = state.readCellRef(address, refNumber) as UConcreteHeapRef
+
             val other = when (structure.ref) {
                 is TvmParameterInfo.DataCellInfo -> {
                     state.assertType(refAddress, TvmDataCellType)
@@ -152,8 +209,9 @@ class TvmDataCellInfoTree private constructor(
                 guard,
                 address,
                 prefixSize,
-                refNumber + 1,
+                mkSizeAddExpr(refNumber, oneSizeExpr),
             )
+
             Vertex(guard, structure, prefixSize, refNumber, listOf(child)) to (childOther + other)
         }
     }

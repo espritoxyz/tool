@@ -5,7 +5,7 @@ import org.ton.TvmCoinsLabel
 import org.ton.TvmDataCellStructure.*
 import org.ton.TvmIntegerLabel
 import org.ton.TvmInternalStdMsgAddrLabel
-import org.ton.TvmMaybeLabel
+import org.ton.TvmMaybeRefLabel
 import org.ton.TvmMsgAddrLabel
 import org.ton.TvmParameterInfo.DataCellInfo
 import org.ton.TvmParameterInfo.DictCellInfo
@@ -58,7 +58,7 @@ val msgStructure = KnownTypePrefix(
 // Notice the structure!
 val dict256Structure =
     KnownTypePrefix(
-        typeOfPrefix = TvmMaybeLabel,
+        typeOfPrefix = TvmMaybeRefLabel,
         rest = SwitchPrefix(
             switchSize = 1,
             mapOf(
