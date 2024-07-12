@@ -25,6 +25,7 @@ import org.usvm.machine.types.TvmSymbolicCellDataType
 import org.usvm.machine.types.TvmDataCellLoadedTypeInfo
 import org.usvm.machine.state.TvmCellRefsRegionValueInfo
 import org.usvm.machine.state.TvmReadingOfUnexpectedType
+import org.usvm.machine.state.TvmReadingOutOfSwitchBounds
 import org.usvm.machine.state.TvmRefsMemoryRegion
 import org.usvm.machine.state.TvmStack
 import org.usvm.machine.state.TvmStack.TvmStackTupleValue
@@ -99,6 +100,7 @@ class TvmTestStateResolver(
             )
             is TvmUnexpectedEndOfReading -> TvmExecutionWithUnexpectedEndOfReading(lastStmt, stack)
             is TvmUnexpectedRefReading -> TvmExecutionWithUnexpectedRefReading(lastStmt, stack)
+            is TvmReadingOutOfSwitchBounds -> TODO()
         }
 
     fun resolveGasUsage(): Int = model.eval(state.calcConsumedGas()).intValue()

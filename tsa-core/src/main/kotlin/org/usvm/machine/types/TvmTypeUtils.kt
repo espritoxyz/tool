@@ -10,6 +10,7 @@ import org.ton.TvmBuiltinDataCellLabel
 import org.usvm.UBoolExpr
 import org.usvm.UConcreteHeapRef
 import org.usvm.UExpr
+import org.usvm.UHeapRef
 import org.usvm.machine.TvmContext
 import org.usvm.machine.TvmSizeSort
 import org.usvm.machine.state.TvmState
@@ -72,7 +73,7 @@ fun TvmBuiltinDataCellLabel.accepts(symbolicType: TvmSymbolicCellDataType): UBoo
 context(TvmContext)
 fun TvmAtomicDataCellLabel.offset(
     state: TvmState,
-    address: UConcreteHeapRef,
+    address: UHeapRef,
     prefixSize: UExpr<TvmSizeSort>,
 ): UExpr<TvmSizeSort> =
     when (this) {
