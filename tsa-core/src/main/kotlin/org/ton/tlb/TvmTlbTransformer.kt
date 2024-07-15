@@ -75,14 +75,26 @@ class TvmTlbTransformer(
             "Either" -> TODO()
         }
 
+        if (args.isNotEmpty()) {
+            TODO()
+        }
+
+        // TODO use this
+//        return TvmCompositeDataCellLabel(
+//            name = def.name,
+//            innerStructure = transformConstructors(
+//                constructors = def.constructors.map { ConstructorTagSuffix(it, it.tag) },
+//                next = next,
+//            )
+//        )
         return transformConstructors(
-            constructors = def.constructors.map { ConstructorHelp(it, it.tag) },
+            constructors = def.constructors.map { ConstructorTagSuffix(it, it.tag) },
             next = next,
         )
     }
 
     private fun transformConstructors(
-        constructors: List<ConstructorHelp>,
+        constructors: List<ConstructorTagSuffix>,
         next: TvmDataCellStructure,
     ): TvmDataCellStructure {
         if (constructors.size == 1 && constructors.single().tagSuffix.isEmpty()) {
@@ -90,7 +102,7 @@ class TvmTlbTransformer(
         }
 
         val minLen = constructors.minOf { it.tagSuffix.length }
-        val groupedConstructors = hashMapOf<String, MutableList<ConstructorHelp>>().withDefault { mutableListOf() }
+        val groupedConstructors = hashMapOf<String, MutableList<ConstructorTagSuffix>>().withDefault { mutableListOf() }
 
         constructors.forEach {
             val prefix = it.tagSuffix.substring(0 until minLen)
@@ -139,7 +151,7 @@ class TvmTlbTransformer(
         return last
     }
 
-    private data class ConstructorHelp(
+    private data class ConstructorTagSuffix(
         val constructor: TvmTlbTypeConstructor,
         var tagSuffix: String,
     )
