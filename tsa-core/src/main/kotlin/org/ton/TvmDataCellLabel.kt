@@ -8,10 +8,10 @@ sealed interface TvmBuiltinDataCellLabel : TvmDataCellLabel
 
 sealed interface TvmAtomicDataCellLabel : TvmDataCellLabel
 
-interface TvmCompositeDataCellLabel : TvmDataCellLabel {
-    val name: String  // TODO: proper id
-    val internalStructure: TvmDataCellStructure
-}
+open class TvmCompositeDataCellLabel(
+    val name: String,  // TODO: proper id
+    val internalStructure: TvmDataCellStructure,
+) : TvmDataCellLabel
 
 data class TvmIntegerLabel(
     val bitSize: Int,
@@ -19,10 +19,9 @@ data class TvmIntegerLabel(
     val endian: Endian
 ) : TvmBuiltinDataCellLabel, TvmAtomicDataCellLabel
 
-data object TvmMsgAddrLabel : TvmBuiltinDataCellLabel, TvmCompositeDataCellLabel {
-    override val name: String = "MsgAddr"
-
-    override val internalStructure: TvmDataCellStructure = SwitchPrefix(
+data object TvmMsgAddrLabel : TvmBuiltinDataCellLabel, TvmCompositeDataCellLabel(
+    "MsgAddr",
+    SwitchPrefix(
         switchSize = 3,
         mapOf(
             "100" to KnownTypePrefix(
@@ -31,13 +30,13 @@ data object TvmMsgAddrLabel : TvmBuiltinDataCellLabel, TvmCompositeDataCellLabel
             )
         )
     )
-}
+)
 
 data class TvmMaybeRefLabel(
     val refInfo: TvmParameterInfo.CellInfo,
-) : TvmBuiltinDataCellLabel, TvmCompositeDataCellLabel {
-    override val name: String = "Maybe"
-    override val internalStructure: TvmDataCellStructure = SwitchPrefix(
+) : TvmBuiltinDataCellLabel, TvmCompositeDataCellLabel(
+    "Maybe",
+    SwitchPrefix(
         switchSize = 1,
         variants = mapOf(
             "0" to Empty,
@@ -47,7 +46,7 @@ data class TvmMaybeRefLabel(
             ),
         ),
     )
-}
+)
 
 // artificial label
 data object TvmInternalStdMsgAddrLabel : TvmAtomicDataCellLabel

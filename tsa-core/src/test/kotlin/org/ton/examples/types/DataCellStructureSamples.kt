@@ -2,6 +2,7 @@ package org.ton.examples.types
 
 import org.ton.Endian
 import org.ton.TvmCoinsLabel
+import org.ton.TvmCompositeDataCellLabel
 import org.ton.TvmDataCellStructure.*
 import org.ton.TvmIntegerLabel
 import org.ton.TvmMaybeRefLabel
@@ -51,4 +52,28 @@ val dict256Structure = KnownTypePrefix(
         refInfo = DictCellInfo(256)
     ),
     rest = Empty
+)
+
+// n:uint16 = X;
+val structureX = TvmCompositeDataCellLabel(
+    name = "X",
+    internalStructure = KnownTypePrefix(
+        typeOfPrefix = TvmIntegerLabel(16, isSigned = true, Endian.BigEndian),
+        rest = Empty
+    )
+)
+
+// a:X b:X c:X = Y;
+val structureY = TvmCompositeDataCellLabel(
+    name = "Y",
+    internalStructure = KnownTypePrefix(
+        structureX,
+        rest = KnownTypePrefix(
+            structureX,
+            rest = KnownTypePrefix(
+                structureX,
+                rest = Empty
+            )
+        )
+    )
 )
