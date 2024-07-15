@@ -102,13 +102,13 @@ class TvmTlbTransformer(
         }
 
         val minLen = constructors.minOf { it.tagSuffix.length }
-        val groupedConstructors = hashMapOf<String, MutableList<ConstructorTagSuffix>>().withDefault { mutableListOf() }
+        val groupedConstructors = hashMapOf<String, MutableList<ConstructorTagSuffix>>()
 
-        constructors.forEach {
-            val prefix = it.tagSuffix.substring(0 until minLen)
+        constructors.forEach { constructor ->
+            val prefix = constructor.tagSuffix.substring(0 until minLen)
 
-            it.tagSuffix = it.tagSuffix.substring(minLen)
-            groupedConstructors.getValue(prefix).add(it)
+            constructor.tagSuffix = constructor.tagSuffix.substring(minLen)
+            groupedConstructors.getOrPut(prefix) { mutableListOf() }.add(constructor)
         }
 
         val variants = groupedConstructors.mapValues { transformConstructors(it.value, next) }
