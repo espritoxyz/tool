@@ -54,12 +54,12 @@ class TvmDataCellInfoTree private constructor(
     fun hasUnknownLeaves(): Boolean =
         fold(false) { acc, vertex -> acc || vertex.structure is TvmDataCellStructure.Unknown }
 
-    fun getTreeDataSize(): Map<UBoolExpr, UExpr<TvmSizeSort>> {
+    fun getTreeDataSize(): Map<UBoolExpr, UExpr<TvmSizeSort>> = with(address.ctx) {
         val result = mutableMapOf<UBoolExpr, UExpr<TvmSizeSort>>()
         onEachVertex { vertex ->
             when (vertex.structure) {
                 is TvmDataCellStructure.Empty -> {
-                    result[vertex.guard] = vertex.prefixSize
+                    result[vertex.guard] = mkBvSubExpr(vertex.prefixSize, initialOffset)
                 }
                 else -> {
                     // do nothing
@@ -69,12 +69,12 @@ class TvmDataCellInfoTree private constructor(
         return result
     }
 
-    fun getTreeRefNumber(): Map<UBoolExpr, UExpr<TvmSizeSort>> {
+    fun getTreeRefNumber(): Map<UBoolExpr, UExpr<TvmSizeSort>> = with(address.ctx) {
         val result = mutableMapOf<UBoolExpr, UExpr<TvmSizeSort>>()
         onEachVertex { vertex ->
             when (vertex.structure) {
                 is TvmDataCellStructure.Empty -> {
-                    result[vertex.guard] = vertex.refNumber
+                    result[vertex.guard] = mkBvSubExpr(vertex.refNumber, initialRefNumber)
                 }
                 else -> {
                     // do nothing

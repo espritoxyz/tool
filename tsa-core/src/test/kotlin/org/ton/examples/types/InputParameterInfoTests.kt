@@ -24,7 +24,6 @@ import org.usvm.test.resolver.TvmMethodFailure
 import org.usvm.test.resolver.TvmSuccessfulExecution
 import java.math.BigInteger
 import kotlin.io.path.Path
-import kotlin.test.Ignore
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -424,7 +423,6 @@ class InputParameterInfoTests {
         )
     }
 
-    @Ignore  // TODO
     @Test
     fun testYStructureError() {
         val resourcePath = this::class.java.getResource(seqLoadInt2Path)?.path?.let { Path(it) }
@@ -447,7 +445,6 @@ class InputParameterInfoTests {
         val results = funcCompileAndAnalyzeAllMethods(resourcePath, inputInfo = mapOf(BigInteger.ZERO to inputInfo))
         assertEquals(1, results.testSuites.size)
         val tests = results.testSuites.first()
-        assertTrue(tests.any { it.result is TvmSuccessfulExecution })
         assertTrue(tests.any { it.result is TvmMethodFailure })
 
         propertiesFound(

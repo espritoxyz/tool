@@ -1,6 +1,7 @@
 package org.usvm.machine.types
 
 import org.ton.TvmBuiltinDataCellLabel
+import org.ton.TvmCompositeDataCellLabel
 import org.ton.TvmDataCellStructure
 import org.ton.TvmInputInfo
 import org.ton.TvmParameterInfo
@@ -54,42 +55,74 @@ class TvmDataCellInfoStorage private constructor(
         val trees = treesOfAddress(loadData.address)
         val result = mutableMapOf<TvmStructuralError, UBoolExpr>()
         trees.forEach { (tree, treeGuard) ->
-            tree.onEachVertex { vertex ->
-                val exactOffsetGuard = loadData.offset eq vertex.prefixSize
-                when (val struct = vertex.structure) {
-                    is TvmDataCellStructure.Unknown,
-                    is TvmDataCellStructure.SwitchPrefix,
-                    is TvmDataCellStructure.LoadRef -> {
-                        // no conflict here
-                    }
+            val cur = getConflictConditionsForLoadData(loadData, tree, treeGuard)
+            cur.forEach { (error, guard) ->
+                val oldValue = result.getOrDefault(error, falseExpr)
+                result[error] = oldValue or guard
+            }
+        }
+        return result
+    }
 
-                    is TvmDataCellStructure.Empty -> {
+    private fun getConflictConditionsForLoadData(
+        loadData: TvmDataCellLoadedTypeInfo.LoadData,
+        tree: TvmDataCellInfoTree,
+        treeGuard: UBoolExpr,
+        rootTree: Boolean = true,
+    ): Map<TvmStructuralError, UBoolExpr> = with(ctx) {
+        val result = mutableMapOf<TvmStructuralError, UBoolExpr>()
+        tree.onEachVertex { vertex ->
+            val exactOffsetGuard = loadData.offset eq vertex.prefixSize
+            when (val struct = vertex.structure) {
+                is TvmDataCellStructure.Unknown,
+                is TvmDataCellStructure.SwitchPrefix,
+                is TvmDataCellStructure.LoadRef -> {
+                    // no conflict here
+                }
+
+                is TvmDataCellStructure.Empty -> {
+                    if (rootTree) {
                         // TvmUnexpectedReading, if loaded more than 0 bits
                         val error = TvmUnexpectedReading(loadData.type)
                         val oldValue = result.getOrDefault(error, falseExpr)
                         val conflict = mkSizeGtExpr(loadData.type.sizeBits, zeroSizeExpr)
-                        result[error] = oldValue or (loadData.guard and vertex.guard and exactOffsetGuard and conflict and treeGuard)
+                        result[error] =
+                            oldValue or (loadData.guard and vertex.guard and exactOffsetGuard and conflict and treeGuard)
+                    }
+                }
+
+                is TvmDataCellStructure.KnownTypePrefix -> {
+                    // TODO: Composite + builtin labels
+                    if (struct.typeOfPrefix is TvmCompositeDataCellLabel && struct.typeOfPrefix !is TvmBuiltinDataCellLabel) {
+                        val internalTree = vertex.internalTree
+                        requireNotNull(internalTree) {
+                            "InternalTree must not be null for TvmCompositeDataCellLabel"
+                        }
+                        val inner = getConflictConditionsForLoadData(loadData, internalTree, treeGuard, rootTree = false)
+                        inner.forEach { (error, guard) ->
+                            val oldValue = result.getOrDefault(error, falseExpr)
+                            result[error] = oldValue or guard
+                        }
+                        return@onEachVertex
                     }
 
-                    is TvmDataCellStructure.KnownTypePrefix -> {
-                        // skip artificial labels
-                        if (struct.typeOfPrefix !is TvmBuiltinDataCellLabel)  // TODO
-                            return@onEachVertex
+                    // skip artificial labels
+                    if (struct.typeOfPrefix !is TvmBuiltinDataCellLabel)
+                        return@onEachVertex
 
-                        // conflict, if types are not consistent
-                        val error = TvmReadingOfUnexpectedType(
-                            labelType = struct.typeOfPrefix,
-                            actualType = loadData.type
-                        )
+                    // conflict, if types are not consistent
+                    val error = TvmReadingOfUnexpectedType(
+                        labelType = struct.typeOfPrefix,
+                        actualType = loadData.type
+                    )
 
-                        val oldValue = result.getOrDefault(error, falseExpr)
-                        val conflict = struct.typeOfPrefix.accepts(loadData.type).not()
-                        result[error] = oldValue or (loadData.guard and vertex.guard and exactOffsetGuard and conflict and treeGuard)
-                    }
+                    val oldValue = result.getOrDefault(error, falseExpr)
+                    val conflict = struct.typeOfPrefix.accepts(loadData.type).not()
+                    result[error] = oldValue or (loadData.guard and vertex.guard and exactOffsetGuard and conflict and treeGuard)
                 }
             }
         }
-        return result
+        result
     }
 
     fun getNoUnexpectedEndOfReadingCondition(
