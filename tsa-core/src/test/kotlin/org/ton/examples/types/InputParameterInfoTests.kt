@@ -37,6 +37,7 @@ class InputParameterInfoTests {
     private val dictPath = "/types/dict.fc"
     private val seqLoadIntPath = "/types/seq_load_int.fc"
     private val intSwitchPath = "/types/switch_int.fc"
+    private val intSwitch2Path = "/types/switch_int_2.fc"
 
     @Test
     fun testCorrectMaybe() {
@@ -381,6 +382,28 @@ class InputParameterInfoTests {
     fun testIntSwitchCorrect() {
         val resourcePath = this::class.java.getResource(intSwitchPath)?.path?.let { Path(it) }
             ?: error("Cannot find resource $intSwitchPath")
+
+        val inputInfo =
+            TvmInputInfo(mapOf(0 to SliceInfo(DataCellInfo(intSwitchStructure))))
+        val results = funcCompileAndAnalyzeAllMethods(resourcePath, inputInfo = mapOf(BigInteger.ZERO to inputInfo))
+        assertEquals(1, results.testSuites.size)
+        val tests = results.testSuites.first()
+        assertTrue(tests.any { it.result is TvmSuccessfulExecution })
+        assertTrue(tests.any { it.result is TvmMethodFailure })
+
+        checkInvariants(
+            tests,
+            listOf { test ->
+                test.result !is TvmExecutionWithStructuralError
+            }
+        )
+    }
+
+
+    @Test
+    fun testIntSwitch2Correct() {
+        val resourcePath = this::class.java.getResource(intSwitch2Path)?.path?.let { Path(it) }
+            ?: error("Cannot find resource $intSwitch2Path")
 
         val inputInfo =
             TvmInputInfo(mapOf(0 to SliceInfo(DataCellInfo(intSwitchStructure))))
