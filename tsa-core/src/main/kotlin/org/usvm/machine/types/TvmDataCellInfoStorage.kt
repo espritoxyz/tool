@@ -48,7 +48,7 @@ class TvmDataCellInfoStorage private constructor(
             }
         }
 
-    fun getNoConflictConditionsForLoadData(
+    fun getConflictConditionsForLoadData(
         loadData: TvmDataCellLoadedTypeInfo.LoadData
     ): Map<TvmStructuralError, UBoolExpr> = with(ctx) {
         val trees = treesOfAddress(loadData.address)
@@ -66,9 +66,9 @@ class TvmDataCellInfoStorage private constructor(
                     is TvmDataCellStructure.Empty -> {
                         // TvmUnexpectedReading, if loaded more than 0 bits
                         val error = TvmUnexpectedReading(loadData.type)
-                        val oldValue = result.getOrDefault(error, trueExpr)
+                        val oldValue = result.getOrDefault(error, falseExpr)
                         val conflict = mkSizeGtExpr(loadData.type.sizeBits, zeroSizeExpr)
-                        result[error] = oldValue and (loadData.guard and vertex.guard and exactOffsetGuard and conflict and treeGuard).not()
+                        result[error] = oldValue or (loadData.guard and vertex.guard and exactOffsetGuard and conflict and treeGuard)
                     }
 
                     is TvmDataCellStructure.KnownTypePrefix -> {
@@ -82,9 +82,9 @@ class TvmDataCellInfoStorage private constructor(
                             actualType = loadData.type
                         )
 
-                        val oldValue = result.getOrDefault(error, trueExpr)
+                        val oldValue = result.getOrDefault(error, falseExpr)
                         val conflict = struct.typeOfPrefix.accepts(loadData.type).not()
-                        result[error] = oldValue and (loadData.guard and vertex.guard and exactOffsetGuard and conflict and treeGuard).not()
+                        result[error] = oldValue or (loadData.guard and vertex.guard and exactOffsetGuard and conflict and treeGuard)
                     }
                 }
             }

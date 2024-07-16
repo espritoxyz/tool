@@ -24,6 +24,7 @@ import org.usvm.test.resolver.TvmMethodFailure
 import org.usvm.test.resolver.TvmSuccessfulExecution
 import java.math.BigInteger
 import kotlin.io.path.Path
+import kotlin.test.Ignore
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -36,6 +37,8 @@ class InputParameterInfoTests {
     private val msgAddrPath = "/types/load_msg_addr.fc"
     private val dictPath = "/types/dict.fc"
     private val seqLoadIntPath = "/types/seq_load_int.fc"
+    private val seqLoadInt2Path = "/types/seq_load_int_2.fc"
+    private val seqLoadInt3Path = "/types/seq_load_int_3.fc"
     private val intSwitchPath = "/types/switch_int.fc"
     private val intSwitch2Path = "/types/switch_int_2.fc"
 
@@ -371,7 +374,7 @@ class InputParameterInfoTests {
             listOf { test ->
                 val exit = test.result as? TvmExecutionWithReadingOfUnexpectedType ?: return@listOf false
                 val expectedType = exit.labelType
-                exit.actualType is TvmCellDataInteger  && exit.actualType.bitSize == 64 &&
+                exit.actualType is TvmCellDataInteger && exit.actualType.bitSize == 64 &&
                         expectedType is TvmIntegerLabel && expectedType.bitSize == 32
             }
         )
@@ -407,6 +410,76 @@ class InputParameterInfoTests {
 
         val inputInfo =
             TvmInputInfo(mapOf(0 to SliceInfo(DataCellInfo(intSwitchStructure))))
+        val results = funcCompileAndAnalyzeAllMethods(resourcePath, inputInfo = mapOf(BigInteger.ZERO to inputInfo))
+        assertEquals(1, results.testSuites.size)
+        val tests = results.testSuites.first()
+        assertTrue(tests.any { it.result is TvmSuccessfulExecution })
+        assertTrue(tests.any { it.result is TvmMethodFailure })
+
+        checkInvariants(
+            tests,
+            listOf { test ->
+                test.result !is TvmExecutionWithStructuralError
+            }
+        )
+    }
+
+    @Ignore  // TODO
+    @Test
+    fun testYStructureError() {
+        val resourcePath = this::class.java.getResource(seqLoadInt2Path)?.path?.let { Path(it) }
+            ?: error("Cannot find resource $seqLoadInt2Path")
+
+        val inputInfo =
+            TvmInputInfo(
+                mapOf(
+                    0 to SliceInfo(
+                        DataCellInfo(
+                            TvmDataCellStructure.KnownTypePrefix(
+                                structureY,
+                                TvmDataCellStructure.Empty
+                            )
+                        )
+                    )
+                )
+            )
+
+        val results = funcCompileAndAnalyzeAllMethods(resourcePath, inputInfo = mapOf(BigInteger.ZERO to inputInfo))
+        assertEquals(1, results.testSuites.size)
+        val tests = results.testSuites.first()
+        assertTrue(tests.any { it.result is TvmSuccessfulExecution })
+        assertTrue(tests.any { it.result is TvmMethodFailure })
+
+        propertiesFound(
+            tests,
+            listOf { test ->
+                val exit = test.result as? TvmExecutionWithReadingOfUnexpectedType ?: return@listOf false
+                val expectedType = exit.labelType
+                exit.actualType is TvmCellDataInteger && exit.actualType.bitSize == 32 &&
+                        expectedType is TvmIntegerLabel && expectedType.bitSize == 16
+            }
+        )
+    }
+
+    @Test
+    fun testYStructureCorrect() {
+        val resourcePath = this::class.java.getResource(seqLoadInt3Path)?.path?.let { Path(it) }
+            ?: error("Cannot find resource $seqLoadInt3Path")
+
+        val inputInfo =
+        TvmInputInfo(
+            mapOf(
+                0 to SliceInfo(
+                    DataCellInfo(
+                        TvmDataCellStructure.KnownTypePrefix(
+                            structureY,
+                            TvmDataCellStructure.Empty
+                        )
+                    )
+                )
+            )
+        )
+
         val results = funcCompileAndAnalyzeAllMethods(resourcePath, inputInfo = mapOf(BigInteger.ZERO to inputInfo))
         assertEquals(1, results.testSuites.size)
         val tests = results.testSuites.first()

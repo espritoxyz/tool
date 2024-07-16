@@ -151,7 +151,6 @@ import org.usvm.machine.types.makeSliceRefLoad
 import org.usvm.machine.types.makeSliceTypeLoad
 import org.usvm.mkSizeAddExpr
 import org.usvm.mkSizeExpr
-import org.usvm.mkSizeLeExpr
 import org.usvm.mkSizeLtExpr
 import org.usvm.mkSizeSubExpr
 import org.usvm.sizeSort
