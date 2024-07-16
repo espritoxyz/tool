@@ -13,6 +13,7 @@ import org.ton.examples.funcCompileAndAnalyzeAllMethods
 import org.ton.examples.propertiesFound
 import org.usvm.machine.TvmMachineOptions
 import org.usvm.test.resolver.TvmCellDataCoins
+import org.usvm.test.resolver.TvmCellDataInteger
 import org.usvm.test.resolver.TvmCellDataMaybeConstructorBit
 import org.usvm.test.resolver.TvmExecutionWithReadingOfUnexpectedType
 import org.usvm.test.resolver.TvmExecutionWithStructuralError
@@ -34,6 +35,8 @@ class InputParameterInfoTests {
     private val coinsPath = "/types/load_coins.fc"
     private val msgAddrPath = "/types/load_msg_addr.fc"
     private val dictPath = "/types/dict.fc"
+    private val seqLoadIntPath = "/types/seq_load_int.fc"
+    private val intSwitchPath = "/types/switch_int.fc"
 
     @Test
     fun testCorrectMaybe() {
@@ -345,6 +348,52 @@ class InputParameterInfoTests {
             listOf { test ->
                 val exit = test.result as? TvmExecutionWithReadingOfUnexpectedType ?: return@listOf false
                 exit.actualType is TvmCellDataCoins && exit.labelType is TvmMaybeRefLabel
+            }
+        )
+    }
+
+    @Test
+    fun testIntSwitchError() {
+        val resourcePath = this::class.java.getResource(seqLoadIntPath)?.path?.let { Path(it) }
+            ?: error("Cannot find resource $seqLoadIntPath")
+
+        val inputInfo =
+            TvmInputInfo(mapOf(0 to SliceInfo(DataCellInfo(intSwitchStructure))))
+        val results = funcCompileAndAnalyzeAllMethods(resourcePath, inputInfo = mapOf(BigInteger.ZERO to inputInfo))
+        assertEquals(1, results.testSuites.size)
+        val tests = results.testSuites.first()
+        assertTrue(tests.any { it.result is TvmSuccessfulExecution })
+        assertTrue(tests.any { it.result is TvmMethodFailure })
+
+        propertiesFound(
+            tests,
+            listOf { test ->
+                val exit = test.result as? TvmExecutionWithReadingOfUnexpectedType ?: return@listOf false
+                val expectedType = exit.labelType
+                exit.actualType is TvmCellDataInteger  && exit.actualType.bitSize == 64 &&
+                        expectedType is TvmIntegerLabel && expectedType.bitSize == 32
+            }
+        )
+    }
+
+
+    @Test
+    fun testIntSwitchCorrect() {
+        val resourcePath = this::class.java.getResource(intSwitchPath)?.path?.let { Path(it) }
+            ?: error("Cannot find resource $intSwitchPath")
+
+        val inputInfo =
+            TvmInputInfo(mapOf(0 to SliceInfo(DataCellInfo(intSwitchStructure))))
+        val results = funcCompileAndAnalyzeAllMethods(resourcePath, inputInfo = mapOf(BigInteger.ZERO to inputInfo))
+        assertEquals(1, results.testSuites.size)
+        val tests = results.testSuites.first()
+        assertTrue(tests.any { it.result is TvmSuccessfulExecution })
+        assertTrue(tests.any { it.result is TvmMethodFailure })
+
+        checkInvariants(
+            tests,
+            listOf { test ->
+                test.result !is TvmExecutionWithStructuralError
             }
         )
     }

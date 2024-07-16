@@ -1630,7 +1630,9 @@ class TvmInterpreter(
                     val neqZero = mkEq(operand, zeroValue).not()
                     scope.fork(
                         neqZero,
-                        blockOnFalseState = { newStmt(stmt.nextStmt()) }
+                        blockOnFalseState = {
+                            newStmt(stmt.nextStmt())
+                        }
                     ) ?: return@with
 
                     // TODO check NaN for integer overflow exception

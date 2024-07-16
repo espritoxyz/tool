@@ -15,6 +15,7 @@ import org.usvm.machine.state.assertType
 import org.usvm.machine.state.readCellRef
 import org.usvm.mkSizeAddExpr
 import org.usvm.mkSizeExpr
+import org.usvm.mkSizeSubExpr
 
 class TvmDataCellInfoTree private constructor(
     val address: UHeapRef,
@@ -202,9 +203,11 @@ class TvmDataCellInfoTree private constructor(
         ): Pair<Vertex, List<TvmDataCellInfoTree>> = with(state.ctx) {
             val other = mutableListOf<TvmDataCellInfoTree>()
             val cellContent = state.memory.readField(address, cellDataField, cellDataSort)
-            val prefix = mkBvExtractExpr(high = structure.switchSize - 1, low = 0, cellContent)
-            val switchSize = structure.switchSize.toUInt()
             val newPrefixSize = mkSizeAddExpr(prefixSize, mkSizeExpr(structure.switchSize))
+            val offsetFromEnd = mkSizeSubExpr(maxDataLengthSizeExpr, newPrefixSize)
+            val shiftedCellContent = mkBvLogicalShiftRightExpr(cellContent, offsetFromEnd.zeroExtendToSort(cellDataSort))
+            val prefix = mkBvExtractExpr(high = structure.switchSize - 1, low = 0, shiftedCellContent)
+            val switchSize = structure.switchSize.toUInt()
 
             val children = structure.variants.entries.map { (key, selfRestVariant) ->
                 val expectedPrefix = mkBv(key, switchSize)

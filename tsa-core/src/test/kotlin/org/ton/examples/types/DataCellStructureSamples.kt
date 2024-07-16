@@ -54,6 +54,20 @@ val dict256Structure = KnownTypePrefix(
     rest = Empty
 )
 
+val intSwitchStructure = SwitchPrefix(
+    switchSize = 2,
+    mapOf(
+        "00" to KnownTypePrefix(
+            typeOfPrefix = TvmIntegerLabel(64, isSigned = true, Endian.BigEndian),
+            rest = Empty
+        ),
+        "01" to KnownTypePrefix(
+            typeOfPrefix = TvmIntegerLabel(32, isSigned = true, Endian.BigEndian),
+            rest = Empty
+        )
+    )
+)
+
 // n:uint16 = X;
 val structureX = TvmCompositeDataCellLabel(
     name = "X",
