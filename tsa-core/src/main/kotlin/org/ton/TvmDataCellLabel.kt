@@ -4,7 +4,7 @@ import org.ton.TvmDataCellStructure.*
 
 sealed interface TvmDataCellLabel
 
-sealed interface TvmBuiltinDataCellLabel : TvmDataCellLabel
+sealed interface TvmBuiltinDataCellLabel
 
 sealed interface TvmAtomicDataCellLabel : TvmDataCellLabel
 

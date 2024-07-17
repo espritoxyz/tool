@@ -150,35 +150,40 @@ class TvmDataCellInfoTree private constructor(
                         initialOffset = prefixSize,
                         initialRefNumber = refNumber,
                     )
-                    require(treeList.isNotEmpty())
+                    check(treeList.isNotEmpty()) {
+                        "At least one tree should have been constructed: the internal tree"
+                    }
                     newRootTrees += treeList.drop(1)
                     val internalTree = treeList.first()
-                    require(!internalTree.hasUnknownLeaves()) {
+                    check(!internalTree.hasUnknownLeaves()) {
                         "Internal tree must not have unknown leaves"
                     }
 
                     val dataOffsets = internalTree.getTreeDataSize()
-                    require(dataOffsets.isNotEmpty())
+                    check(dataOffsets.isNotEmpty()) {
+                        "internalTree must have at least one leaf"
+                    }
                     var dataOffset = dataOffsets.values.first()  // arbitrary value
                     dataOffsets.forEach { (condition, value) ->
-                        if (value == dataOffset)
+                        if (value == dataOffset) {
                             return@forEach
+                        }
                         dataOffset = mkIte(condition, value, dataOffset)
                     }
 
                     val refOffsets = internalTree.getTreeRefNumber()
-                    require(refOffsets.isNotEmpty())
+                    check(refOffsets.isNotEmpty()) {
+                        "internalTree must have at least one leaf"
+                    }
                     var refOffset = refOffsets.values.first()  // arbitrary value
                     refOffsets.forEach { (condition, value) ->
-                        if (value == dataOffset)
+                        if (value == dataOffset) {
                             return@forEach
+                        }
                         refOffset = mkIte(condition, value, refOffset)
                     }
 
                     (dataOffset to refOffset) to internalTree
-                }
-                else -> {
-                    error("Not reachable. (Why doesn't compiler infer that?)")
                 }
             }
             val (dataOffset, refOffset) = offsets

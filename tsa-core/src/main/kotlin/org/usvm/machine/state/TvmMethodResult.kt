@@ -45,7 +45,7 @@ sealed interface TvmMethodResult {
     }
 
     @Serializable
-    sealed interface TvmStructuralError: TvmMethodResult {
+    sealed interface TvmStructuralError : TvmMethodResult {
         val message: String
     }
 }

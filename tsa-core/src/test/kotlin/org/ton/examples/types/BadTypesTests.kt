@@ -3,6 +3,7 @@ package org.ton.examples.types
 import org.junit.jupiter.api.Test
 import org.ton.examples.compareSymbolicAndConcreteResults
 import org.ton.examples.compileAndAnalyzeFift
+import org.ton.examples.intMaxValueAsBigInteger
 import org.ton.examples.runFiftMethod
 import java.math.BigInteger
 import kotlin.io.path.Path
@@ -20,7 +21,7 @@ class BadTypesTests {
 
         val symbolicResult = compileAndAnalyzeFift(
             fiftResourcePath,
-            methodsBlackList = setOf(BigInteger.ZERO, Int.MAX_VALUE.toBigInteger())
+            methodsBlackList = setOf(BigInteger.ZERO, intMaxValueAsBigInteger)
         )
 
         assertEquals(1, symbolicResult.testSuites.size)

@@ -20,6 +20,7 @@ import org.usvm.machine.state.generateSymbolicSlice
 import org.usvm.machine.types.TvmDataCellInfoTree.Companion.construct
 import org.usvm.memory.foldHeapRef
 import org.usvm.mkSizeGtExpr
+import org.usvm.mkSizeLtExpr
 
 
 class TvmDataCellInfoStorage private constructor(
@@ -107,8 +108,9 @@ class TvmDataCellInfoStorage private constructor(
                     }
 
                     // skip artificial labels
-                    if (struct.typeOfPrefix !is TvmBuiltinDataCellLabel)
+                    if (struct.typeOfPrefix !is TvmBuiltinDataCellLabel) {
                         return@onEachVertex
+                    }
 
                     // conflict, if types are not consistent
                     val error = TvmReadingOfUnexpectedType(
@@ -132,13 +134,14 @@ class TvmDataCellInfoStorage private constructor(
         return trees.fold(trueExpr as UBoolExpr) { outerResult, (tree, treeGuard) ->
             tree.fold(outerResult) internalFold@{ result, vertex ->
                 // we can check only leaves
-                if (vertex.structure !is TvmDataCellStructure.Empty && vertex.structure !is TvmDataCellStructure.Unknown)
+                if (vertex.structure !is TvmDataCellStructure.Empty && vertex.structure !is TvmDataCellStructure.Unknown) {
                     return@internalFold result
+                }
 
                 // conflict, if ended cell before this vertex
-                val offsetGuard = mkBvSignedLessExpr(endOfCell.offset, vertex.prefixSize)
+                val offsetGuard = mkSizeLtExpr(endOfCell.offset, vertex.prefixSize)
                 // conflict, if ended cell before loaded all refs
-                val refNumberGuard = mkBvSignedLessExpr(endOfCell.refNumber, vertex.refNumber)
+                val refNumberGuard = mkSizeLtExpr(endOfCell.refNumber, vertex.refNumber)
                 result and (endOfCell.guard and vertex.guard and (offsetGuard or refNumberGuard) and treeGuard).not()
             }
         }
@@ -160,7 +163,7 @@ class TvmDataCellInfoStorage private constructor(
                     }
 
                     is TvmDataCellStructure.Empty -> {
-                        val conflict = mkBvSignedGreaterExpr(loadRef.refNumber, vertex.refNumber)
+                        val conflict = mkSizeLtExpr(loadRef.refNumber, vertex.refNumber)
                         result and (vertex.guard and conflict and treeGuard).not()
                     }
                 }

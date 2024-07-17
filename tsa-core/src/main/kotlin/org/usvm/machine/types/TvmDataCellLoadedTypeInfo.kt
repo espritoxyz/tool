@@ -5,7 +5,10 @@ import kotlinx.collections.immutable.PersistentMap
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.persistentMapOf
 import org.ton.Endian
-import org.usvm.*
+import org.usvm.UBoolExpr
+import org.usvm.UConcreteHeapRef
+import org.usvm.UExpr
+import org.usvm.UHeapRef
 import org.usvm.api.readField
 import org.usvm.machine.TvmContext
 import org.usvm.machine.TvmSizeSort
@@ -15,6 +18,8 @@ import org.usvm.machine.state.TvmUnexpectedRefReading
 import org.usvm.machine.state.calcOnStateCtx
 import org.usvm.memory.GuardedExpr
 import org.usvm.memory.foldHeapRef
+import org.usvm.mkSizeAddExpr
+import org.usvm.sizeSort
 
 class TvmDataCellLoadedTypeInfo(
     var addressToActions: PersistentMap<UConcreteHeapRef, PersistentList<Action>>
