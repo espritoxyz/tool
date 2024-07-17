@@ -163,7 +163,7 @@ class TvmDataCellInfoStorage private constructor(
                     }
 
                     is TvmDataCellStructure.Empty -> {
-                        val conflict = mkSizeLtExpr(loadRef.refNumber, vertex.refNumber)
+                        val conflict = mkSizeGtExpr(loadRef.refNumber, vertex.refNumber)
                         result and (vertex.guard and conflict and treeGuard).not()
                     }
                 }
