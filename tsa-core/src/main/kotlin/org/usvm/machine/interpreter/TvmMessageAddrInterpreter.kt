@@ -249,6 +249,9 @@ class TvmMessageAddrInterpreter(private val ctx: TvmContext) {
     }
 
     private fun TvmStepScope.loadMessageAddr(updatedSlice: UHeapRef, inst: TvmAppAddrLdmsgaddrInst) = calcOnStateCtx {
+        makeSliceTypeLoad(updatedSlice, TvmSymbolicCellDataMsgAddr(ctx))
+            ?: return@calcOnStateCtx
+
         val prefix = slicePreloadDataBits(updatedSlice, bits = 2)
             ?: return@calcOnStateCtx
 
@@ -257,8 +260,6 @@ class TvmMessageAddrInterpreter(private val ctx: TvmContext) {
         val addrStd = mkBv(value = 2, sizeBits = 2u)
         val addrVar = mkBv(value = 3, sizeBits = 2u)
 
-        makeSliceTypeLoad(updatedSlice, TvmSymbolicCellDataMsgAddr(ctx))
-            ?: return@calcOnStateCtx
         sliceMoveDataPtr(updatedSlice, bits = 2)
 
         // TODO hack! assume that the address is std, since it is the only one we can handle

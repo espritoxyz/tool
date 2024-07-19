@@ -22,6 +22,7 @@ import org.usvm.test.resolver.TvmExecutionWithUnexpectedReading
 import org.usvm.test.resolver.TvmExecutionWithUnexpectedRefReading
 import org.usvm.test.resolver.TvmMethodFailure
 import org.usvm.test.resolver.TvmSuccessfulExecution
+import org.usvm.test.resolver.TvmTestSliceValue
 import java.math.BigInteger
 import kotlin.io.path.Path
 import kotlin.test.Test
@@ -73,7 +74,7 @@ class InputParameterInfoTests {
         assertEquals(1, results.testSuites.size)
         val tests = results.testSuites.first()
         assertTrue(tests.all { it.result !is TvmSuccessfulExecution })
-        assertTrue(tests.any { it.result is TvmMethodFailure })
+        assertTrue(tests.all { it.result !is TvmMethodFailure })
 
         propertiesFound(
             tests,
@@ -95,7 +96,6 @@ class InputParameterInfoTests {
         assertEquals(1, results.testSuites.size)
         val tests = results.testSuites.first()
         assertTrue(tests.all { it.result !is TvmSuccessfulExecution })
-        assertTrue(tests.any { it.result is TvmMethodFailure })
 
         propertiesFound(
             tests,
@@ -113,7 +113,10 @@ class InputParameterInfoTests {
 
         val inputInfo =
             TvmInputInfo(mapOf(0 to SliceInfo(DataCellInfo(TvmDataCellStructure.Empty))))
-        val options = TvmMachineOptions(checkDataCellContentTypes = false)
+        val options = TvmMachineOptions(
+            checkDataCellContentTypes = false,
+            excludeInputsThatDoNotMatchGivenScheme = false,
+        )
         val results = funcCompileAndAnalyzeAllMethods(
             resourcePath,
             inputInfo = mapOf(BigInteger.ZERO to inputInfo),
@@ -190,7 +193,7 @@ class InputParameterInfoTests {
         assertEquals(1, results.testSuites.size)
         val tests = results.testSuites.first()
         assertTrue(tests.any { it.result is TvmSuccessfulExecution })
-        assertTrue(tests.any { it.result is TvmMethodFailure })
+        assertTrue(tests.all { it.result !is TvmMethodFailure })
     }
 
     @Test
@@ -237,7 +240,7 @@ class InputParameterInfoTests {
         assertEquals(1, results.testSuites.size)
         val tests = results.testSuites.first()
         assertTrue(tests.all { it.result !is TvmSuccessfulExecution })
-        assertTrue(tests.any { it.result is TvmMethodFailure })
+        assertTrue(tests.all { it.result !is TvmMethodFailure })
 
         propertiesFound(
             tests,
@@ -259,7 +262,7 @@ class InputParameterInfoTests {
         assertEquals(1, results.testSuites.size)
         val tests = results.testSuites.first()
         assertTrue(tests.any { it.result is TvmSuccessfulExecution })
-        assertTrue(tests.any { it.result is TvmMethodFailure })
+        assertTrue(tests.all { it.result !is TvmMethodFailure })
 
         checkInvariants(
             tests,
@@ -280,14 +283,22 @@ class InputParameterInfoTests {
         assertEquals(1, results.testSuites.size)
         val tests = results.testSuites.first()
         assertTrue(tests.any { it.result !is TvmSuccessfulExecution })
-        assertTrue(tests.any { it.result is TvmMethodFailure })
+        assertTrue(tests.all { it.result !is TvmMethodFailure })
 
         propertiesFound(
             tests,
-            listOf { test ->
-                val exit = test.result as? TvmExecutionWithReadingOfUnexpectedType ?: return@listOf false
-                exit.actualType is TvmCellDataCoins && exit.labelType is TvmMsgAddrLabel
-            }
+            listOf(
+                { test ->
+                    val exit = test.result as? TvmExecutionWithReadingOfUnexpectedType ?: return@listOf false
+                    exit.actualType is TvmCellDataCoins && exit.labelType is TvmMsgAddrLabel
+                },
+                { test ->
+                    val param = test.usedParameters.lastOrNull() as? TvmTestSliceValue
+                        ?: return@listOf false
+                    val cell = param.cell
+                    cell.data.startsWith("100")
+                }
+            )
         )
     }
 
@@ -302,7 +313,7 @@ class InputParameterInfoTests {
         assertEquals(1, results.testSuites.size)
         val tests = results.testSuites.first()
         assertTrue(tests.any { it.result is TvmSuccessfulExecution })
-        assertTrue(tests.any { it.result is TvmMethodFailure })
+        assertTrue(tests.all { it.result !is TvmMethodFailure })
 
         checkInvariants(
             tests,
@@ -366,7 +377,7 @@ class InputParameterInfoTests {
         assertEquals(1, results.testSuites.size)
         val tests = results.testSuites.first()
         assertTrue(tests.any { it.result is TvmSuccessfulExecution })
-        assertTrue(tests.any { it.result is TvmMethodFailure })
+        assertTrue(tests.all { it.result !is TvmMethodFailure })
 
         propertiesFound(
             tests,
@@ -445,7 +456,7 @@ class InputParameterInfoTests {
         val results = funcCompileAndAnalyzeAllMethods(resourcePath, inputInfo = mapOf(BigInteger.ZERO to inputInfo))
         assertEquals(1, results.testSuites.size)
         val tests = results.testSuites.first()
-        assertTrue(tests.any { it.result is TvmMethodFailure })
+        assertTrue(tests.all { it.result !is TvmMethodFailure })
 
         propertiesFound(
             tests,
@@ -464,24 +475,24 @@ class InputParameterInfoTests {
             ?: error("Cannot find resource $seqLoadInt3Path")
 
         val inputInfo =
-        TvmInputInfo(
-            mapOf(
-                0 to SliceInfo(
-                    DataCellInfo(
-                        TvmDataCellStructure.KnownTypePrefix(
-                            structureY,
-                            TvmDataCellStructure.Empty
+            TvmInputInfo(
+                mapOf(
+                    0 to SliceInfo(
+                        DataCellInfo(
+                            TvmDataCellStructure.KnownTypePrefix(
+                                structureY,
+                                TvmDataCellStructure.Empty
+                            )
                         )
                     )
                 )
             )
-        )
 
         val results = funcCompileAndAnalyzeAllMethods(resourcePath, inputInfo = mapOf(BigInteger.ZERO to inputInfo))
         assertEquals(1, results.testSuites.size)
         val tests = results.testSuites.first()
         assertTrue(tests.any { it.result is TvmSuccessfulExecution })
-        assertTrue(tests.any { it.result is TvmMethodFailure })
+        assertTrue(tests.all { it.result !is TvmMethodFailure })
 
         checkInvariants(
             tests,
