@@ -207,6 +207,9 @@ class TvmDataCellInfoStorage private constructor(
             when (paramInfo) {
                 is TvmParameterInfo.DataCellInfo -> {
                     val stackValue = state.stack.getStackValue(entry, TvmCellType) { state.generateSymbolicCell() }
+                    // At this point stack should be empty (since TvmState is the initial state)
+                    // => stackValue is from input stack entry
+                    // => stackValue.cellValue must be UConcreteHeapRef
                     val address = stackValue.cellValue as UConcreteHeapRef
                     construct(state, paramInfo.dataCellStructure, address)
                 }
@@ -215,6 +218,10 @@ class TvmDataCellInfoStorage private constructor(
                     val stackValue = state.stack.getStackValue(entry, TvmSliceType) { state.generateSymbolicSlice() }
                     val sliceAddress = stackValue.sliceValue
                         ?: error("Could not extract slice address while building TvmDataCellInfoStorage")
+                    // At this point stack should be empty (since TvmState is the initial state)
+                    // => stackValue is from input stack entry
+                    // => sliceAddress must be UConcreteHeapRef
+                    // => the corresponding cell address must also be concrete
                     val address =
                         state.memory.readField(sliceAddress, sliceCellField, state.ctx.addressSort) as UConcreteHeapRef
                     construct(state, paramInfo.cellInfo.dataCellStructure, address)

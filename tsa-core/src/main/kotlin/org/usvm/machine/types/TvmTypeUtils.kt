@@ -50,6 +50,7 @@ fun TvmBuiltinDataCellLabel.accepts(symbolicType: TvmSymbolicCellDataType): UBoo
         is TvmMsgAddrLabel -> {
             when (symbolicType) {
                 is TvmSymbolicCellDataMsgAddr -> trueExpr
+                // TODO: process this case more accurately
                 is TvmSymbolicCellDataInteger -> mkSizeLeExpr(symbolicType.sizeBits, mkSizeExpr(stdMsgAddrSize))
                 else -> falseExpr
             }

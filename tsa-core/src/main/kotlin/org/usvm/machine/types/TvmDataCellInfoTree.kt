@@ -130,6 +130,22 @@ class TvmDataCellInfoTree private constructor(
                 }
             }
 
+        private fun constructOffset(
+            offsetSet: Map<UBoolExpr, UExpr<TvmSizeSort>>,
+        ) : UExpr<TvmSizeSort> {
+            check(offsetSet.isNotEmpty()) {
+                "internalTree must have at least one leaf"
+            }
+            var result = offsetSet.values.first()  // arbitrary value
+            offsetSet.forEach { (condition, value) ->
+                if (value == result) {
+                    return@forEach
+                }
+                result = with(value.ctx) { mkIte(condition, value, result) }
+            }
+            return result
+        }
+
         private fun constructVertexForKnownTypePrefix(
             structure: TvmDataCellStructure.KnownTypePrefix,
             state: TvmState,
@@ -161,29 +177,8 @@ class TvmDataCellInfoTree private constructor(
                         "Internal tree must not have unknown leaves"
                     }
 
-                    val dataOffsets = internalTree.getTreeDataSize()
-                    check(dataOffsets.isNotEmpty()) {
-                        "internalTree must have at least one leaf"
-                    }
-                    var dataOffset = dataOffsets.values.first()  // arbitrary value
-                    dataOffsets.forEach { (condition, value) ->
-                        if (value == dataOffset) {
-                            return@forEach
-                        }
-                        dataOffset = mkIte(condition, value, dataOffset)
-                    }
-
-                    val refOffsets = internalTree.getTreeRefNumber()
-                    check(refOffsets.isNotEmpty()) {
-                        "internalTree must have at least one leaf"
-                    }
-                    var refOffset = refOffsets.values.first()  // arbitrary value
-                    refOffsets.forEach { (condition, value) ->
-                        if (value == dataOffset) {
-                            return@forEach
-                        }
-                        refOffset = mkIte(condition, value, refOffset)
-                    }
+                    val dataOffset = constructOffset(internalTree.getTreeDataSize())
+                    val refOffset = constructOffset(internalTree.getTreeRefNumber())
 
                     (dataOffset to refOffset) to internalTree
                 }

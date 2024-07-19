@@ -3,7 +3,6 @@ package org.ton.examples
 import io.ksmt.utils.toBigInteger
 import org.ton.TvmInputInfo
 import org.ton.bytecode.TvmContractCode
-import org.usvm.machine.types.TvmIntegerType
 import org.usvm.machine.BocAnalyzer
 import org.usvm.machine.FiftAnalyzer
 import org.usvm.machine.FiftInterpreterResult
@@ -12,6 +11,7 @@ import org.usvm.machine.TactAnalyzer
 import org.usvm.machine.TvmMachineOptions
 import org.usvm.machine.intValue
 import org.usvm.machine.state.TvmStack
+import org.usvm.machine.types.TvmIntegerType
 import org.usvm.test.resolver.TvmContractSymbolicTestResult
 import org.usvm.test.resolver.TvmExecutionWithStructuralError
 import org.usvm.test.resolver.TvmMethodFailure
@@ -114,7 +114,12 @@ internal fun TvmStack.loadIntegers(n: Int) = List(n) {
     takeLast(TvmIntegerType) { error("Impossible") }.intValue.intValue()
 }.reversed()
 
-internal fun TvmSymbolicTest.executionCode(): Int? = result.exitCode?.toInt()
+internal fun TvmSymbolicTest.executionCode(): Int? =
+    when (val casted = result) {
+        is TvmMethodFailure -> casted.exitCode.toInt()
+        is TvmSuccessfulExecution -> 0
+        is TvmExecutionWithStructuralError -> null  // execution interrupted
+    }
 
 internal fun compareSymbolicAndConcreteResults(
     methodIds: Set<Int>,

@@ -76,7 +76,7 @@ class TvmTestStateResolver(
         return when (val it = state.methodResult) {
             TvmMethodResult.NoCall -> error("Missed result for state $state")
             is TvmMethodResult.TvmFailure -> TvmMethodFailure(it, state.lastStmt, it.exit.exitCode, resolvedResults)
-            is TvmMethodResult.TvmSuccess -> TvmSuccessfulExecution(it.exit.exitCode, resolvedResults)
+            is TvmMethodResult.TvmSuccess -> TvmSuccessfulExecution(resolvedResults)
             is TvmMethodResult.TvmStructuralError -> resolveTvmStructuralError(state.lastStmt, resolvedResults, it)
         }
     }
