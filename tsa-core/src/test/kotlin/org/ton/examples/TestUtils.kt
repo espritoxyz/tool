@@ -14,10 +14,9 @@ import org.usvm.machine.state.TvmStack
 import org.usvm.machine.types.TvmIntegerType
 import org.usvm.test.resolver.TvmContractSymbolicTestResult
 import org.usvm.test.resolver.TvmExecutionWithStructuralError
-import org.usvm.test.resolver.TvmMethodFailure
-import org.usvm.test.resolver.TvmSuccessfulExecution
 import org.usvm.test.resolver.TvmSymbolicTest
 import org.usvm.test.resolver.TvmSymbolicTestSuite
+import org.usvm.test.resolver.TvmTerminalMethodSymbolicResult
 import org.usvm.test.resolver.TvmTestIntegerValue
 import org.usvm.test.resolver.TvmTestNullValue
 import org.usvm.test.resolver.TvmTestTupleValue
@@ -116,8 +115,7 @@ internal fun TvmStack.loadIntegers(n: Int) = List(n) {
 
 internal fun TvmSymbolicTest.executionCode(): Int? =
     when (val casted = result) {
-        is TvmMethodFailure -> casted.exitCode.toInt()
-        is TvmSuccessfulExecution -> 0
+        is TvmTerminalMethodSymbolicResult -> casted.exitCode.toInt()
         is TvmExecutionWithStructuralError -> null  // execution interrupted
     }
 

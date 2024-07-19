@@ -53,14 +53,21 @@ sealed interface TvmMethodSymbolicResult {
     val stack: List<TvmTestValue>
 }
 
+sealed interface TvmTerminalMethodSymbolicResult : TvmMethodSymbolicResult {
+    val exitCode: UInt
+}
+
 data class TvmMethodFailure(
     val failure: TvmFailure,
     val lastStmt: TvmInst,
-    val exitCode: UInt,
+    override val exitCode: UInt,
     override val stack: List<TvmTestValue>
-) : TvmMethodSymbolicResult
+) : TvmTerminalMethodSymbolicResult
 
-data class TvmSuccessfulExecution(override val stack: List<TvmTestValue>) : TvmMethodSymbolicResult
+data class TvmSuccessfulExecution(
+    override val exitCode: UInt,
+    override val stack: List<TvmTestValue>,
+) : TvmTerminalMethodSymbolicResult
 
 sealed class TvmExecutionWithStructuralError(
     open val lastStmt: TvmInst,
