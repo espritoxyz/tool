@@ -25,10 +25,10 @@ import org.usvm.mkSizeLtExpr
 
 class TvmDataCellInfoStorage private constructor(
     private val ctx: TvmContext,
-    private val addressToTree: Set<TvmDataCellInfoTree>,
+    private val treeSet: Set<TvmDataCellInfoTree>,
 ) {
     private fun treesOfAddress(address: UConcreteHeapRef): List<Pair<TvmDataCellInfoTree, UBoolExpr>> = with(ctx) {
-        addressToTree.mapNotNull { tree ->
+        treeSet.mapNotNull { tree ->
             val guard = foldHeapRef(
                 tree.address,
                 initial = falseExpr as UBoolExpr,
