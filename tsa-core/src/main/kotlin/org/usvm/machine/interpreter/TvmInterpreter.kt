@@ -290,6 +290,7 @@ class TvmInterpreter(
     val typeSystem: TvmTypeSystem,
     private val inputInfo: TvmInputInfo,
     private val checkDataCellContentTypes: Boolean,
+    private val excludeInputsThatDoNotMatchGivenScheme: Boolean,
     var forkBlackList: UForkBlackList<TvmState, TvmInst> = UForkBlackList.createDefault(),
 ) : UInterpreter<TvmState>() {
     companion object {
@@ -361,7 +362,11 @@ class TvmInterpreter(
             typeSystem = typeSystem,
         )
 
-        val dataCellInfoStorage = TvmDataCellInfoStorage.build(checkDataCellContentTypes, state, inputInfo)
+        val dataCellInfoStorage = TvmDataCellInfoStorage.build(
+            checkDataCellContentTypes,
+            state,
+            inputInfo
+        )
         state.dataCellInfoStorage = dataCellInfoStorage
 
         state.registers.c4 = C4Register(TvmCellValue(state.generateSymbolicCell()))

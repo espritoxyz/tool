@@ -174,6 +174,10 @@ class TvmDataCellInfoStorage private constructor(
         }
     }
 
+    fun generateStructuralConstraints(): UBoolExpr {
+        TODO()
+    }
+
     // this behavior might be changed in the future
     fun clone(): TvmDataCellInfoStorage = this
 

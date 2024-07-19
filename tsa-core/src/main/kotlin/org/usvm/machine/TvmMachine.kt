@@ -45,6 +45,7 @@ class TvmMachine(
             typeSystem = components.typeSystem,
             inputInfo = inputInfo,
             checkDataCellContentTypes = tvmOptions.checkDataCellContentTypes,
+            excludeInputsThatDoNotMatchGivenScheme = tvmOptions.excludeInputsThatDoNotMatchGivenScheme,
         )
         logger.debug("{}.analyze({})", this, contractCode)
         val initialState = interpreter.getInitialState(contractCode, contractData, methodId)
