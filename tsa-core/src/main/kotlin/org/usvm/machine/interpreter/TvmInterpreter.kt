@@ -369,13 +369,20 @@ class TvmInterpreter(
         )
         state.dataCellInfoStorage = dataCellInfoStorage
 
+        if (excludeInputsThatDoNotMatchGivenScheme) {
+            val structuralConstraints = dataCellInfoStorage.generateStructuralConstraints(state)
+            state.pathConstraints += structuralConstraints
+        }
+
         state.registers.c4 = C4Register(TvmCellValue(state.generateSymbolicCell()))
         state.registers.c5 = C5Register(TvmCellValue(state.allocEmptyCell()))
         state.registers.c7 = C7Register(ctx, configRoot = state.initConfigRoot())
 
         val solver = ctx.solver<TvmType>()
 
-        val model = (solver.check(state.pathConstraints) as USatResult).model
+        val kModel = solver.check(state.pathConstraints) as? USatResult
+            ?: error("Cannot construct model for initial state")
+        val model = kModel.model
         state.models = listOf(model)
 
         state.callStack.push(method, returnSite = null)

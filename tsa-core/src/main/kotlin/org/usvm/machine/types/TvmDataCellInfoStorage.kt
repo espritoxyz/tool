@@ -10,6 +10,7 @@ import org.usvm.UConcreteHeapRef
 import org.usvm.api.readField
 import org.usvm.machine.TvmContext
 import org.usvm.machine.TvmContext.Companion.sliceCellField
+import org.usvm.machine.TvmSizeSort
 import org.usvm.machine.state.TvmMethodResult.TvmStructuralError
 import org.usvm.machine.state.TvmReadingOfUnexpectedType
 import org.usvm.machine.state.TvmStack
@@ -19,8 +20,10 @@ import org.usvm.machine.state.generateSymbolicCell
 import org.usvm.machine.state.generateSymbolicSlice
 import org.usvm.machine.types.TvmDataCellInfoTree.Companion.construct
 import org.usvm.memory.foldHeapRef
+import org.usvm.mkSizeGeExpr
 import org.usvm.mkSizeGtExpr
 import org.usvm.mkSizeLtExpr
+import org.usvm.sizeSort
 
 
 class TvmDataCellInfoStorage private constructor(
@@ -174,8 +177,31 @@ class TvmDataCellInfoStorage private constructor(
         }
     }
 
-    fun generateStructuralConstraints(): UBoolExpr {
-        TODO()
+    fun generateStructuralConstraints(state: TvmState): UBoolExpr = with(ctx) {
+        treeSet.fold(trueExpr as UBoolExpr) { outerAcc, tree ->
+
+            val dataLength = state.memory.readField(tree.address, TvmContext.cellDataLengthField, sizeSort)
+            val refLength = state.memory.readField(tree.address, TvmContext.cellRefsLengthField, sizeSort)
+
+            tree.fold(outerAcc) innerFold@{ acc, vertex ->
+                when (vertex.structure) {
+                    is TvmDataCellStructure.Unknown -> {
+                        val cur = mkSizeGeExpr(dataLength, vertex.prefixSize) and mkSizeGeExpr(refLength, vertex.refNumber)
+                        acc and (vertex.guard implies cur)
+                    }
+
+                    is TvmDataCellStructure.Empty -> {
+                        val cur = mkEq(dataLength, vertex.prefixSize) and mkEq(refLength, vertex.refNumber)
+                        acc and (vertex.guard implies cur)
+                    }
+
+                    else -> {
+                        // skip non-leaves
+                        acc
+                    }
+                }
+            }
+        }
     }
 
     // this behavior might be changed in the future
