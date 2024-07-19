@@ -8,6 +8,7 @@ import org.usvm.UBoolExpr
 import org.usvm.UExpr
 import org.usvm.UHeapRef
 import org.usvm.api.readField
+import org.usvm.machine.TvmContext
 import org.usvm.machine.TvmContext.Companion.cellDataField
 import org.usvm.machine.TvmSizeSort
 import org.usvm.machine.state.TvmState
@@ -18,10 +19,11 @@ import org.usvm.mkSizeExpr
 import org.usvm.mkSizeSubExpr
 
 class TvmDataCellInfoTree private constructor(
+    private val ctx: TvmContext,
     val address: UHeapRef,
     private val root: Vertex,
-    val initialOffset: UExpr<TvmSizeSort>,
-    val initialRefNumber: UExpr<TvmSizeSort>,
+    private val initialOffset: UExpr<TvmSizeSort>,
+    private val initialRefNumber: UExpr<TvmSizeSort>,
 ) {
     fun <Acc> fold(init: Acc, f: (Acc, Vertex) -> Acc): Acc =
         root.fold(init, f)
@@ -54,12 +56,12 @@ class TvmDataCellInfoTree private constructor(
     fun hasUnknownLeaves(): Boolean =
         fold(false) { acc, vertex -> acc || vertex.structure is TvmDataCellStructure.Unknown }
 
-    fun getTreeDataSize(): Map<UBoolExpr, UExpr<TvmSizeSort>> = with(address.ctx) {
+    fun getTreeDataSize(): Map<UBoolExpr, UExpr<TvmSizeSort>> = with(ctx) {
         val result = mutableMapOf<UBoolExpr, UExpr<TvmSizeSort>>()
         onEachVertex { vertex ->
             when (vertex.structure) {
                 is TvmDataCellStructure.Empty -> {
-                    result[vertex.guard] = mkBvSubExpr(vertex.prefixSize, initialOffset)
+                    result[vertex.guard] = mkSizeSubExpr(vertex.prefixSize, initialOffset)
                 }
                 else -> {
                     // do nothing
@@ -69,12 +71,12 @@ class TvmDataCellInfoTree private constructor(
         return result
     }
 
-    fun getTreeRefNumber(): Map<UBoolExpr, UExpr<TvmSizeSort>> = with(address.ctx) {
+    fun getTreeRefNumber(): Map<UBoolExpr, UExpr<TvmSizeSort>> = with(ctx) {
         val result = mutableMapOf<UBoolExpr, UExpr<TvmSizeSort>>()
         onEachVertex { vertex ->
             when (vertex.structure) {
                 is TvmDataCellStructure.Empty -> {
-                    result[vertex.guard] = mkBvSubExpr(vertex.refNumber, initialRefNumber)
+                    result[vertex.guard] = mkSizeSubExpr(vertex.refNumber, initialRefNumber)
                 }
                 else -> {
                     // do nothing
@@ -101,7 +103,7 @@ class TvmDataCellInfoTree private constructor(
                 prefixSize = initialOffset,
                 refNumber = initialRefNumber,
             )
-            val result = TvmDataCellInfoTree(address, root, initialOffset, initialRefNumber)
+            val result = TvmDataCellInfoTree(state.ctx, address, root, initialOffset, initialRefNumber)
             return listOf(result) + other
         }
 

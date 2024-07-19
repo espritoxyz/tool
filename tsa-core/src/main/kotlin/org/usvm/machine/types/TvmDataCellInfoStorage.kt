@@ -27,28 +27,29 @@ class TvmDataCellInfoStorage private constructor(
     private val ctx: TvmContext,
     private val addressToTree: Set<TvmDataCellInfoTree>,
 ) {
-    private fun treesOfAddress(address: UConcreteHeapRef): List<Pair<TvmDataCellInfoTree, UBoolExpr>> =
+    private fun treesOfAddress(address: UConcreteHeapRef): List<Pair<TvmDataCellInfoTree, UBoolExpr>> = with(ctx) {
         addressToTree.mapNotNull { tree ->
             val guard = foldHeapRef(
                 tree.address,
-                initial = ctx.falseExpr as UBoolExpr,
-                initialGuard = ctx.trueExpr,
+                initial = falseExpr as UBoolExpr,
+                initialGuard = trueExpr,
                 staticIsConcrete = true,
                 blockOnSymbolic = { _, (ref, _) -> error("Unexpected ref $ref") },
                 blockOnConcrete = { acc, (expr, guard) ->
                     if (expr == address) {
-                        with(ctx) { acc or guard }
+                        acc or guard
                     } else {
                         acc
                     }
                 }
             )
-            if (guard == ctx.falseExpr) {
+            if (guard == falseExpr) {
                 null
             } else {
                 tree to guard
             }
         }
+    }
 
     fun getConflictConditionsForLoadData(
         loadData: TvmDataCellLoadedTypeInfo.LoadData
@@ -82,6 +83,7 @@ class TvmDataCellInfoStorage private constructor(
                 }
 
                 is TvmDataCellStructure.Empty -> {
+                    // we want to throw TvmUnexpectedReading only from the root tree
                     if (rootTree) {
                         // TvmUnexpectedReading, if loaded more than 0 bits
                         val error = TvmUnexpectedReading(loadData.type)
@@ -133,7 +135,8 @@ class TvmDataCellInfoStorage private constructor(
         val trees = treesOfAddress(endOfCell.address)
         return trees.fold(trueExpr as UBoolExpr) { outerResult, (tree, treeGuard) ->
             tree.fold(outerResult) internalFold@{ result, vertex ->
-                // we can check only leaves
+                // we can check only leaves, because if there is a conflicting vertex,
+                // then there is also a conflicting leaf.
                 if (vertex.structure !is TvmDataCellStructure.Empty && vertex.structure !is TvmDataCellStructure.Unknown) {
                     return@internalFold result
                 }
