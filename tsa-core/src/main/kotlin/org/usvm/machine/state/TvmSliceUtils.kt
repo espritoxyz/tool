@@ -4,6 +4,7 @@ import io.ksmt.KContext
 import io.ksmt.expr.KBitVecValue
 import io.ksmt.utils.uncheckedCast
 import io.ksmt.expr.KInterpretedValue
+import io.ksmt.sort.KBvSort
 import org.ton.bytecode.TvmCell
 import org.ton.bytecode.TvmSubSliceSerializedLoader
 import org.usvm.machine.types.TvmBuilderType
@@ -226,6 +227,24 @@ private fun TvmState.loadDataBitsFromCellWithoutChecks(
     val endOffset = mkSizeAddExpr(offset, sizeBits)
     val offsetDataPos = mkSizeSubExpr(maxDataLengthSizeExpr, endOffset)
     mkBvLogicalShiftRightExpr(cellData, offsetDataPos.zeroExtendToSort(cellDataSort))
+}
+
+fun TvmState.loadDataBitsFromCellWithoutChecks(
+    cell: UHeapRef,
+    offset: UExpr<TvmSizeSort>,
+    sizeBits: Int,
+): UExpr<KBvSort> = with(ctx) {
+    val shiftedData = loadDataBitsFromCellWithoutChecks(cell, offset, mkSizeExpr(sizeBits))
+    return mkBvExtractExpr(high = sizeBits- 1, low = 0, shiftedData)
+}
+
+fun TvmState.loadDataBitsFromCellWithoutChecks(
+    slice: UHeapRef,
+    sizeBits: Int,
+): UExpr<KBvSort> = with(ctx) {
+    val cell = memory.readField(slice, sliceCellField, addressSort)
+    val dataPosition = memory.readField(slice, sliceDataPosField, sizeSort)
+   return loadDataBitsFromCellWithoutChecks(cell, dataPosition, sizeBits)
 }
 
 /**

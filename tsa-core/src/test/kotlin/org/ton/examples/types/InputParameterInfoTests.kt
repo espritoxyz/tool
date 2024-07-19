@@ -355,7 +355,7 @@ class InputParameterInfoTests {
         assertEquals(1, results.testSuites.size)
         val tests = results.testSuites.first()
         assertTrue(tests.any { it.result !is TvmSuccessfulExecution })
-        assertTrue(tests.any { it.result is TvmMethodFailure })
+        assertTrue(tests.all { it.result !is TvmMethodFailure })
 
         propertiesFound(
             tests,

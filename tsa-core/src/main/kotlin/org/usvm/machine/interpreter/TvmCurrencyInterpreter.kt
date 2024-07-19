@@ -12,6 +12,7 @@ import org.usvm.machine.state.addOnStack
 import org.usvm.machine.state.builderCopy
 import org.usvm.machine.state.consumeDefaultGas
 import org.usvm.machine.state.doWithStateCtx
+import org.usvm.machine.state.loadDataBitsFromCellWithoutChecks
 import org.usvm.machine.state.newStmt
 import org.usvm.machine.state.nextStmt
 import org.usvm.machine.state.sliceCopy
@@ -47,11 +48,13 @@ class TvmCurrencyInterpreter(private val ctx: TvmContext) {
 
             val updatedSlice = memory.allocConcrete(TvmSliceType).also { sliceCopy(slice, it) }
 
+            val lengthPeek = scope.calcOnState { loadDataBitsFromCellWithoutChecks(slice, sizeBits = 4) }
+            scope.makeSliceTypeLoad(slice, TvmSymbolicCellDataCoins(ctx, lengthPeek.zeroExtendToSort(sizeSort)))
+                ?: return@doWithStateCtx
+
             val length = scope.slicePreloadDataBits(updatedSlice, bits = 4)?.zeroExtendToSort(sizeSort)
                 ?: return@doWithStateCtx
 
-            scope.makeSliceTypeLoad(slice, TvmSymbolicCellDataCoins(ctx, length))
-                ?: return@doWithStateCtx
             sliceMoveDataPtr(updatedSlice, bits = 4)
 
             val extendedLength = mkBvShiftLeftExpr(length, shift = mkSizeExpr(3))

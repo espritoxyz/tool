@@ -10,7 +10,6 @@ import org.usvm.UConcreteHeapRef
 import org.usvm.api.readField
 import org.usvm.machine.TvmContext
 import org.usvm.machine.TvmContext.Companion.sliceCellField
-import org.usvm.machine.TvmSizeSort
 import org.usvm.machine.state.TvmMethodResult.TvmStructuralError
 import org.usvm.machine.state.TvmReadingOfUnexpectedType
 import org.usvm.machine.state.TvmStack
@@ -18,6 +17,7 @@ import org.usvm.machine.state.TvmState
 import org.usvm.machine.state.TvmUnexpectedReading
 import org.usvm.machine.state.generateSymbolicCell
 import org.usvm.machine.state.generateSymbolicSlice
+import org.usvm.machine.state.loadDataBitsFromCellWithoutChecks
 import org.usvm.machine.types.TvmDataCellInfoTree.Companion.construct
 import org.usvm.memory.foldHeapRef
 import org.usvm.mkSizeGeExpr
@@ -179,26 +179,67 @@ class TvmDataCellInfoStorage private constructor(
 
     fun generateStructuralConstraints(state: TvmState): UBoolExpr = with(ctx) {
         treeSet.fold(trueExpr as UBoolExpr) { outerAcc, tree ->
+            val cur = generateStructuralConstraints(state, tree)
+            outerAcc and cur
+        }
+    }
 
-            val dataLength = state.memory.readField(tree.address, TvmContext.cellDataLengthField, sizeSort)
-            val refLength = state.memory.readField(tree.address, TvmContext.cellRefsLengthField, sizeSort)
+    private fun generateStructuralConstraints(
+        state: TvmState,
+        tree: TvmDataCellInfoTree,
+        isRoot: Boolean = true,
+    ): UBoolExpr = with(ctx) {
+        val dataLength = state.memory.readField(tree.address, TvmContext.cellDataLengthField, sizeSort)
+        val refLength = state.memory.readField(tree.address, TvmContext.cellRefsLengthField, sizeSort)
 
-            tree.fold(outerAcc) innerFold@{ acc, vertex ->
-                when (vertex.structure) {
-                    is TvmDataCellStructure.Unknown -> {
-                        val cur = mkSizeGeExpr(dataLength, vertex.prefixSize) and mkSizeGeExpr(refLength, vertex.refNumber)
+        tree.fold(trueExpr as UBoolExpr) innerFold@{ acc, vertex ->
+            when (vertex.structure) {
+                is TvmDataCellStructure.Unknown -> {
+                    if (isRoot) {
+                        val cur =
+                            mkSizeGeExpr(dataLength, vertex.prefixSize) and mkSizeGeExpr(refLength, vertex.refNumber)
                         acc and (vertex.guard implies cur)
-                    }
-
-                    is TvmDataCellStructure.Empty -> {
-                        val cur = mkEq(dataLength, vertex.prefixSize) and mkEq(refLength, vertex.refNumber)
-                        acc and (vertex.guard implies cur)
-                    }
-
-                    else -> {
-                        // skip non-leaves
+                    } else {
                         acc
                     }
+                }
+
+                is TvmDataCellStructure.Empty -> {
+                    if (isRoot) {
+                        val cur = mkEq(dataLength, vertex.prefixSize) and mkEq(refLength, vertex.refNumber)
+                        acc and (vertex.guard implies cur)
+                    } else {
+                        acc
+                    }
+                }
+
+                is TvmDataCellStructure.SwitchPrefix -> {
+                    val prefix = state.loadDataBitsFromCellWithoutChecks(
+                        tree.address,
+                        vertex.prefixSize,
+                        vertex.structure.switchSize
+                    )
+                    val size = vertex.structure.switchSize.toUInt()
+                    val cur = vertex.structure.variants.keys.fold(falseExpr as UBoolExpr) { innerAcc, key ->
+                        val expectedPrefix = mkBv(key, size)
+                        innerAcc or (prefix eq expectedPrefix)
+                    }
+                    acc and (vertex.guard implies cur)
+                }
+
+                is TvmDataCellStructure.KnownTypePrefix -> {
+                    if (vertex.structure.typeOfPrefix is TvmCompositeDataCellLabel) {
+                        val internalTree = vertex.internalTree
+                            ?: error("internalTree must not be null for vertex with TvmCompositeDataCellLabel")
+                        acc and generateStructuralConstraints(state, internalTree, isRoot = false)
+                    } else {
+                        acc
+                    }
+                }
+
+                is TvmDataCellStructure.LoadRef -> {
+                    // ignore
+                    acc
                 }
             }
         }

@@ -13,6 +13,7 @@ import org.usvm.machine.TvmContext.Companion.cellDataField
 import org.usvm.machine.TvmSizeSort
 import org.usvm.machine.state.TvmState
 import org.usvm.machine.state.assertType
+import org.usvm.machine.state.loadDataBitsFromCellWithoutChecks
 import org.usvm.machine.state.readCellRef
 import org.usvm.mkSizeAddExpr
 import org.usvm.mkSizeExpr
@@ -204,11 +205,8 @@ class TvmDataCellInfoTree private constructor(
             refNumber: UExpr<TvmSizeSort>,
         ): Pair<Vertex, List<TvmDataCellInfoTree>> = with(state.ctx) {
             val other = mutableListOf<TvmDataCellInfoTree>()
-            val cellContent = state.memory.readField(address, cellDataField, cellDataSort)
             val newPrefixSize = mkSizeAddExpr(prefixSize, mkSizeExpr(structure.switchSize))
-            val offsetFromEnd = mkSizeSubExpr(maxDataLengthSizeExpr, newPrefixSize)
-            val shiftedCellContent = mkBvLogicalShiftRightExpr(cellContent, offsetFromEnd.zeroExtendToSort(cellDataSort))
-            val prefix = mkBvExtractExpr(high = structure.switchSize - 1, low = 0, shiftedCellContent)
+            val prefix = state.loadDataBitsFromCellWithoutChecks(address, prefixSize, structure.switchSize)
             val switchSize = structure.switchSize.toUInt()
 
             val children = structure.variants.entries.map { (key, selfRestVariant) ->
