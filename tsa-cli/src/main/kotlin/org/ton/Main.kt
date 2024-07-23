@@ -75,6 +75,10 @@ class FiftAnalysis : CliktCommand(name = "fift", help = "Options for analyzing s
         .required()
         .help("The path to the Fift assembly of the smart contract")
 
+    private val tlbJsonPath by option("-t", "--tlb")
+        .path(mustExist = true, canBeFile = true, canBeDir = false)
+        .help("The path to the parsed TL-B scheme.")
+
     private val contractProperties by ContractProperties()
     private val fiftOptions by FiftOptions()
 
