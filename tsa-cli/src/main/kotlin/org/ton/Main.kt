@@ -9,15 +9,12 @@ import com.github.ajalt.clikt.parameters.options.help
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
 import com.github.ajalt.clikt.parameters.types.path
-import kotlinx.serialization.json.Json
+import org.ton.sarif.toSarifReport
+import org.ton.tlb.readFromJson
 import org.usvm.machine.BocAnalyzer
 import org.usvm.machine.FiftAnalyzer
 import org.usvm.machine.FuncAnalyzer
 import org.usvm.machine.TactAnalyzer
-import org.ton.sarif.toSarifReport
-import org.ton.tlb.TvmTlbTransformer
-import org.ton.tlb.TvmTlbTypeDefinition
-import org.ton.tlb.readFromJson
 import java.math.BigInteger
 
 class ContractProperties : OptionGroup("Contract properties") {
