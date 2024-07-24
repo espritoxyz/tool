@@ -9,11 +9,16 @@ import com.github.ajalt.clikt.parameters.options.help
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
 import com.github.ajalt.clikt.parameters.types.path
+import kotlinx.serialization.json.Json
 import org.usvm.machine.BocAnalyzer
 import org.usvm.machine.FiftAnalyzer
 import org.usvm.machine.FuncAnalyzer
 import org.usvm.machine.TactAnalyzer
 import org.ton.sarif.toSarifReport
+import org.ton.tlb.TvmTlbTransformer
+import org.ton.tlb.TvmTlbTypeDefinition
+import org.ton.tlb.readFromJson
+import java.math.BigInteger
 
 class ContractProperties : OptionGroup("Contract properties") {
     val contractData by option("-d", "--data").help("The serialized contract persistent data")
@@ -58,11 +63,30 @@ class FuncAnalysis : CliktCommand(name = "func", help = "Options for analyzing F
     private val fiftOptions by FiftOptions()
     private val funcOptions by FuncOptions()
 
+    private val tlbJsonPath by option("-t", "--tlb")
+        .path(mustExist = true, canBeFile = true, canBeDir = false)
+        .help("The path to the parsed TL-B scheme.")
+
+    private fun extractInputInfo(): Map<BigInteger, TvmInputInfo> {
+        val path = tlbJsonPath
+        return if (path == null) {
+            emptyMap()
+        } else {
+            val struct = readFromJson(path, "InternalMsgBody")
+            val info = TvmParameterInfo.SliceInfo(
+                TvmParameterInfo.DataCellInfo(
+                    struct
+                )
+            )
+            mapOf(BigInteger.ZERO to TvmInputInfo(mapOf(0 to info)))
+        }
+    }
+
     override fun run() {
         FuncAnalyzer(
             funcStdlibPath = funcOptions.funcStdlibPath,
             fiftStdlibPath = fiftOptions.fiftStdlibPath
-        ).analyzeAllMethods(funcSourcesPath, contractProperties.contractData).let {
+        ).analyzeAllMethods(funcSourcesPath, contractProperties.contractData, inputInfo = extractInputInfo()).let {
             // TODO parse FunC sources in CLI without TON plugin usage
             echo(it.toSarifReport(methodsMapping = emptyMap()))
         }
@@ -75,17 +99,13 @@ class FiftAnalysis : CliktCommand(name = "fift", help = "Options for analyzing s
         .required()
         .help("The path to the Fift assembly of the smart contract")
 
-    private val tlbJsonPath by option("-t", "--tlb")
-        .path(mustExist = true, canBeFile = true, canBeDir = false)
-        .help("The path to the parsed TL-B scheme.")
-
     private val contractProperties by ContractProperties()
     private val fiftOptions by FiftOptions()
 
     override fun run() {
         FiftAnalyzer(
             fiftStdlibPath = fiftOptions.fiftStdlibPath
-        ).analyzeAllMethods(fiftSourcesPath, contractProperties.contractData).let {
+        ).analyzeAllMethods(fiftSourcesPath, contractProperties.contractData,).let {
             echo(it.toSarifReport(methodsMapping = emptyMap()))
         }
     }

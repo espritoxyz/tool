@@ -50,11 +50,11 @@ class TvmTlbTransformer(
             name == "int" -> TvmIntegerLabel(bitSize = args.toIntConst(), isSigned = true, endian = BigEndian)
             name.startsWith("bits") -> TODO()
             name.startsWith("int") -> {
-                val bits = name.removeSuffix("int").toInt()
+                val bits = name.removePrefix("int").toInt()
                 TvmIntegerLabel(bitSize = bits, isSigned = true, endian = BigEndian)
             }
             name.startsWith("uint") -> {
-                val bits = name.removeSuffix("uint").toInt()
+                val bits = name.removePrefix("uint").toInt()
                 TvmIntegerLabel(bitSize = bits, isSigned = false, endian = BigEndian)
             }
             name == "Cell" || name == "Any" -> return Unknown
