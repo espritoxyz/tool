@@ -13,8 +13,7 @@ import org.usvm.api.readField
 import org.usvm.machine.TvmContext
 import org.usvm.machine.TvmSizeSort
 import org.usvm.machine.TvmStepScope
-import org.usvm.machine.state.TvmUnexpectedEndOfReading
-import org.usvm.machine.state.TvmUnexpectedRefReading
+import org.usvm.machine.state.TvmMethodResult
 import org.usvm.machine.state.calcOnStateCtx
 import org.usvm.memory.GuardedExpr
 import org.usvm.memory.foldHeapRef
@@ -167,7 +166,7 @@ fun TvmStepScope.assertEndOfCell(slice: UHeapRef): Unit? {
             fork(
                 noConflictCond,
                 blockOnFalseState = {
-                    methodResult = TvmUnexpectedEndOfReading
+                    methodResult = TvmMethodResult.TvmStructuralError(TvmUnexpectedEndOfReading())
                 }
             ) ?: return@calcOnStateCtx null
         }
@@ -185,7 +184,7 @@ fun TvmStepScope.makeSliceRefLoad(slice: UHeapRef): Unit? {
             fork(
                 noConflictCond,
                 blockOnFalseState = {
-                    methodResult = TvmUnexpectedRefReading
+                    methodResult = TvmMethodResult.TvmStructuralError(TvmUnexpectedRefReading())
                 }
             ) ?: return@calcOnStateCtx null
         }

@@ -1,10 +1,10 @@
 package org.usvm.test.resolver
 
-import org.ton.TvmBuiltinDataCellLabel
 import org.ton.bytecode.TvmInst
 import org.ton.bytecode.TvmMethod
 import org.usvm.machine.state.TvmMethodResult.TvmFailure
 import org.usvm.machine.state.TvmState
+import org.usvm.machine.types.TvmStructuralExit
 import java.math.BigInteger
 
 data object TvmTestResolver {
@@ -69,30 +69,8 @@ data class TvmSuccessfulExecution(
     override val stack: List<TvmTestValue>,
 ) : TvmTerminalMethodSymbolicResult
 
-sealed class TvmExecutionWithStructuralError(
-    open val lastStmt: TvmInst,
-    override val stack: List<TvmTestValue>
+data class TvmExecutionWithStructuralError(
+    val lastStmt: TvmInst,
+    override val stack: List<TvmTestValue>,
+    val exit: TvmStructuralExit<TvmCellDataType>,
 ) : TvmMethodSymbolicResult
-
-data class TvmExecutionWithUnexpectedReading(
-    val readingType: TvmCellDataType,
-    override val lastStmt: TvmInst,
-    override val stack: List<TvmTestValue>,
-) : TvmExecutionWithStructuralError(lastStmt, stack)
-
-data class TvmExecutionWithUnexpectedEndOfReading(
-    override val lastStmt: TvmInst,
-    override val stack: List<TvmTestValue>,
-) : TvmExecutionWithStructuralError(lastStmt, stack)
-
-data class TvmExecutionWithUnexpectedRefReading(
-    override val lastStmt: TvmInst,
-    override val stack: List<TvmTestValue>,
-) : TvmExecutionWithStructuralError(lastStmt, stack)
-
-data class TvmExecutionWithReadingOfUnexpectedType(
-    val labelType: TvmBuiltinDataCellLabel,
-    val actualType: TvmCellDataType,
-    override val lastStmt: TvmInst,
-    override val stack: List<TvmTestValue>,
-) : TvmExecutionWithStructuralError(lastStmt, stack)

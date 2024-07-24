@@ -12,14 +12,14 @@ import org.ton.examples.checkInvariants
 import org.ton.examples.funcCompileAndAnalyzeAllMethods
 import org.ton.examples.propertiesFound
 import org.usvm.machine.TvmMachineOptions
+import org.usvm.machine.types.TvmReadingOfUnexpectedType
+import org.usvm.machine.types.TvmUnexpectedEndOfReading
+import org.usvm.machine.types.TvmUnexpectedDataReading
+import org.usvm.machine.types.TvmUnexpectedRefReading
 import org.usvm.test.resolver.TvmCellDataCoins
 import org.usvm.test.resolver.TvmCellDataInteger
 import org.usvm.test.resolver.TvmCellDataMaybeConstructorBit
-import org.usvm.test.resolver.TvmExecutionWithReadingOfUnexpectedType
 import org.usvm.test.resolver.TvmExecutionWithStructuralError
-import org.usvm.test.resolver.TvmExecutionWithUnexpectedEndOfReading
-import org.usvm.test.resolver.TvmExecutionWithUnexpectedReading
-import org.usvm.test.resolver.TvmExecutionWithUnexpectedRefReading
 import org.usvm.test.resolver.TvmMethodFailure
 import org.usvm.test.resolver.TvmSuccessfulExecution
 import org.usvm.test.resolver.TvmTestSliceValue
@@ -79,8 +79,9 @@ class InputParameterInfoTests {
         propertiesFound(
             tests,
             listOf { test ->
-                val exit = test.result as? TvmExecutionWithReadingOfUnexpectedType ?: return@listOf false
-                exit.actualType is TvmCellDataMaybeConstructorBit && exit.labelType is TvmIntegerLabel
+                val exit = test.result as? TvmExecutionWithStructuralError ?: return@listOf false
+                val error = exit.exit as? TvmReadingOfUnexpectedType ?: return@listOf false
+                error.actualType is TvmCellDataMaybeConstructorBit && error.labelType is TvmIntegerLabel
             }
         )
     }
@@ -100,8 +101,9 @@ class InputParameterInfoTests {
         propertiesFound(
             tests,
             listOf { test ->
-                val exit = test.result as? TvmExecutionWithUnexpectedReading ?: return@listOf false
-                exit.readingType is TvmCellDataMaybeConstructorBit
+                val exit = test.result as? TvmExecutionWithStructuralError ?: return@listOf false
+                val error = exit.exit as? TvmUnexpectedDataReading ?: return@listOf false
+                error.readingType is TvmCellDataMaybeConstructorBit
             }
         )
     }
@@ -157,7 +159,8 @@ class InputParameterInfoTests {
         propertiesFound(
             tests,
             listOf { test ->
-                test.result is TvmExecutionWithUnexpectedEndOfReading
+                val exit = test.result as? TvmExecutionWithStructuralError ?: return@listOf false
+                exit.exit is TvmUnexpectedEndOfReading
             }
         )
     }
@@ -177,7 +180,8 @@ class InputParameterInfoTests {
         propertiesFound(
             tests,
             listOf { test ->
-                test.result is TvmExecutionWithUnexpectedEndOfReading
+                val exit = test.result as? TvmExecutionWithStructuralError ?: return@listOf false
+                exit.exit is TvmUnexpectedEndOfReading
             }
         )
     }
@@ -224,7 +228,8 @@ class InputParameterInfoTests {
         propertiesFound(
             tests,
             listOf { test ->
-                test.result is TvmExecutionWithUnexpectedRefReading
+                val exit = test.result as? TvmExecutionWithStructuralError ?: return@listOf false
+                exit.exit is TvmUnexpectedRefReading
             }
         )
     }
@@ -245,8 +250,9 @@ class InputParameterInfoTests {
         propertiesFound(
             tests,
             listOf { test ->
-                val exit = test.result as? TvmExecutionWithReadingOfUnexpectedType ?: return@listOf false
-                exit.actualType is TvmCellDataMaybeConstructorBit && exit.labelType is TvmCoinsLabel
+                val exit = test.result as? TvmExecutionWithStructuralError ?: return@listOf false
+                val error = exit.exit as? TvmReadingOfUnexpectedType ?: return@listOf false
+                error.actualType is TvmCellDataMaybeConstructorBit && error.labelType is TvmCoinsLabel
             }
         )
     }
@@ -289,8 +295,9 @@ class InputParameterInfoTests {
             tests,
             listOf(
                 { test ->
-                    val exit = test.result as? TvmExecutionWithReadingOfUnexpectedType ?: return@listOf false
-                    exit.actualType is TvmCellDataCoins && exit.labelType is TvmMsgAddrLabel
+                    val exit = test.result as? TvmExecutionWithStructuralError ?: return@listOf false
+                    val error = exit.exit as? TvmReadingOfUnexpectedType ?: return@listOf false
+                    error.actualType is TvmCellDataCoins && error.labelType is TvmMsgAddrLabel
                 },
                 { test ->
                     val param = test.usedParameters.lastOrNull() as? TvmTestSliceValue
@@ -360,8 +367,9 @@ class InputParameterInfoTests {
         propertiesFound(
             tests,
             listOf { test ->
-                val exit = test.result as? TvmExecutionWithReadingOfUnexpectedType ?: return@listOf false
-                exit.actualType is TvmCellDataCoins && exit.labelType is TvmMaybeRefLabel
+                val exit = test.result as? TvmExecutionWithStructuralError ?: return@listOf false
+                val error = exit.exit as? TvmReadingOfUnexpectedType ?: return@listOf false
+                error.actualType is TvmCellDataCoins && error.labelType is TvmMaybeRefLabel
             }
         )
     }
@@ -382,9 +390,10 @@ class InputParameterInfoTests {
         propertiesFound(
             tests,
             listOf { test ->
-                val exit = test.result as? TvmExecutionWithReadingOfUnexpectedType ?: return@listOf false
-                val expectedType = exit.labelType
-                exit.actualType is TvmCellDataInteger && exit.actualType.bitSize == 64 &&
+                val exit = test.result as? TvmExecutionWithStructuralError ?: return@listOf false
+                val error = exit.exit as? TvmReadingOfUnexpectedType ?: return@listOf false
+                val expectedType = error.labelType
+                error.actualType is TvmCellDataInteger && error.actualType.bitSize == 64 &&
                         expectedType is TvmIntegerLabel && expectedType.bitSize == 32
             }
         )
@@ -459,9 +468,10 @@ class InputParameterInfoTests {
         propertiesFound(
             tests,
             listOf { test ->
-                val exit = test.result as? TvmExecutionWithReadingOfUnexpectedType ?: return@listOf false
-                val expectedType = exit.labelType
-                exit.actualType is TvmCellDataInteger && exit.actualType.bitSize == 32 &&
+                val exit = test.result as? TvmExecutionWithStructuralError ?: return@listOf false
+                val error = exit.exit as? TvmReadingOfUnexpectedType ?: return@listOf false
+                val expectedType = error.labelType
+                error.actualType is TvmCellDataInteger && error.actualType.bitSize == 32 &&
                         expectedType is TvmIntegerLabel && expectedType.bitSize == 16
             }
         )

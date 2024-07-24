@@ -1,10 +1,10 @@
 package org.usvm.machine.state
 
 import kotlinx.serialization.Serializable
-import org.ton.TvmBuiltinDataCellLabel
 import org.usvm.UBv32Sort
 import org.usvm.UExpr
 import org.usvm.machine.state.TvmMethodResult.*
+import org.usvm.machine.types.TvmStructuralExit
 import org.usvm.machine.types.TvmSymbolicCellDataType
 
 /**
@@ -44,10 +44,10 @@ sealed interface TvmMethodResult {
         val ruleName: String
     }
 
-    @Serializable
-    sealed interface TvmStructuralError : TvmMethodResult {
-        val message: String
-    }
+    @JvmInline
+    value class TvmStructuralError(
+        val exit: TvmStructuralExit<TvmSymbolicCellDataType>,
+    ) : TvmMethodResult
 }
 
 object TvmNormalExit : TvmSuccessfulExit {
@@ -155,7 +155,7 @@ data class TvmUnknownFailure(override val exitCode: UInt): TvmErrorExit {
 }
 
 // TODO add remaining
-
+/*
 data class TvmUnexpectedReading(
     val readingType: TvmSymbolicCellDataType,
 ) : TvmStructuralError {
@@ -187,3 +187,4 @@ data class TvmReadingOfUnexpectedType(
     override val message: String =
         "Reading of unexpected type: expected reading of $labelType, but read $actualType"
 }
+*/

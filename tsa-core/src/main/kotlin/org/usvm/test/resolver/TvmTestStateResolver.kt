@@ -5,7 +5,6 @@ import io.ksmt.utils.BvUtils.toBigIntegerSigned
 import kotlinx.collections.immutable.persistentListOf
 import org.ton.bytecode.TvmCodeBlock
 import org.ton.bytecode.TvmInst
-import org.usvm.machine.types.TvmType
 import org.usvm.NULL_ADDRESS
 import org.usvm.UAddressSort
 import org.usvm.UConcreteHeapAddress
@@ -18,33 +17,34 @@ import org.usvm.isTrue
 import org.usvm.machine.TvmContext
 import org.usvm.machine.TvmSizeSort
 import org.usvm.machine.intValue
-import org.usvm.machine.state.TvmMethodResult
-import org.usvm.machine.types.TvmSymbolicCellMaybeConstructorBit
-import org.usvm.machine.types.TvmSymbolicCellDataInteger
-import org.usvm.machine.types.TvmSymbolicCellDataType
-import org.usvm.machine.types.TvmDataCellLoadedTypeInfo
 import org.usvm.machine.state.TvmCellRefsRegionValueInfo
-import org.usvm.machine.state.TvmReadingOfUnexpectedType
-import org.usvm.machine.state.TvmReadingOutOfSwitchBounds
+import org.usvm.machine.state.TvmMethodResult
 import org.usvm.machine.state.TvmRefsMemoryRegion
 import org.usvm.machine.state.TvmStack
 import org.usvm.machine.state.TvmStack.TvmStackTupleValue
 import org.usvm.machine.state.TvmStack.TvmStackTupleValueConcreteNew
 import org.usvm.machine.state.TvmState
-import org.usvm.machine.state.TvmUnexpectedEndOfReading
-import org.usvm.machine.state.TvmUnexpectedReading
-import org.usvm.machine.state.TvmUnexpectedRefReading
-import org.usvm.machine.types.TvmSymbolicCellDataBitArray
 import org.usvm.machine.state.calcConsumedGas
 import org.usvm.machine.state.ensureSymbolicBuilderInitialized
 import org.usvm.machine.state.ensureSymbolicCellInitialized
 import org.usvm.machine.state.ensureSymbolicSliceInitialized
 import org.usvm.machine.state.lastStmt
 import org.usvm.machine.state.tvmCellRefsRegion
+import org.usvm.machine.types.TvmDataCellLoadedTypeInfo
 import org.usvm.machine.types.TvmDataCellType
 import org.usvm.machine.types.TvmDictCellType
+import org.usvm.machine.types.TvmReadingOfUnexpectedType
+import org.usvm.machine.types.TvmReadingOutOfSwitchBounds
+import org.usvm.machine.types.TvmSymbolicCellDataBitArray
 import org.usvm.machine.types.TvmSymbolicCellDataCoins
+import org.usvm.machine.types.TvmSymbolicCellDataInteger
 import org.usvm.machine.types.TvmSymbolicCellDataMsgAddr
+import org.usvm.machine.types.TvmSymbolicCellDataType
+import org.usvm.machine.types.TvmSymbolicCellMaybeConstructorBit
+import org.usvm.machine.types.TvmType
+import org.usvm.machine.types.TvmUnexpectedEndOfReading
+import org.usvm.machine.types.TvmUnexpectedDataReading
+import org.usvm.machine.types.TvmUnexpectedRefReading
 import org.usvm.machine.types.getPossibleTypes
 import org.usvm.memory.UMemory
 import org.usvm.model.UModelBase
@@ -85,23 +85,21 @@ class TvmTestStateResolver(
         lastStmt: TvmInst,
         stack: List<TvmTestValue>,
         exit: TvmMethodResult.TvmStructuralError,
-    ): TvmExecutionWithStructuralError =
-        when (exit) {
-            is TvmUnexpectedReading -> TvmExecutionWithUnexpectedReading(
-                resolveCellDataType(exit.readingType),
-                lastStmt,
-                stack,
+    ): TvmExecutionWithStructuralError {
+        val resolvedExit = when (exit.exit) {
+            is TvmUnexpectedDataReading -> TvmUnexpectedDataReading(
+                resolveCellDataType(exit.exit.readingType),
             )
-            is TvmReadingOfUnexpectedType -> TvmExecutionWithReadingOfUnexpectedType(
-                labelType = exit.labelType,
-                actualType = resolveCellDataType(exit.actualType),
-                lastStmt,
-                stack
+            is TvmReadingOfUnexpectedType -> TvmReadingOfUnexpectedType(
+                labelType = exit.exit.labelType,
+                actualType = resolveCellDataType(exit.exit.actualType),
             )
-            is TvmUnexpectedEndOfReading -> TvmExecutionWithUnexpectedEndOfReading(lastStmt, stack)
-            is TvmUnexpectedRefReading -> TvmExecutionWithUnexpectedRefReading(lastStmt, stack)
+            is TvmUnexpectedEndOfReading -> TvmUnexpectedEndOfReading()
+            is TvmUnexpectedRefReading -> TvmUnexpectedRefReading()
             is TvmReadingOutOfSwitchBounds -> TODO()
         }
+        return TvmExecutionWithStructuralError(lastStmt, stack, resolvedExit)
+    }
 
     fun resolveGasUsage(): Int = model.eval(state.calcConsumedGas()).intValue()
 

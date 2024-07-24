@@ -11,10 +11,8 @@ import org.usvm.api.readField
 import org.usvm.machine.TvmContext
 import org.usvm.machine.TvmContext.Companion.sliceCellField
 import org.usvm.machine.state.TvmMethodResult.TvmStructuralError
-import org.usvm.machine.state.TvmReadingOfUnexpectedType
 import org.usvm.machine.state.TvmStack
 import org.usvm.machine.state.TvmState
-import org.usvm.machine.state.TvmUnexpectedReading
 import org.usvm.machine.state.generateSymbolicCell
 import org.usvm.machine.state.generateSymbolicSlice
 import org.usvm.machine.state.loadDataBitsFromCellWithoutChecks
@@ -89,7 +87,7 @@ class TvmDataCellInfoStorage private constructor(
                     // we want to throw TvmUnexpectedReading only from the root tree
                     if (rootTree) {
                         // TvmUnexpectedReading, if loaded more than 0 bits
-                        val error = TvmUnexpectedReading(loadData.type)
+                        val error = TvmStructuralError(TvmUnexpectedDataReading(loadData.type))
                         val oldValue = result.getOrDefault(error, falseExpr)
                         val conflict = mkSizeGtExpr(loadData.type.sizeBits, zeroSizeExpr)
                         result[error] =
@@ -118,9 +116,11 @@ class TvmDataCellInfoStorage private constructor(
                     }
 
                     // conflict, if types are not consistent
-                    val error = TvmReadingOfUnexpectedType(
-                        labelType = struct.typeOfPrefix,
-                        actualType = loadData.type
+                    val error = TvmStructuralError(
+                            TvmReadingOfUnexpectedType(
+                            labelType = struct.typeOfPrefix,
+                            actualType = loadData.type
+                        )
                     )
 
                     val oldValue = result.getOrDefault(error, falseExpr)

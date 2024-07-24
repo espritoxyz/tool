@@ -42,7 +42,8 @@ private fun TvmSymbolicTestSuite.toSarifResult(methodsMapping: Map<BigInteger, S
                 resolveRuleId(methodFailure.failure) to methodFailure.failure.toString()
             }
             is TvmExecutionWithStructuralError -> {
-                "dummy-rule-id" to "dummy-msg"
+                val exit = (it.result as TvmExecutionWithStructuralError).exit
+                exit.ruleId to exit.toString()
             }
             is TvmSuccessfulExecution -> {
                 return@mapNotNull null
