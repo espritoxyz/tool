@@ -9,6 +9,7 @@ import org.ton.TvmDataCellStructure.LoadRef
 import org.ton.TvmDataCellStructure.SwitchPrefix
 import org.ton.TvmDataCellStructure.Unknown
 import org.ton.TvmIntegerLabel
+import org.ton.TvmMsgAddrLabel
 import org.ton.TvmParameterInfo.DataCellInfo
 
 class TvmTlbTransformer(
@@ -31,8 +32,14 @@ class TvmTlbTransformer(
     ): TvmDataCellStructure = transformed.getOrPut(def to args) {
         if (def.isBuiltin) return transformBuiltins(def, args, next)
 
-        return transformComplexType(def, args, next)
+        return when (def.name) {
+            "MsgAddress" -> transformMsgAddr(next)
+            else -> transformComplexType(def, args, next)
+        }
     }
+
+    private fun transformMsgAddr(next: TvmDataCellStructure): TvmDataCellStructure =
+        KnownTypePrefix(TvmMsgAddrLabel, next)
 
     private fun transformBuiltins(
         def: TvmTlbTypeDefinition,

@@ -1,0 +1,15 @@
+#include "../stdlib.fc";
+
+
+() recv_internal(int msg_value, cell in_msg_cell, slice in_msg) impure {
+    var addr = in_msg~load_msg_addr();
+    int a = in_msg~load_int(32);
+    int b = in_msg~load_int(32);
+
+    var msg = begin_cell()
+        .store_int(a, 32)
+        .store_int(b, 32)
+        .end_cell();
+
+    msg~impure_touch();
+}
