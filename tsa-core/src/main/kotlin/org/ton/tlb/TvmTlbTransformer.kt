@@ -1,6 +1,7 @@
 package org.ton.tlb
 
 import org.ton.Endian.BigEndian
+import org.ton.TvmCompositeDataCellLabel
 import org.ton.TvmDataCellLabel
 import org.ton.TvmDataCellStructure
 import org.ton.TvmDataCellStructure.Empty
@@ -9,14 +10,16 @@ import org.ton.TvmDataCellStructure.LoadRef
 import org.ton.TvmDataCellStructure.SwitchPrefix
 import org.ton.TvmDataCellStructure.Unknown
 import org.ton.TvmIntegerLabel
+import org.ton.TvmMaybeRefLabel
 import org.ton.TvmMsgAddrLabel
+import org.ton.TvmParameterInfo
 import org.ton.TvmParameterInfo.DataCellInfo
 
 class TvmTlbTransformer(
     definitions: List<TvmTlbTypeDefinition>
 ) {
     private val typeDefinitions = definitions.associateBy { it.id }
-    private val transformed = hashMapOf<Pair<TvmTlbTypeDefinition, List<TvmTlbTypeExpr>>, TvmDataCellStructure>()
+    private val transformed = hashMapOf<Pair<TvmTlbTypeDefinition, List<TvmTlbTypeExpr>>, TvmDataCellLabel>()
 
     fun transform(
         def: TvmTlbTypeDefinition,
@@ -29,27 +32,26 @@ class TvmTlbTransformer(
         def: TvmTlbTypeDefinition,
         args: List<TvmTlbTypeExpr>,
         next: TvmDataCellStructure,
-    ): TvmDataCellStructure = transformed.getOrPut(def to args) {
-        if (def.isBuiltin) return transformBuiltins(def, args, next)
-
-        return when (def.name) {
-            "MsgAddress" -> transformMsgAddr(next)
-            else -> transformComplexType(def, args, next)
+    ): TvmDataCellStructure {
+        val label = transformed.getOrPut(def to args) {
+            if (def.isBuiltin) {
+                transformBuiltins(def, args)
+                    ?: return Unknown
+            } else {
+                transformComplexType(def, args)
+            }
         }
+        return KnownTypePrefix(label, next)
     }
-
-    private fun transformMsgAddr(next: TvmDataCellStructure): TvmDataCellStructure =
-        KnownTypePrefix(TvmMsgAddrLabel, next)
 
     private fun transformBuiltins(
         def: TvmTlbTypeDefinition,
         args: List<TvmTlbTypeExpr>,
-        next: TvmDataCellStructure,
-    ): TvmDataCellStructure {
+    ): TvmDataCellLabel? {
         val name = def.name
 
         // TODO check `isSigned` and `endian` fields
-        val label: TvmDataCellLabel = when {
+        return when {
             name == "#" -> TvmIntegerLabel(bitSize = 32, isSigned = false, endian = BigEndian)
             name == "##" -> TvmIntegerLabel(bitSize = args.toIntConst(), isSigned = true, endian = BigEndian)
             name == "bits" -> TODO()
@@ -64,22 +66,28 @@ class TvmTlbTransformer(
                 val bits = name.removePrefix("uint").toInt()
                 TvmIntegerLabel(bitSize = bits, isSigned = false, endian = BigEndian)
             }
-            name == "Cell" || name == "Any" -> return Unknown
+            name == "Cell" || name == "Any" -> return null
             else -> TODO()
         }
-
-        return KnownTypePrefix(label, next)
     }
 
     private fun transformComplexType(
         def: TvmTlbTypeDefinition,
         args: List<TvmTlbTypeExpr>,
-        next: TvmDataCellStructure,
-    ): TvmDataCellStructure {
+    ): TvmDataCellLabel {
         // special cases
         when (def.name) {
-            "Maybe" -> TODO()
-            "Either" -> TODO()
+            "Maybe" -> {
+                require(args.size == 1)
+                val internal = transformSequenceOfExprs(args)
+                return TvmMaybeRefLabel(DataCellInfo(internal))
+            }
+            "Either" -> {
+                TODO()
+            }
+            "MsgAddress" -> {
+                return TvmMsgAddrLabel
+            }
         }
 
         if (args.isNotEmpty()) {
@@ -87,25 +95,19 @@ class TvmTlbTransformer(
         }
 
         // TODO use this
-//        return TvmCompositeDataCellLabel(
-//            name = def.name,
-//            innerStructure = transformConstructors(
-//                constructors = def.constructors.map { ConstructorTagSuffix(it, it.tag) },
-//                next = next,
-//            )
-//        )
-        return transformConstructors(
-            constructors = def.constructors.map { ConstructorTagSuffix(it, it.tag) },
-            next = next,
+        return TvmCompositeDataCellLabel(
+            name = def.name,
+            internalStructure = transformConstructors(
+                def.constructors.map { ConstructorTagSuffix(it, it.tag) }
+            )
         )
     }
 
     private fun transformConstructors(
         constructors: List<ConstructorTagSuffix>,
-        next: TvmDataCellStructure,
     ): TvmDataCellStructure {
         if (constructors.size == 1 && constructors.single().tagSuffix.isEmpty()) {
-            return transformConstructor(constructors.single().constructor, next)
+            return transformConstructor(constructors.single().constructor)
         }
 
         val minLen = constructors.minOf { it.tagSuffix.length }
@@ -118,7 +120,7 @@ class TvmTlbTransformer(
             groupedConstructors.getOrPut(prefix) { mutableListOf() }.add(constructor)
         }
 
-        val variants = groupedConstructors.mapValues { transformConstructors(it.value, next) }
+        val variants = groupedConstructors.mapValues { transformConstructors(it.value) }
 
         return SwitchPrefix(
             minLen,
@@ -126,16 +128,14 @@ class TvmTlbTransformer(
         )
     }
 
-    private fun transformConstructor(
-        constructor: TvmTlbTypeConstructor,
-        next: TvmDataCellStructure,
+    private fun transformSequenceOfExprs(
+        sequence: List<TvmTlbTypeExpr>,
     ): TvmDataCellStructure {
-        var last: TvmDataCellStructure = next
-
-        constructor.fields.reversed().forEach { field ->
-            last = when (val typeExpr = field.typeExpr) {
+        var last: TvmDataCellStructure = Empty
+        sequence.reversed().forEach { expr ->
+            last = when (expr) {
                 is TvmTlbReference -> {
-                    val ref = typeExpr.ref
+                    val ref = expr.ref
                     require(ref is TvmTlbType) {
                         "Unexpected reference: $ref"
                     }
@@ -146,9 +146,9 @@ class TvmTlbTransformer(
                 }
 
                 is TvmTlbType -> {
-                    val typeDef = getTypeDef(typeExpr.id)
+                    val typeDef = getTypeDef(expr.id)
 
-                    transformTypeDefinition(typeDef, typeExpr.args, last)
+                    transformTypeDefinition(typeDef, expr.args, last)
                 }
 
                 else -> TODO()
@@ -156,6 +156,13 @@ class TvmTlbTransformer(
         }
 
         return last
+    }
+
+    private fun transformConstructor(
+        constructor: TvmTlbTypeConstructor
+    ): TvmDataCellStructure {
+        val exprs = constructor.fields.map { it.typeExpr }
+        return transformSequenceOfExprs(exprs)
     }
 
     private data class ConstructorTagSuffix(
