@@ -9,8 +9,10 @@ import org.usvm.machine.TvmContext
 import org.usvm.machine.TvmStepScope
 import org.usvm.machine.state.consumeDefaultGas
 import org.usvm.machine.state.consumeGas
+import org.usvm.machine.state.getGlobalVariable
 import org.usvm.machine.state.newStmt
 import org.usvm.machine.state.nextStmt
+import org.usvm.machine.state.setGlobalVariable
 import org.usvm.machine.state.takeLastIntOrNull
 import org.usvm.machine.state.toStackEntry
 import org.usvm.utils.intValueOrNull
@@ -22,8 +24,13 @@ class TvmGlobalsInterpreter(private val ctx: TvmContext) {
             is TvmAppGlobalGetglobInst -> {
                 scope.consumeDefaultGas(stmt)
 
+                val index = stmt.k
+                require(index in 1..31) {
+                    "Unexpected global variable with index $index"
+                }
+
                 scope.doWithState {
-                    val value = registers.c7[stmt.k, stack]
+                    val value = getGlobalVariable(index, stack)
                     stack.addStackEntry(value.toStackEntry())
                 }
             }
@@ -33,7 +40,7 @@ class TvmGlobalsInterpreter(private val ctx: TvmContext) {
                 scope.doWithState {
                     val index = stack.takeLastIntOrNull()?.intValueOrNull
                         ?: TODO("Get global variable with symbolic index")
-                    val value = registers.c7[index, stack]
+                    val value = getGlobalVariable(index, stack)
                     stack.addStackEntry(value.toStackEntry())
                 }
             }
@@ -41,10 +48,15 @@ class TvmGlobalsInterpreter(private val ctx: TvmContext) {
                 // TODO complex gas 26 + |c7|
                 scope.doWithState { consumeGas(26) }
 
+                val index = stmt.k
+                require(index in 1..31) {
+                    "Unexpected global variable with index $index"
+                }
+
                 scope.doWithState {
                     val value = stack.takeLastEntry()
 
-                    registers.c7[stmt.k] = value
+                    setGlobalVariable(index, value)
                 }
             }
             is TvmAppGlobalSetglobvarInst -> {
@@ -56,7 +68,7 @@ class TvmGlobalsInterpreter(private val ctx: TvmContext) {
                         ?: TODO("Set global variable with symbolic index")
                     val value = stack.takeLastEntry()
 
-                    registers.c7[index] = value
+                    setGlobalVariable(index, value)
                 }
             }
         }
