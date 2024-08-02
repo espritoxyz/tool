@@ -5,11 +5,12 @@ import org.ton.examples.compileAndAnalyzeFift
 import org.ton.examples.runFiftMethod
 import org.usvm.machine.TvmComponents
 import org.usvm.machine.TvmContext
+import org.usvm.machine.TvmOptions
 import kotlin.io.path.Path
 import kotlin.test.Test
 
 class TupleTest {
-    private val ctx = TvmContext(TvmComponents())
+    private val ctx = TvmContext(TvmOptions(), TvmComponents())
 
     private val tupleSuccessFiftPath: String = "/tuple/TupleSuccess.fif"
     private val tupleFailureFiftPath: String = "/tuple/TupleFailure.fif"

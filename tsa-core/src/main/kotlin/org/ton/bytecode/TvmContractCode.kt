@@ -32,7 +32,6 @@ interface TvmContractCode {
                 }
 
                 registerTvmInstSerializer()
-                registerTvmArtificialLoadAddrInstSerializer()
 
                 contextual(BigInteger::class, BigIntSerializer)
             }

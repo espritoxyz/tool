@@ -267,6 +267,9 @@ import org.usvm.machine.state.allocEmptyCell
 import org.usvm.machine.state.allocSliceFromCell
 import org.usvm.machine.state.allocateCell
 import org.usvm.machine.state.bitsToBv
+import org.usvm.machine.state.checkOutOfRange
+import org.usvm.machine.state.checkOverflow
+import org.usvm.machine.state.checkUnderflow
 import org.usvm.machine.state.defineC0
 import org.usvm.machine.state.defineC1
 import org.usvm.machine.state.defineC2
@@ -311,6 +314,7 @@ class TvmInterpreter(
     private val cryptoInterpreter = TvmCryptoInterpreter(ctx)
     private val gasInterpreter = TvmGasInterpreter(ctx)
     private val globalsInterpreter = TvmGlobalsInterpreter(ctx)
+    private val transactionInterpreter = TvmTransactionInterpreter(ctx)
 
     fun getInitialState(contractCode: TvmContractCode, contractData: Cell, methodId: BigInteger, targets: List<TvmTarget> = emptyList()): TvmState {
         /*val contract = contractCode.methods[0]!!
@@ -849,21 +853,6 @@ class TvmInterpreter(
             }
         }
     }
-
-    private fun checkOverflow(noOverflowExpr: UBoolExpr, scope: TvmStepScope): Unit? = scope.fork(
-        noOverflowExpr,
-        blockOnFalseState = ctx.throwIntegerOverflowError
-    )
-
-    private fun checkUnderflow(noUnderflowExpr: UBoolExpr, scope: TvmStepScope): Unit? = scope.fork(
-        noUnderflowExpr,
-        blockOnFalseState = ctx.throwIntegerOverflowError
-    )
-
-    private fun checkOutOfRange(notOutOfRangeExpr: UBoolExpr, scope: TvmStepScope): Unit? = scope.fork(
-        condition = notOutOfRangeExpr,
-        blockOnFalseState = ctx.throwIntegerOutOfRangeError
-    )
 
     private fun visitArithmeticLogicalInst(scope: TvmStepScope, stmt: TvmArithmLogicalInst): Unit = with(ctx) {
         val result: UExpr<TvmInt257Sort> = when (stmt) {

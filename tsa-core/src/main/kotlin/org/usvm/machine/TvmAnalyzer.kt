@@ -365,7 +365,8 @@ fun analyzeAllMethods(
     contractDataHex: String? = null
 ): TvmContractSymbolicTestResult {
     val contractData = Cell.Companion.of(contractDataHex ?: DEFAULT_CONTRACT_DATA_HEX)
-    val machine = TvmMachine()
+    val tvmOptions = TvmOptions(enableVarAddress = false)
+    val machine = TvmMachine(tvmOptions = tvmOptions)
     val methodsExceptDictPushConst = contract.methods.filterKeys { it.toInt() !in methodsBlackList }
     val methodStates = methodsExceptDictPushConst.values.associateWith { method ->
         runCatching {

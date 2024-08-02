@@ -1,7 +1,10 @@
 package org.ton.examples.contracts
 
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable
 import org.ton.examples.checkAtLeastOneStateForAllMethods
 import org.ton.examples.funcCompileAndAnalyzeAllMethods
+import org.ton.examples.runHardTestsRegex
+import org.ton.examples.runHardTestsVar
 import kotlin.io.path.Path
 import kotlin.test.Ignore
 import kotlin.test.Test
@@ -41,6 +44,7 @@ class ContractsTest {
         analyzeContract(walletV5Path, methodsNumber = 7)
     }
 
+    @EnabledIfEnvironmentVariable(named = runHardTestsVar, matches = runHardTestsRegex)
     @Test
     fun nftItem() {
         analyzeContract(nftItemPath, methodsNumber = 15)
@@ -86,6 +90,7 @@ class ContractsTest {
         analyzeContract(bridgeVotesCollectorPath, methodsNumber = 5)
     }
 
+    @EnabledIfEnvironmentVariable(named = runHardTestsVar, matches = runHardTestsRegex)
     @Test
     fun nominatorPool() {
         analyzeContract(nominatorPoolPath, methodsNumber = 10)

@@ -153,7 +153,8 @@ private fun TvmState.initContractInfo(): TvmStackTupleValue = with(ctx) {
 private fun TvmState.initConfigRoot(): UHeapRef = with(ctx) {
     val configDict = memory.allocConcrete(TvmDictCellType)
 
-    val hexAddressBits = ADDRESS_BITS.toInt() / 4
+    val hexAddressBits = ADDRESS_BITS / 4
+    val addressBits = ADDRESS_BITS.toUInt()
     val tagBits = 8u
     val uint16Bits = 16u
     val uint32Bits = 32u
@@ -166,13 +167,13 @@ private fun TvmState.initConfigRoot(): UHeapRef = with(ctx) {
     /**
      * Index: 0
      */
-    val configAddr = mkBvHex("5".repeat(hexAddressBits), ADDRESS_BITS)
+    val configAddr = mkBvHex("5".repeat(hexAddressBits), addressBits)
     setConfigParam(configDict, 0, allocCellFromData(configAddr))
 
     /**
      * Index: 1
      */
-    val electorAddr = mkBvHex("3".repeat(hexAddressBits), ADDRESS_BITS)
+    val electorAddr = mkBvHex("3".repeat(hexAddressBits), addressBits)
     setConfigParam(configDict, 1, allocCellFromData(electorAddr))
 
     /**
@@ -287,11 +288,11 @@ private fun TvmState.initConfigRoot(): UHeapRef = with(ctx) {
      * Index: 71
      */
     val ethereumBridge = allocCellFromFields(
-        mkBvHex("dd24c4a1f2b88f8b7053513b5cc6c5a31bc44b2a72dcb4d8c0338af0f0d37ec5", ADDRESS_BITS),  // bridge_addr
-        mkBvHex("3b9bbfd0ad5338b9700f0833380ee17d463e51c1ae671ee6f08901bde899b202", ADDRESS_BITS),  // oracle_multisig_address
+        mkBvHex("dd24c4a1f2b88f8b7053513b5cc6c5a31bc44b2a72dcb4d8c0338af0f0d37ec5", addressBits), // bridge_addr
+        mkBvHex("3b9bbfd0ad5338b9700f0833380ee17d463e51c1ae671ee6f08901bde899b202", addressBits), // oracle_multisig_address
         // TODO real dict
         mkBv(0, sizeBits = 1u),                                                                     // oracles
-        mkBvHex("000000000000000000000000582d872a1b094fc48f5de31d3b73f2d9be47def1", ADDRESS_BITS),  // external_chain_address
+        mkBvHex("000000000000000000000000582d872a1b094fc48f5de31d3b73f2d9be47def1", addressBits), // external_chain_address
     )
     setConfigParam(configDict, 71, ethereumBridge)
 

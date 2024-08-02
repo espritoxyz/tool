@@ -187,7 +187,7 @@ private fun TvmStepScope.doQuitJump(cont: TvmQuitContinuation) = doWithState {
         else -> error("Unexpected exit code ${cont.exitCode}")
     }
 
-
+    commitedState = TvmCommitedState(registers.c4, registers.c5)
     methodResult = TvmMethodResult.TvmSuccess(exit, stack)
 }
 

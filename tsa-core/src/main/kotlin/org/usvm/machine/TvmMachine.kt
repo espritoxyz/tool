@@ -21,13 +21,16 @@ import org.usvm.stopstrategies.StepLimitStopStrategy
 import org.usvm.stopstrategies.StopStrategy
 import java.math.BigInteger
 
-class TvmMachine(private val options: UMachineOptions = defaultOptions) : UMachine<TvmState>() {
+class TvmMachine(
+    private val options: UMachineOptions = defaultOptions,
+    tvmOptions: TvmOptions = TvmOptions(),
+) : UMachine<TvmState>() {
     override fun close() {
         // Do nothing
     }
 
     private val components = TvmComponents()
-    private val ctx = TvmContext(components)
+    private val ctx = TvmContext(tvmOptions, components)
 
     fun analyze(contractCode: TvmContractCode, contractData: Cell, methodId: BigInteger): List<TvmState> {
         val interpreter = TvmInterpreter(ctx, contractCode, typeSystem = components.typeSystem)
