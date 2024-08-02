@@ -10,8 +10,8 @@ private val instructionsListPath = Path("tvm-disasm/dist/tvm-spec/cp0.json")
 private val generatedInstPath = Path("tsa-core/src/main/kotlin/org/ton/bytecode/TvmInstructions.kt")
 
 private val instructionOperandType = mapOf(
-    "PUSHCONT_SHORT" to mapOf("s" to "TvmInstList"),
-    "PUSHCONT" to mapOf("s" to "TvmInstList"),
+    "PUSHCONT_SHORT" to mapOf("c" to "TvmInstList"),
+    "PUSHCONT" to mapOf("c" to "TvmInstList"),
     "PUSHREFCONT" to mapOf("c" to "TvmInstList"),
     "IFREF" to mapOf("c" to "TvmInstList"),
     "IFNOTREF" to mapOf("c" to "TvmInstList"),
@@ -171,6 +171,7 @@ private fun tvmInstDeclaration(inst: InstructionDescription): String {
 
     arguments += "|    override val location: TvmInstLocation,"
 
+    var contArgsCount = 0
     for (arg in inst.bytecode.operands.orEmpty()) {
         var type = instructionOperandType[inst.mnemonic]?.get(arg.name)
         if (type == null) {
@@ -182,12 +183,20 @@ private fun tvmInstDeclaration(inst: InstructionDescription): String {
 
         if (type == null) continue
 
-        arguments += "|    val ${arg.name}: ${type}, // ${arg.loader}"
+        val modifier = if (type == "TvmInstList") {
+            contArgsCount++
+            "override "
+        } else {
+            ""
+        }
+
+        arguments += "|    ${modifier}val ${arg.name}: ${type}, // ${arg.loader}"
     }
 
-    val additionalInterfaces = ", TvmRefOperandLoader".takeIf {
+    var additionalInterfaces = ", TvmRefOperandLoader".takeIf {
         inst.bytecode.operands.orEmpty().any { it.loader == "ref" }
     } ?: ""
+    additionalInterfaces += ", TvmContOperand${contArgsCount}Inst".takeIf { contArgsCount > 0 } ?: ""
 
     val docs = normalizeDocString(inst.doc.description).joinToString("\n") { "| * $it" }
 

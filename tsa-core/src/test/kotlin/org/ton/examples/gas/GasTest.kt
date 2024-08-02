@@ -30,7 +30,7 @@ class GasTest {
 
         val symbolicResult = analyzeAllMethods(contract)
 
-        for ((methodId, tests) in symbolicResult) {
+        for ((methodId, _, tests) in symbolicResult) {
             val methodIdInt = methodId.toInt()
             val concreteResult = concreteResults.getOrNull(methodIdInt) ?: continue
             val test = tests.single()

@@ -1,0 +1,21 @@
+#include "stdlib.fc";
+
+cont get_c0() asm "c0 PUSH";
+() set_c2(cont c) impure asm "c2 POP";
+
+int main() impure method_id (0) {
+    var return_cont = get_c0();
+
+    try {
+        set_c2(return_cont);
+
+        ;; program termination with exit code 0
+        throw(5);
+    } catch (x, n) {
+        ;; does not execute
+        return 1;
+    }
+
+    ;; does not execute
+    return 10;
+}

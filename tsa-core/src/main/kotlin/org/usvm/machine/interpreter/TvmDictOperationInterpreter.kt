@@ -400,7 +400,8 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
             return
         }
 
-        val dictCellRef = loadDict(scope)
+        // this instruction can be used to store data cells, not just dict cells
+        val dictCellRef = loadDict(scope, assertType = false)
 
         val resultBuilder = scope.calcOnStateCtx { memory.allocConcrete(TvmBuilderType) }
         scope.doWithStateCtx { builderCopy(builder, resultBuilder) }
@@ -831,13 +832,17 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
 
     // todo: dict is slice?
     // todo: verify key length
-    private fun loadDict(scope: TvmStepScope): UHeapRef? =
+    private fun loadDict(scope: TvmStepScope, assertType: Boolean = true): UHeapRef? =
         scope.calcOnState {
             if (stack.lastIsNull()) {
                 stack.pop(0)
                 null
             } else {
-                takeLastCell()?.also { assertType(it, TvmDictCellType) }
+                takeLastCell()?.also {
+                    if (assertType) {
+                        assertType(it, TvmDictCellType)
+                    }
+                }
             }
         }
 

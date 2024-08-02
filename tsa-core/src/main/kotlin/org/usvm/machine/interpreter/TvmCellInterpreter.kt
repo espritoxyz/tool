@@ -23,6 +23,7 @@ import org.ton.bytecode.TvmCellBuildStslicerInst
 import org.ton.bytecode.TvmCellBuildStslicerqInst
 import org.ton.bytecode.TvmCellBuildStuInst
 import org.ton.bytecode.TvmCellBuildStuxInst
+import org.ton.bytecode.TvmCellParseCdepthInst
 import org.ton.bytecode.TvmCellParseCtosInst
 import org.ton.bytecode.TvmCellParseEndsInst
 import org.ton.bytecode.TvmCellParseInst
@@ -85,9 +86,9 @@ import org.ton.bytecode.TvmCellParseSskiplastInst
 import org.ton.bytecode.TvmCellParseXctosInst
 import org.ton.bytecode.TvmInst
 import org.ton.bytecode.TvmSubSliceSerializedLoader
-import org.usvm.UBoolExpr
 import org.usvm.UExpr
 import org.usvm.UHeapRef
+import org.usvm.api.makeSymbolicPrimitive
 import org.usvm.api.readField
 import org.usvm.api.writeField
 import org.usvm.machine.TvmContext
@@ -117,6 +118,7 @@ import org.usvm.machine.state.builderStoreSlice
 import org.usvm.machine.state.checkCellDataUnderflow
 import org.usvm.machine.state.checkCellOverflow
 import org.usvm.machine.state.checkCellRefsUnderflow
+import org.usvm.machine.state.checkOutOfRange
 import org.usvm.machine.state.consumeDefaultGas
 import org.usvm.machine.state.consumeGas
 import org.usvm.machine.state.doPop
@@ -242,6 +244,7 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
             is TvmCellParseSdbeginsxqInst -> {
                 visitBeginsXInst(scope, stmt, quiet = true)
             }
+            is TvmCellParseCdepthInst -> visitCellDepthInst(scope, stmt)
             is TvmAliasInst -> visitCellParseInst(scope, stmt.resolveAlias() as TvmCellParseInst)
             else -> TODO("Unknown stmt: $stmt")
         }
@@ -321,11 +324,6 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
             else -> TODO("$stmt")
         }
     }
-
-    private fun checkOutOfRange(notOutOfRangeExpr: UBoolExpr, scope: TvmStepScope): Unit? = scope.fork(
-        condition = notOutOfRangeExpr,
-        blockOnFalseState = ctx.throwIntegerOutOfRangeError
-    )
 
     private fun visitLoadRefInst(scope: TvmStepScope, stmt: TvmCellParseLdrefInst) {
         scope.consumeDefaultGas(stmt)
@@ -942,6 +940,31 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
 
             stack.addInt(sizeBits.signedExtendToInteger())
             stack.addInt(sizeRefs.signedExtendToInteger())
+            newStmt(stmt.nextStmt())
+        }
+    }
+
+    private fun visitCellDepthInst(scope: TvmStepScope, stmt: TvmCellParseCdepthInst) {
+        scope.consumeDefaultGas(stmt)
+
+        val cell = scope.takeLastCell()
+
+        scope.doWithStateCtx {
+            val result = if (cell != null) {
+                // TODO make correct implementation
+                makeSymbolicPrimitive(int257sort).also { cellDepth ->
+                    scope.assert(
+                        mkBvSignedLessOrEqualExpr(zeroValue, cellDepth),
+                        unsatBlock = {
+                            error("Cannot make the cell depth not negative")
+                        }
+                    )
+                }
+            } else {
+                zeroValue
+            }
+
+            stack.addInt(result)
             newStmt(stmt.nextStmt())
         }
     }

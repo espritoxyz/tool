@@ -4,6 +4,7 @@ import com.github.snksoft.crc.CRC
 import com.intellij.openapi.project.Project
 import org.ton.intellij.func.psi.FuncFunction
 import org.ton.intellij.func.psi.FuncPsiFactory
+import org.usvm.machine.MethodId
 import java.math.BigInteger
 import java.nio.file.Path
 import java.util.concurrent.atomic.AtomicInteger
@@ -12,7 +13,7 @@ import kotlin.io.path.name
 fun makeMethodsMapping(
     funcSourcesPath: Path,
     project: Project,
-    mapping: MutableMap<BigInteger, FuncFunction>,
+    mapping: MutableMap<MethodId, FuncFunction>,
     counter: AtomicInteger,
     visitedSources: MutableSet<Path>
 ) {
@@ -34,7 +35,7 @@ fun makeMethodsMapping(
     functions.associateByTo(mapping) { getMethodId(it, counter) }
 }
 
-fun getMethodId(funcFunction: FuncFunction, counter: AtomicInteger): BigInteger {
+fun getMethodId(funcFunction: FuncFunction, counter: AtomicInteger): MethodId {
     val methodIdDefinition = funcFunction.methodIdDefinition
     val name = funcFunction.name!!
     if (methodIdDefinition != null) {

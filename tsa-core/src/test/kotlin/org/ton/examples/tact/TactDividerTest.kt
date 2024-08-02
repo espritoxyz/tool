@@ -2,6 +2,7 @@ package org.ton.examples.tact
 
 import org.ton.examples.tactCompileAndAnalyzeAllMethods
 import org.usvm.machine.state.TvmIntegerOverflowError
+import org.usvm.machine.toMethodId
 import org.usvm.test.resolver.TvmMethodFailure
 import kotlin.io.path.Path
 import kotlin.test.Test
@@ -18,8 +19,7 @@ class TactDividerTest {
         // TODO analyze only divide method 95202
         val symbolicResult = tactCompileAndAnalyzeAllMethods(
             resourcePath,
-            methodsBlackList = listOf(Int.MAX_VALUE, 0, 113617, 115390, 121275)
-                .mapTo(hashSetOf()) { it.toBigInteger() }
+            methodsBlackList = listOf(Int.MAX_VALUE, 0, 113617, 115390, 121275).map { it.toMethodId() }.toSet()
         )
 
         val allTests = symbolicResult.map { it.tests }.flatten()

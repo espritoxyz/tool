@@ -1,8 +1,12 @@
 package org.ton.examples.contracts
 
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable
 import org.ton.examples.checkAtLeastOneStateForAllMethods
 import org.ton.examples.funcCompileAndAnalyzeAllMethods
-import java.math.BigInteger
+import org.ton.examples.runHardTestsRegex
+import org.ton.examples.runHardTestsVar
+import org.usvm.machine.MethodId
+import org.usvm.machine.mainMethodId
 import kotlin.io.path.Path
 import kotlin.test.Ignore
 import kotlin.test.Test
@@ -42,6 +46,7 @@ class ContractsTest {
         analyzeContract(walletV5Path, methodsNumber = 7)
     }
 
+    @EnabledIfEnvironmentVariable(named = runHardTestsVar, matches = runHardTestsRegex)
     @Test
     fun nftItem() {
         analyzeContract(nftItemPath, methodsNumber = 15)
@@ -87,6 +92,7 @@ class ContractsTest {
         analyzeContract(bridgeVotesCollectorPath, methodsNumber = 5)
     }
 
+    @EnabledIfEnvironmentVariable(named = runHardTestsVar, matches = runHardTestsRegex)
     @Test
     fun nominatorPool() {
         analyzeContract(nominatorPoolPath, methodsNumber = 10)
@@ -125,7 +131,7 @@ class ContractsTest {
     private fun analyzeContract(
         contractPath: String,
         methodsNumber: Int,
-        methodsBlackList: Set<BigInteger> = setOf(Int.MAX_VALUE.toBigInteger())
+        methodsBlackList: Set<MethodId> = hashSetOf(mainMethodId),
     ) {
         val bytecodeResourcePath = this::class.java.getResource(contractPath)?.path?.let { Path(it) }
             ?: error("Cannot find resource bytecode $contractPath")

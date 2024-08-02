@@ -11,7 +11,6 @@ import org.usvm.machine.state.C5Register
 import org.usvm.machine.state.C7Register
 
 
-// TODO savelist is not immutable, because of the mutable registers
 data class TvmRegisterSavelist(
     val c0: C0Register? = null,
     val c1: C1Register? = null,

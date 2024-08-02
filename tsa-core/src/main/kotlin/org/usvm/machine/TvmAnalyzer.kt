@@ -16,6 +16,8 @@ import java.math.BigInteger
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.util.concurrent.TimeUnit
+import org.usvm.machine.state.TvmState
+import org.usvm.test.resolver.TvmMethodCoverage
 import kotlin.io.path.ExperimentalPathApi
 import kotlin.io.path.absolutePathString
 import kotlin.io.path.copyTo
@@ -28,14 +30,15 @@ import kotlin.io.path.outputStream
 import kotlin.io.path.readBytes
 import kotlin.io.path.readText
 import kotlin.io.path.walk
+import kotlin.io.path.writeText
 
 sealed interface TvmAnalyzer {
     fun analyzeAllMethods(
         sourcesPath: Path,
         contractDataHex: String? = null,
-        methodsBlackList: Set<BigInteger> = hashSetOf(Int.MAX_VALUE.toBigInteger()),
+        methodsBlackList: Set<MethodId> = hashSetOf(mainMethodId),
         inputInfo: Map<BigInteger, TvmInputInfo> = emptyMap(),
-        tvmOptions: TvmMachineOptions = TvmMachineOptions(),
+        tvmOptions: TvmOptions = TvmOptions(),
     ): TvmContractSymbolicTestResult
 }
 
@@ -44,9 +47,9 @@ data object TactAnalyzer : TvmAnalyzer {
     override fun analyzeAllMethods(
         sourcesPath: Path,
         contractDataHex: String?,
-        methodsBlackList: Set<BigInteger>,
+        methodsBlackList: Set<MethodId>,
         inputInfo: Map<BigInteger, TvmInputInfo>,
-        tvmOptions: TvmMachineOptions,
+        tvmOptions: TvmOptions,
     ): TvmContractSymbolicTestResult {
         val outputDir = createTempDirectory(CONFIG_OUTPUT_PREFIX)
         val sourcesInOutputDir = sourcesPath.copyTo(outputDir.resolve(sourcesPath.fileName))
@@ -130,9 +133,9 @@ class FuncAnalyzer(
     override fun analyzeAllMethods(
         sourcesPath: Path,
         contractDataHex: String?,
-        methodsBlackList: Set<BigInteger>,
+        methodsBlackList: Set<MethodId>,
         inputInfo: Map<BigInteger, TvmInputInfo>,
-        tvmOptions: TvmMachineOptions,
+        tvmOptions: TvmOptions,
     ): TvmContractSymbolicTestResult {
         val tmpBocFile = createTempFile(suffix = ".boc")
         try {
@@ -147,6 +150,22 @@ class FuncAnalyzer(
         } finally {
             tmpBocFile.deleteIfExists()
         }
+    }
+
+    fun compileFuncSourceToFift(funcSourcesPath: Path, fiftFilePath: Path) {
+        val command = "$funcExecutablePath -AP $funcStdlibPath ${funcSourcesPath.absolutePathString()}"
+        val compilerProcess = ProcessBuilder(listOf("/bin/sh", "-c", command))
+            .start()
+        val exited = compilerProcess.waitFor(COMPILER_TIMEOUT, TimeUnit.SECONDS)
+        check(exited) {
+            compilerProcess.destroyForcibly()
+            "Compiler process has not finished in $COMPILER_TIMEOUT seconds"
+        }
+        val fiftIncludePreamble = """"Fift.fif" include"""
+        val output = compilerProcess.inputReader().readText()
+        val fiftCode = "$fiftIncludePreamble\n$output"
+
+        fiftFilePath.writeText(fiftCode)
     }
 
     private fun compileFuncSourceToBoc(funcSourcesPath: Path, bocFilePath: Path) {
@@ -180,9 +199,9 @@ class FiftAnalyzer(
     override fun analyzeAllMethods(
         sourcesPath: Path,
         contractDataHex: String?,
-        methodsBlackList: Set<BigInteger>,
+        methodsBlackList: Set<MethodId>,
         inputInfo: Map<BigInteger, TvmInputInfo>,
-        tvmOptions: TvmMachineOptions,
+        tvmOptions: TvmOptions,
     ): TvmContractSymbolicTestResult {
         val tmpBocFile = createTempFile(suffix = ".boc")
         try {
@@ -351,9 +370,9 @@ data object BocAnalyzer : TvmAnalyzer {
     override fun analyzeAllMethods(
         sourcesPath: Path,
         contractDataHex: String?,
-        methodsBlackList: Set<BigInteger>,
+        methodsBlackList: Set<MethodId>,
         inputInfo: Map<BigInteger, TvmInputInfo>,
-        tvmOptions: TvmMachineOptions,
+        tvmOptions: TvmOptions,
     ): TvmContractSymbolicTestResult {
         val contract = loadContractFromBoc(sourcesPath)
         return analyzeAllMethods(contract, methodsBlackList, contractDataHex, inputInfo, tvmOptions)
@@ -391,33 +410,46 @@ data object BocAnalyzer : TvmAnalyzer {
 
 fun analyzeAllMethods(
     contract: TvmContractCode,
-    methodsBlackList: Set<BigInteger> = hashSetOf(Int.MAX_VALUE.toBigInteger()),
+    methodsBlackList: Set<MethodId> = hashSetOf(mainMethodId),
     contractDataHex: String? = null,
     inputInfo: Map<BigInteger, TvmInputInfo> = emptyMap(),
-    tvmOptions: TvmMachineOptions = TvmMachineOptions(),
+    tvmOptions: TvmOptions = TvmOptions(),
 ): TvmContractSymbolicTestResult {
     val contractData = Cell.Companion.of(contractDataHex ?: DEFAULT_CONTRACT_DATA_HEX)
     val machine = TvmMachine(tvmOptions = tvmOptions)
     val methodsExceptDictPushConst = contract.methods.filterKeys { it !in methodsBlackList }
     val methodStates = methodsExceptDictPushConst.values.associateWith { method ->
         runCatching {
-            machine.analyze(
+            val coverageStatistics = TvmCoverageStatistics(contract)
+            val states = machine.analyze(
                 contract,
                 contractData,
                 method.id,
-                inputInfo[method.id] ?: TvmInputInfo()
+                inputInfo[method.id] ?: TvmInputInfo(),
+                coverageStatistics,
             )
+            val coverage = TvmMethodCoverage(
+                coverageStatistics.getMethodCoveragePercents(method),
+                coverageStatistics.getTransitiveCoveragePercents()
+            )
+
+            states to coverage
         }.getOrElse {
             logger.error(it) {
                 "Failed analyzing $method"
             }
-            emptyList()
+
+            emptyList<TvmState>() to TvmMethodCoverage(coverage = 0f, transitiveCoverage = 0f)
         }
     }
-    methodStates.forEach {
-        logger.debug("Method {}", it.key)
-        val exceptionalStates = it.value.filter { state -> state.isExceptional }
-        logger.debug("States: ${it.value.size}, exceptional: ${exceptionalStates.size}")
+    methodStates.forEach { (method, analysisResult) ->
+        val states = analysisResult.first
+        val coverage = analysisResult.second
+
+        logger.debug("Method {}", method)
+        logger.debug("Coverage: ${coverage.coverage}, transitive coverage: ${coverage.transitiveCoverage}")
+        val exceptionalStates = states.filter { state -> state.isExceptional }
+        logger.debug("States: ${states.size}, exceptional: ${exceptionalStates.size}")
         exceptionalStates.forEach { state -> logger.debug(state.methodResult.toString()) }
         logger.debug("=====".repeat(20))
     }
@@ -434,5 +466,12 @@ data class FiftInterpreterResult(
 
 private const val DEFAULT_CONTRACT_DATA_HEX = "b5ee9c7241010101000a00001000000185d258f59ccfc59500"
 private const val COMPILER_TIMEOUT = 5.toLong() // seconds
+
+typealias MethodId = BigInteger
+
+@Suppress("NOTHING_TO_INLINE")
+inline fun Int.toMethodId(): MethodId = toBigInteger()
+
+val mainMethodId: MethodId = Int.MAX_VALUE.toMethodId()
 
 private val logger = object : KLogging() {}.logger

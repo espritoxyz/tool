@@ -15,6 +15,8 @@ import org.ton.bytecode.TvmUntilContinuation
 import org.ton.bytecode.TvmWhileContinuation
 import org.usvm.UHeapRef
 import org.usvm.machine.TvmStepScope
+import org.usvm.machine.state.TvmStack.TvmStackTupleValue
+import org.usvm.machine.state.TvmStack.TvmStackTupleValueConcreteNew
 import org.usvm.utils.intValueOrNull
 
 
@@ -113,12 +115,40 @@ fun TvmContinuation.defineC2(cont: TvmContinuation): TvmContinuation {
     return updateSavelist(savelist.copy(c2 = C2Register(cont)))
 }
 
+fun TvmContinuation.defineC3(cont: TvmContinuation): TvmContinuation {
+    if (savelist.c3 != null) {
+        return this
+    }
+
+    return updateSavelist(savelist.copy(c3 = C3Register(cont)))
+}
+
 fun TvmContinuation.defineC4(cell: UHeapRef): TvmContinuation {
     if (savelist.c4 != null) {
         return this
     }
 
     return updateSavelist(savelist.copy(c4 = C4Register(TvmCellValue(cell))))
+}
+
+fun TvmContinuation.defineC5(cell: UHeapRef): TvmContinuation {
+    if (savelist.c5 != null) {
+        return this
+    }
+
+    return updateSavelist(savelist.copy(c5 = C5Register(TvmCellValue(cell))))
+}
+
+fun TvmContinuation.defineC7(tuple: TvmStackTupleValue): TvmContinuation {
+    if (savelist.c7 != null) {
+        return this
+    }
+
+    require(tuple is TvmStackTupleValueConcreteNew) {
+        TODO("Support non-concrete tuples")
+    }
+
+    return updateSavelist(savelist.copy(c7 = C7Register(tuple)))
 }
 
 fun TvmStepScope.jump(cont: TvmContinuation) {
@@ -157,7 +187,7 @@ private fun TvmStepScope.doQuitJump(cont: TvmQuitContinuation) = doWithState {
         else -> error("Unexpected exit code ${cont.exitCode}")
     }
 
-
+    commitedState = TvmCommitedState(registers.c4, registers.c5)
     methodResult = TvmMethodResult.TvmSuccess(exit, stack)
 }
 

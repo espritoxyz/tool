@@ -20,24 +20,24 @@ import org.usvm.statistics.StepsStatistics
 import org.usvm.statistics.collectors.AllStatesCollector
 import org.usvm.stopstrategies.StepLimitStopStrategy
 import org.usvm.stopstrategies.StopStrategy
-import java.math.BigInteger
 
 class TvmMachine(
     private val options: UMachineOptions = defaultOptions,
-    private val tvmOptions: TvmMachineOptions = TvmMachineOptions(),
+    private val tvmOptions: TvmOptions = TvmOptions(),
 ) : UMachine<TvmState>() {
     override fun close() {
         // Do nothing
     }
 
     private val components = TvmComponents()
-    private val ctx = TvmContext(components)
+    private val ctx = TvmContext(tvmOptions, components)
 
     fun analyze(
         contractCode: TvmContractCode,
         contractData: Cell,
-        methodId: BigInteger,
-        inputInfo: TvmInputInfo = TvmInputInfo()
+        methodId: MethodId,
+        inputInfo: TvmInputInfo = TvmInputInfo(),
+        coverageStatistics: TvmCoverageStatistics,
     ): List<TvmState> {
         val interpreter = TvmInterpreter(
             ctx,
@@ -102,7 +102,7 @@ class TvmMachine(
             StateCollectionStrategy.ALL -> AllStatesCollector<TvmState>()
         }
 
-        val observers = mutableListOf(statesCollector, stepsStatistics)
+        val observers = mutableListOf(statesCollector, stepsStatistics, coverageStatistics)
         run(
             interpreter,
             pathSelector,

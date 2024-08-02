@@ -47,6 +47,7 @@ class TvmState(
     targets: UTargetsSet<TvmTarget, TvmInst> = UTargetsSet.empty(),
     val dataCellLoadedTypeInfo: TvmDataCellLoadedTypeInfo = TvmDataCellLoadedTypeInfo.empty(),
     val typeSystem: TvmTypeSystem,
+    var commitedState: TvmCommitedState? = null,
 ) : UState<TvmType, TvmCodeBlock, TvmInst, TvmContext, TvmTarget, TvmState>(
     ctx,
     callStack,
@@ -114,6 +115,7 @@ class TvmState(
             targets = targets.clone(),
             dataCellLoadedTypeInfo = dataCellLoadedTypeInfo.clone(),
             typeSystem = typeSystem,
+            commitedState = commitedState,
         ).also { newState ->
             newState.dataCellInfoStorage = dataCellInfoStorage.clone()
         }
@@ -142,3 +144,8 @@ class TvmState(
         initializer(ref)
     }
 }
+
+data class TvmCommitedState(
+    val c4: C4Register,
+    val c5: C5Register,
+)
