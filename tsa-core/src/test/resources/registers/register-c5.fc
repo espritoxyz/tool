@@ -1,0 +1,16 @@
+#include "stdlib.fc";
+
+cell get_c5() asm "c5 PUSH";
+
+int main() impure method_id (0) {
+    ;; add reserve action to c5
+    raw_reserve(10, 2);
+
+    ;; out_list$_ {n:#} prev:^(OutList n) action:OutAction = OutList (n + 1);
+    var c5 = get_c5().begin_parse();
+
+    ;; action_reserve_currency#36e6b809
+    var action_tag = c5~load_int(32);
+
+    return action_tag;
+}

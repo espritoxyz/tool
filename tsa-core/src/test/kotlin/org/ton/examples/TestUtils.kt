@@ -10,8 +10,6 @@ import org.usvm.machine.TactAnalyzer
 import org.usvm.machine.intValue
 import org.usvm.machine.state.TvmStack
 import org.usvm.test.resolver.TvmContractSymbolicTestResult
-import org.usvm.test.resolver.TvmMethodFailure
-import org.usvm.test.resolver.TvmSuccessfulExecution
 import org.usvm.test.resolver.TvmSymbolicTest
 import org.usvm.test.resolver.TvmSymbolicTestSuite
 import org.usvm.test.resolver.TvmTestIntegerValue
@@ -68,6 +66,10 @@ fun compileFiftCodeBlocksContract(
     fiftWorkDir: Path,
     codeBlocks: List<String>,
 ): TvmContractCode = FiftAnalyzer(fiftStdlibPath = FIFT_STDLIB_RESOURCE).compileFiftCodeBlocksContract(fiftWorkDir, codeBlocks)
+
+fun compileFuncToFift(funcSourcesPath: Path, fiftFilePath: Path) =
+    FuncAnalyzer(funcStdlibPath = FUNC_STDLIB_RESOURCE, fiftStdlibPath = FIFT_STDLIB_RESOURCE)
+        .compileFuncSourceToFift(funcSourcesPath, fiftFilePath)
 
 fun analyzeAllMethods(
     bytecodePath: String,

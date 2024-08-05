@@ -1,0 +1,15 @@
+#include "stdlib.fc";
+
+() retalt() impure asm "RETALT";
+
+() other_fun() impure method_id (1) {
+    ;; program termination with exit code 1
+    retalt();
+}
+
+int main() impure method_id (0) {
+    other_fun();
+
+    ;; does not execute
+    return 10;
+}

@@ -1,0 +1,13 @@
+#include "stdlib.fc";
+
+tuple get_c7() asm "c7 PUSH";
+
+global int a;
+
+int main() impure method_id (0) {
+    ;; c7[1] = 4
+    a = 4;
+
+    tuple params = get_c7();
+    return params.second();
+}

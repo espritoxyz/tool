@@ -26,6 +26,7 @@ import kotlin.io.path.outputStream
 import kotlin.io.path.readBytes
 import kotlin.io.path.readText
 import kotlin.io.path.walk
+import kotlin.io.path.writeText
 
 sealed interface TvmAnalyzer {
     fun analyzeAllMethods(
@@ -127,6 +128,22 @@ class FuncAnalyzer(
         } finally {
             tmpBocFile.deleteIfExists()
         }
+    }
+
+    fun compileFuncSourceToFift(funcSourcesPath: Path, fiftFilePath: Path) {
+        val command = "$funcExecutablePath -AP $funcStdlibPath ${funcSourcesPath.absolutePathString()}"
+        val compilerProcess = ProcessBuilder(listOf("/bin/sh", "-c", command))
+            .start()
+        val exited = compilerProcess.waitFor(COMPILER_TIMEOUT, TimeUnit.SECONDS)
+        check(exited) {
+            compilerProcess.destroyForcibly()
+            "Compiler process has not finished in $COMPILER_TIMEOUT seconds"
+        }
+        val fiftIncludePreamble = """"Fift.fif" include"""
+        val output = compilerProcess.inputReader().readText()
+        val fiftCode = "$fiftIncludePreamble\n$output"
+
+        fiftFilePath.writeText(fiftCode)
     }
 
     private fun compileFuncSourceToBoc(funcSourcesPath: Path, bocFilePath: Path) {
