@@ -18,7 +18,7 @@ class TactDividerTest {
         // TODO analyze only divide method 95202
         val symbolicResult = tactCompileAndAnalyzeAllMethods(
             resourcePath,
-            methodsBlackList = hashSetOf(Int.MAX_VALUE, 0, 113617, 115390, 121275)
+            methodsBlackList = listOf(Int.MAX_VALUE, 0, 113617, 115390, 121275).map { it.toBigInteger() }.toSet()
         )
 
         val allTests = symbolicResult.map { it.tests }.flatten()

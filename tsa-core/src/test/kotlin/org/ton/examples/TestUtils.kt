@@ -7,6 +7,7 @@ import org.usvm.machine.FiftAnalyzer
 import org.usvm.machine.FiftInterpreterResult
 import org.usvm.machine.FuncAnalyzer
 import org.usvm.machine.TactAnalyzer
+import org.usvm.machine.intMaxValueAsBigInteger
 import org.usvm.machine.intValue
 import org.usvm.machine.state.TvmStack
 import org.usvm.test.resolver.TvmContractSymbolicTestResult
@@ -16,6 +17,7 @@ import org.usvm.test.resolver.TvmTestIntegerValue
 import org.usvm.test.resolver.TvmTestNullValue
 import org.usvm.test.resolver.TvmTestTupleValue
 import org.usvm.test.resolver.TvmTestValue
+import java.math.BigInteger
 import java.nio.file.Path
 import kotlin.io.path.Path
 import kotlin.test.assertEquals
@@ -32,7 +34,7 @@ private val FIFT_STDLIB_RESOURCE: Path = object {}.javaClass.getResource(FIFT_ST
 fun tactCompileAndAnalyzeAllMethods(
     tactSourcesPath: Path,
     contractDataHex: String? = null,
-    methodsBlackList: Set<Int> = hashSetOf(Int.MAX_VALUE),
+    methodsBlackList: Set<BigInteger> = hashSetOf(intMaxValueAsBigInteger),
 ): TvmContractSymbolicTestResult = TactAnalyzer.analyzeAllMethods(
     tactSourcesPath,
     contractDataHex,
@@ -42,7 +44,7 @@ fun tactCompileAndAnalyzeAllMethods(
 fun funcCompileAndAnalyzeAllMethods(
     funcSourcesPath: Path,
     contractDataHex: String? = null,
-    methodsBlackList: Set<Int> = hashSetOf(Int.MAX_VALUE),
+    methodsBlackList: Set<BigInteger> = hashSetOf(intMaxValueAsBigInteger),
 ): TvmContractSymbolicTestResult = FuncAnalyzer(funcStdlibPath = FUNC_STDLIB_RESOURCE, fiftStdlibPath = FIFT_STDLIB_RESOURCE).analyzeAllMethods(
     funcSourcesPath,
     contractDataHex,
@@ -52,7 +54,7 @@ fun funcCompileAndAnalyzeAllMethods(
 fun compileAndAnalyzeFift(
     fiftPath: Path,
     contractDataHex: String? = null,
-    methodsBlackList: Set<Int> = hashSetOf(Int.MAX_VALUE),
+    methodsBlackList: Set<BigInteger> = hashSetOf(intMaxValueAsBigInteger),
 ): TvmContractSymbolicTestResult = FiftAnalyzer(fiftStdlibPath = FIFT_STDLIB_RESOURCE).analyzeAllMethods(
     fiftPath,
     contractDataHex,
@@ -74,7 +76,7 @@ fun compileFuncToFift(funcSourcesPath: Path, fiftFilePath: Path) =
 fun analyzeAllMethods(
     bytecodePath: String,
     contractDataHex: String? = null,
-    methodsBlackList: Set<Int> = hashSetOf(Int.MAX_VALUE),
+    methodsBlackList: Set<BigInteger> = hashSetOf(intMaxValueAsBigInteger),
 ): TvmContractSymbolicTestResult = BocAnalyzer.analyzeAllMethods(Path(bytecodePath), contractDataHex, methodsBlackList)
 
 /**

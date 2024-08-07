@@ -4,6 +4,8 @@ import org.ton.examples.compareSymbolicAndConcreteResults
 import org.ton.examples.compileAndAnalyzeFift
 import org.ton.examples.compileFuncToFift
 import org.ton.examples.runFiftMethod
+import org.usvm.machine.intMaxValueAsBigInteger
+import java.math.BigInteger
 import kotlin.io.path.Path
 import kotlin.io.path.createTempFile
 import kotlin.io.path.deleteIfExists
@@ -19,13 +21,13 @@ class RegistersTest {
 
     @Test
     fun testC0Register() {
-        val methodsBlackList = hashSetOf(Int.MAX_VALUE, 1)
+        val methodsBlackList = hashSetOf(intMaxValueAsBigInteger, BigInteger.ONE)
         analyzeContract(registerC0TestPath, methodsBlackList)
     }
 
     @Test
     fun testC1Register() {
-        val methodsBlackList = hashSetOf(Int.MAX_VALUE, 1)
+        val methodsBlackList = hashSetOf(intMaxValueAsBigInteger, BigInteger.ONE)
         analyzeContract(registerC1TestPath, methodsBlackList)
     }
 
@@ -51,7 +53,7 @@ class RegistersTest {
 
     private fun analyzeContract(
         contractPath: String,
-        methodsBlackList: Set<Int> = setOf(Int.MAX_VALUE)
+        methodsBlackList: Set<BigInteger> = hashSetOf(intMaxValueAsBigInteger),
     ) {
         val resourcePath = this::class.java.getResource(contractPath)?.path?.let { Path(it) }
             ?: error("Cannot find resource bytecode $contractPath")

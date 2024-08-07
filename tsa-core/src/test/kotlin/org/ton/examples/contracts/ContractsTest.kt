@@ -5,6 +5,8 @@ import org.ton.examples.checkAtLeastOneStateForAllMethods
 import org.ton.examples.funcCompileAndAnalyzeAllMethods
 import org.ton.examples.runHardTestsRegex
 import org.ton.examples.runHardTestsVar
+import org.usvm.machine.intMaxValueAsBigInteger
+import java.math.BigInteger
 import kotlin.io.path.Path
 import kotlin.test.Ignore
 import kotlin.test.Test
@@ -129,7 +131,7 @@ class ContractsTest {
     private fun analyzeContract(
         contractPath: String,
         methodsNumber: Int,
-        methodsBlackList: Set<Int> = setOf(Int.MAX_VALUE)
+        methodsBlackList: Set<BigInteger> = hashSetOf(intMaxValueAsBigInteger),
     ) {
         val bytecodeResourcePath = this::class.java.getResource(contractPath)?.path?.let { Path(it) }
             ?: error("Cannot find resource bytecode $contractPath")

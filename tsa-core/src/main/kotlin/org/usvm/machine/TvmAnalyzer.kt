@@ -11,6 +11,7 @@ import org.usvm.machine.FuncAnalyzer.Companion.FIFT_EXECUTABLE
 import org.usvm.test.resolver.TvmContractSymbolicTestResult
 import org.usvm.test.resolver.TvmTestResolver
 import org.usvm.utils.FileUtils
+import java.math.BigInteger
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.util.concurrent.TimeUnit
@@ -32,7 +33,7 @@ sealed interface TvmAnalyzer {
     fun analyzeAllMethods(
         sourcesPath: Path,
         contractDataHex: String? = null,
-        methodsBlackList: Set<Int> = hashSetOf(Int.MAX_VALUE)
+        methodsBlackList: Set<BigInteger> = hashSetOf(intMaxValueAsBigInteger)
     ): TvmContractSymbolicTestResult
 }
 
@@ -41,7 +42,7 @@ data object TactAnalyzer : TvmAnalyzer {
     override fun analyzeAllMethods(
         sourcesPath: Path,
         contractDataHex: String?,
-        methodsBlackList: Set<Int>
+        methodsBlackList: Set<BigInteger>
     ): TvmContractSymbolicTestResult {
         val outputDir = createTempDirectory(CONFIG_OUTPUT_PREFIX)
         val sourcesInOutputDir = sourcesPath.copyTo(outputDir.resolve(sourcesPath.fileName))
@@ -119,7 +120,7 @@ class FuncAnalyzer(
     override fun analyzeAllMethods(
         sourcesPath: Path,
         contractDataHex: String?,
-        methodsBlackList: Set<Int>
+        methodsBlackList: Set<BigInteger>
     ): TvmContractSymbolicTestResult {
         val tmpBocFile = createTempFile(suffix = ".boc")
         try {
@@ -177,7 +178,7 @@ class FiftAnalyzer(
     override fun analyzeAllMethods(
         sourcesPath: Path,
         contractDataHex: String?,
-        methodsBlackList: Set<Int>
+        methodsBlackList: Set<BigInteger>
     ): TvmContractSymbolicTestResult {
         val tmpBocFile = createTempFile(suffix = ".boc")
         try {
@@ -340,7 +341,7 @@ data object BocAnalyzer : TvmAnalyzer {
     override fun analyzeAllMethods(
         sourcesPath: Path,
         contractDataHex: String?,
-        methodsBlackList: Set<Int>
+        methodsBlackList: Set<BigInteger>
     ): TvmContractSymbolicTestResult {
         val contract = loadContractFromBoc(sourcesPath)
         return analyzeAllMethods(contract, methodsBlackList, contractDataHex)
@@ -378,13 +379,13 @@ data object BocAnalyzer : TvmAnalyzer {
 
 fun analyzeAllMethods(
     contract: TvmContractCode,
-    methodsBlackList: Set<Int> = hashSetOf(Int.MAX_VALUE),
+    methodsBlackList: Set<BigInteger> = hashSetOf(intMaxValueAsBigInteger),
     contractDataHex: String? = null
 ): TvmContractSymbolicTestResult {
     val contractData = Cell.Companion.of(contractDataHex ?: DEFAULT_CONTRACT_DATA_HEX)
     val tvmOptions = TvmOptions(enableVarAddress = false)
     val machine = TvmMachine(tvmOptions = tvmOptions)
-    val methodsExceptDictPushConst = contract.methods.filterKeys { it.toInt() !in methodsBlackList }
+    val methodsExceptDictPushConst = contract.methods.filterKeys { it !in methodsBlackList }
     val methodStates = methodsExceptDictPushConst.values.associateWith { method ->
         runCatching {
             machine.analyze(
@@ -419,5 +420,7 @@ data class FiftInterpreterResult(
 
 private const val DEFAULT_CONTRACT_DATA_HEX = "b5ee9c7241010101000a00001000000185d258f59ccfc59500"
 private const val COMPILER_TIMEOUT = 5.toLong() // seconds
+
+val intMaxValueAsBigInteger = Int.MAX_VALUE.toBigInteger()
 
 private val logger = object : KLogging() {}.logger
