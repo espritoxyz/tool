@@ -224,7 +224,6 @@ import org.usvm.mkSizeGeExpr
 import org.usvm.sizeSort
 import org.usvm.solver.USatResult
 import org.usvm.targets.UTargetsSet
-import java.math.BigInteger
 import org.ton.bytecode.TvmArtificialExecuteContInst
 import org.ton.bytecode.TvmArtificialJmpToContInst
 import org.ton.bytecode.TvmCompareOtherSdcnttrail0Inst
@@ -249,9 +248,12 @@ import org.ton.bytecode.TvmContRegistersSamealtsaveInst
 import org.ton.bytecode.TvmContRegistersSaveInst
 import org.ton.bytecode.TvmContRegistersSetcontctrInst
 import org.ton.bytecode.TvmInstList
+import org.ton.bytecode.TvmInstMethodLocation
 import org.ton.bytecode.TvmOrdContinuation
+import org.usvm.machine.MethodId
 import org.usvm.machine.TvmStepScope
 import org.usvm.machine.bigIntValue
+import org.usvm.machine.mainMethodId
 import org.usvm.machine.state.C0Register
 import org.usvm.machine.state.C1Register
 import org.usvm.machine.state.C2Register
@@ -287,8 +289,9 @@ import org.usvm.machine.state.switchToContinuation
 import org.usvm.machine.state.returnFromContinuation
 import org.usvm.machine.state.slicePreloadDataBits
 import org.usvm.machine.state.takeLastTuple
+import org.usvm.machine.toMethodId
 import org.usvm.machine.types.TvmTypeSystem
-
+import java.math.BigInteger
 
 // TODO there are a lot of `scope.calcOnState` and `scope.doWithState` invocations that are not inline - optimize it
 class TvmInterpreter(
@@ -316,7 +319,7 @@ class TvmInterpreter(
     private val globalsInterpreter = TvmGlobalsInterpreter(ctx)
     private val transactionInterpreter = TvmTransactionInterpreter(ctx)
 
-    fun getInitialState(contractCode: TvmContractCode, contractData: Cell, methodId: BigInteger, targets: List<TvmTarget> = emptyList()): TvmState {
+    fun getInitialState(contractCode: TvmContractCode, contractData: Cell, methodId: MethodId, targets: List<TvmTarget> = emptyList()): TvmState {
         /*val contract = contractCode.methods[0]!!
         val registers = TvmRegisters()
         val currentContinuation = TvmContinuationValue(
@@ -341,7 +344,7 @@ class TvmInterpreter(
         return state*/
         val method = contractCode.methods[methodId] ?: error("Unknown method $methodId")
 
-        val mainMethod = contractCode.methods[Int.MAX_VALUE.toBigInteger()]
+        val mainMethod = contractCode.methods[mainMethodId]
             ?: error("No main method found")
         val c3 = C3Register(TvmOrdContinuation(mainMethod))
 
@@ -725,7 +728,7 @@ class TvmInterpreter(
                 }
             }
             is TvmConstDataPushcontInst -> scope.doWithStateCtx {
-                val continuationValue = TvmOrdContinuation(TvmLambda(stmt.s.toMutableList()))
+                val continuationValue = TvmOrdContinuation(TvmLambda(stmt.c.toMutableList()))
                 stack.addContinuation(continuationValue)
 
                 newStmt(stmt.nextStmt())
@@ -736,7 +739,7 @@ class TvmInterpreter(
 
     private fun visitPushContShortInst(scope: TvmStepScope, stmt: TvmConstDataPushcontShortInst) {
         scope.doWithState {
-            val lambda = TvmLambda(stmt.s.toMutableList())
+            val lambda = TvmLambda(stmt.c.toMutableList())
             val continuationValue = TvmOrdContinuation(lambda)
 
             stack.addContinuation(continuationValue)
@@ -1819,7 +1822,7 @@ class TvmInterpreter(
 
         when (stmt) {
             is TvmContDictCalldictInst -> {
-                val methodId = stmt.n.toBigInteger()
+                val methodId = stmt.n.toMethodId()
 
 //                    stack += argument.toBv257()
 ////                    val c3Continuation = registers.c3!!.value
@@ -1848,6 +1851,12 @@ class TvmInterpreter(
 
         when (stmt) {
             is TvmDictSpecialDictigetjmpzInst -> {
+                val statementMethod = (stmt.location as? TvmInstMethodLocation)?.methodId
+                val selectorMethodId = mainMethodId
+                require(statementMethod == selectorMethodId) {
+                    "The general case is not supported: $stmt"
+                }
+
                 val methodId = scope.takeLastIntOrThrowTypeError()?.bigIntValue()
                     ?: return
                 val method = contractCode.methods[methodId]!!

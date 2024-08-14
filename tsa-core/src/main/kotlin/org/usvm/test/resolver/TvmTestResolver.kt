@@ -2,9 +2,9 @@ package org.usvm.test.resolver
 
 import org.ton.bytecode.TvmInst
 import org.ton.bytecode.TvmMethod
+import org.usvm.machine.MethodId
 import org.usvm.machine.state.TvmMethodResult.TvmFailure
 import org.usvm.machine.state.TvmState
-import java.math.BigInteger
 
 data object TvmTestResolver {
     fun resolve(method: TvmMethod, state: TvmState): TvmSymbolicTest {
@@ -25,10 +25,16 @@ data object TvmTestResolver {
         )
     }
 
-    fun resolve(methodStates: Map<TvmMethod, List<TvmState>>): TvmContractSymbolicTestResult = TvmContractSymbolicTestResult(
+    fun resolve(
+        methodStates: Map<TvmMethod, Pair<List<TvmState>, TvmMethodCoverage>>
+    ): TvmContractSymbolicTestResult = TvmContractSymbolicTestResult(
         methodStates.map {
             val method = it.key
-            TvmSymbolicTestSuite(method.id, it.value.map { state -> resolve(method, state) })
+            TvmSymbolicTestSuite(
+                method.id,
+                it.value.second,
+                it.value.first.map { state -> resolve(method, state) },
+            )
         }
     )
 }
@@ -36,12 +42,18 @@ data object TvmTestResolver {
 data class TvmContractSymbolicTestResult(val testSuites: List<TvmSymbolicTestSuite>) : List<TvmSymbolicTestSuite> by testSuites
 
 data class TvmSymbolicTestSuite(
-    val methodId: BigInteger,
-    val tests: List<TvmSymbolicTest>
+    val methodId: MethodId,
+    val methodCoverage: TvmMethodCoverage,
+    val tests: List<TvmSymbolicTest>,
 ) : List<TvmSymbolicTest> by tests
 
+data class TvmMethodCoverage(
+    val coverage: Float,
+    val transitiveCoverage: Float,
+)
+
 data class TvmSymbolicTest(
-    val methodId: BigInteger,
+    val methodId: MethodId,
     val usedParameters: List<TvmTestValue>,
     val result: TvmMethodSymbolicResult,
     val stackTrace: List<TvmInst>,

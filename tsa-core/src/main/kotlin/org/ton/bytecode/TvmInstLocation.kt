@@ -3,7 +3,7 @@ package org.ton.bytecode
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import java.math.BigInteger
+import org.usvm.machine.MethodId
 
 @Serializable
 sealed class TvmInstLocation {
@@ -15,7 +15,7 @@ sealed class TvmInstLocation {
 @Serializable
 @SerialName("TvmInstMethodLocation")
 data class TvmInstMethodLocation(
-    val methodId: @Contextual BigInteger,
+    val methodId: @Contextual MethodId,
     override val index: Int
 ) : TvmInstLocation() {
     @kotlinx.serialization.Transient

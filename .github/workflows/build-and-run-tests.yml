@@ -32,7 +32,7 @@ jobs:
           npm run build
 
       - name: 'Build and run test'
-        run: gradle clean build
+        run: ./gradlew clean build
         env:
           TSA_RUN_HARD_TESTS: 1
 

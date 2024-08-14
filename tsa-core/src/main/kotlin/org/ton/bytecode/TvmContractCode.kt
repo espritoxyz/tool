@@ -11,12 +11,12 @@ import kotlinx.serialization.modules.SerializersModule
 import kotlinx.serialization.modules.polymorphic
 import kotlinx.serialization.modules.subclass
 import org.ton.bigint.BigIntSerializer
-import java.math.BigInteger
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.builtins.serializer
+import org.usvm.machine.MethodId
 
 interface TvmContractCode {
-    val methods: Map<BigInteger, TvmMethod>
+    val methods: Map<MethodId, TvmMethod>
 
     companion object {
         private val defaultSerializationModule: SerializersModule
@@ -33,7 +33,7 @@ interface TvmContractCode {
 
                 registerTvmInstSerializer()
 
-                contextual(BigInteger::class, BigIntSerializer)
+                contextual(MethodId::class, BigIntSerializer)
             }
 
         val json = Json {
@@ -50,7 +50,7 @@ interface TvmContractCode {
 
 @Serializable
 data class TvmContractCodeImpl(
-    override val methods: Map<@Serializable(BigIntSerializer::class) BigInteger, TvmMethod>
+    override val methods: Map<@Serializable(BigIntSerializer::class) MethodId, TvmMethod>
 ) : TvmContractCode
 
 @Serializable(with = TvmInstListSerializer::class)

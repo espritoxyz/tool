@@ -4,7 +4,7 @@ import org.junit.jupiter.api.Test
 import org.ton.examples.compareSymbolicAndConcreteResults
 import org.ton.examples.compileAndAnalyzeFift
 import org.ton.examples.runFiftMethod
-import org.usvm.machine.intMaxValueAsBigInteger
+import org.usvm.machine.mainMethodId
 import java.math.BigInteger
 import kotlin.io.path.Path
 import kotlin.test.assertEquals
@@ -19,7 +19,7 @@ class BadTypesTests {
         val fiftResourcePath = this::class.java.getResource(fiftPath)?.path?.let { Path(it) }
             ?: error("Cannot find resource fift $fiftPath")
 
-        val symbolicResult = compileAndAnalyzeFift(fiftResourcePath, methodsBlackList = setOf(BigInteger.ZERO, intMaxValueAsBigInteger))
+        val symbolicResult = compileAndAnalyzeFift(fiftResourcePath, methodsBlackList = setOf(BigInteger.ZERO, mainMethodId))
 
         assertEquals(1, symbolicResult.testSuites.size)
 

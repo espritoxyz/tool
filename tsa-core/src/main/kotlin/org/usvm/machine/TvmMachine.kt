@@ -19,7 +19,6 @@ import org.usvm.statistics.StepsStatistics
 import org.usvm.statistics.collectors.AllStatesCollector
 import org.usvm.stopstrategies.StepLimitStopStrategy
 import org.usvm.stopstrategies.StopStrategy
-import java.math.BigInteger
 
 class TvmMachine(
     private val options: UMachineOptions = defaultOptions,
@@ -32,7 +31,12 @@ class TvmMachine(
     private val components = TvmComponents()
     private val ctx = TvmContext(tvmOptions, components)
 
-    fun analyze(contractCode: TvmContractCode, contractData: Cell, methodId: BigInteger): List<TvmState> {
+    fun analyze(
+        contractCode: TvmContractCode,
+        contractData: Cell,
+        methodId: MethodId,
+        coverageStatistics: TvmCoverageStatistics,
+    ): List<TvmState> {
         val interpreter = TvmInterpreter(ctx, contractCode, typeSystem = components.typeSystem)
         logger.debug("{}.analyze({})", this, contractCode)
         val initialState = interpreter.getInitialState(contractCode, contractData, methodId)
@@ -89,7 +93,7 @@ class TvmMachine(
             StateCollectionStrategy.ALL -> AllStatesCollector<TvmState>()
         }
 
-        val observers = mutableListOf(statesCollector, stepsStatistics)
+        val observers = mutableListOf(statesCollector, stepsStatistics, coverageStatistics)
         run(
             interpreter,
             pathSelector,

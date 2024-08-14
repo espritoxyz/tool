@@ -19,7 +19,7 @@ class IntComparisonExample {
             ?: error("Cannot find resource source $sourcesPath")
 
         val symbolicResult = funcCompileAndAnalyzeAllMethods(sourceResourcePath)
-        symbolicResult.forEach { (methodId, tests) ->
+        symbolicResult.forEach { (methodId, _, tests) ->
             if (methodId.toInt() == 0)
                 return@forEach
             val results = tests.flatMap { test ->

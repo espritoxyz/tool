@@ -15,24 +15,29 @@ import kotlinx.serialization.json.encodeToJsonElement
 import org.ton.bytecode.TvmContractCode
 import org.ton.bytecode.TvmInst
 import org.ton.bytecode.TvmMethod
+import org.usvm.machine.MethodId
 import org.usvm.machine.state.TvmMethodResult.TvmFailure
 import org.usvm.test.resolver.TvmContractSymbolicTestResult
 import org.usvm.test.resolver.TvmMethodFailure
 import org.usvm.test.resolver.TvmSymbolicTestSuite
-import java.math.BigInteger
 
-fun TvmContractSymbolicTestResult.toSarifReport(methodsMapping: Map<BigInteger, String>): String = SarifSchema210(
+fun TvmContractSymbolicTestResult.toSarifReport(methodsMapping: Map<MethodId, String>): String = SarifSchema210(
     schema = TsaSarifSchema.SCHEMA,
     version = TsaSarifSchema.VERSION,
     runs = listOf(
         Run(
             tool = TsaSarifSchema.TsaSarifTool.TOOL,
-            results = testSuites.flatMap { it.toSarifResult(methodsMapping) }
+            results = testSuites.flatMap { it.toSarifResult(methodsMapping) },
+            properties = PropertyBag(
+                mapOf(
+                    "coverage" to testSuites.associate { it.methodId to it.methodCoverage.transitiveCoverage }
+                )
+            )
         )
     )
 ).let { TvmContractCode.json.encodeToString(it) }
 
-private fun TvmSymbolicTestSuite.toSarifResult(methodsMapping: Map<BigInteger, String>): List<Result> {
+private fun TvmSymbolicTestSuite.toSarifResult(methodsMapping: Map<MethodId, String>): List<Result> {
     val allErroneousTests = tests.filter { it.result is TvmMethodFailure }
 
     return allErroneousTests.map {
@@ -66,7 +71,7 @@ private fun TvmSymbolicTestSuite.toSarifResult(methodsMapping: Map<BigInteger, S
 
 private fun resolveRuleId(methodResult: TvmFailure): String = methodResult.exit.ruleName
 
-private fun resolveCodeFlows(stackTrace: List<TvmInst>, methodsMapping: Map<BigInteger, String>): List<CodeFlow> {
+private fun resolveCodeFlows(stackTrace: List<TvmInst>, methodsMapping: Map<MethodId, String>): List<CodeFlow> {
     val threadFlows = mutableListOf<ThreadFlow>()
 
     for (stmt in stackTrace) {

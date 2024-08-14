@@ -6,8 +6,9 @@ import org.usvm.machine.BocAnalyzer
 import org.usvm.machine.FiftAnalyzer
 import org.usvm.machine.FiftInterpreterResult
 import org.usvm.machine.FuncAnalyzer
+import org.usvm.machine.MethodId
 import org.usvm.machine.TactAnalyzer
-import org.usvm.machine.intMaxValueAsBigInteger
+import org.usvm.machine.mainMethodId
 import org.usvm.machine.intValue
 import org.usvm.machine.state.TvmStack
 import org.usvm.test.resolver.TvmContractSymbolicTestResult
@@ -17,7 +18,6 @@ import org.usvm.test.resolver.TvmTestIntegerValue
 import org.usvm.test.resolver.TvmTestNullValue
 import org.usvm.test.resolver.TvmTestTupleValue
 import org.usvm.test.resolver.TvmTestValue
-import java.math.BigInteger
 import java.nio.file.Path
 import kotlin.io.path.Path
 import kotlin.test.assertEquals
@@ -34,7 +34,7 @@ private val FIFT_STDLIB_RESOURCE: Path = object {}.javaClass.getResource(FIFT_ST
 fun tactCompileAndAnalyzeAllMethods(
     tactSourcesPath: Path,
     contractDataHex: String? = null,
-    methodsBlackList: Set<BigInteger> = hashSetOf(intMaxValueAsBigInteger),
+    methodsBlackList: Set<MethodId> = hashSetOf(mainMethodId),
 ): TvmContractSymbolicTestResult = TactAnalyzer.analyzeAllMethods(
     tactSourcesPath,
     contractDataHex,
@@ -44,7 +44,7 @@ fun tactCompileAndAnalyzeAllMethods(
 fun funcCompileAndAnalyzeAllMethods(
     funcSourcesPath: Path,
     contractDataHex: String? = null,
-    methodsBlackList: Set<BigInteger> = hashSetOf(intMaxValueAsBigInteger),
+    methodsBlackList: Set<MethodId> = hashSetOf(mainMethodId),
 ): TvmContractSymbolicTestResult = FuncAnalyzer(funcStdlibPath = FUNC_STDLIB_RESOURCE, fiftStdlibPath = FIFT_STDLIB_RESOURCE).analyzeAllMethods(
     funcSourcesPath,
     contractDataHex,
@@ -54,7 +54,7 @@ fun funcCompileAndAnalyzeAllMethods(
 fun compileAndAnalyzeFift(
     fiftPath: Path,
     contractDataHex: String? = null,
-    methodsBlackList: Set<BigInteger> = hashSetOf(intMaxValueAsBigInteger),
+    methodsBlackList: Set<MethodId> = hashSetOf(mainMethodId),
 ): TvmContractSymbolicTestResult = FiftAnalyzer(fiftStdlibPath = FIFT_STDLIB_RESOURCE).analyzeAllMethods(
     fiftPath,
     contractDataHex,
@@ -76,7 +76,7 @@ fun compileFuncToFift(funcSourcesPath: Path, fiftFilePath: Path) =
 fun analyzeAllMethods(
     bytecodePath: String,
     contractDataHex: String? = null,
-    methodsBlackList: Set<BigInteger> = hashSetOf(intMaxValueAsBigInteger),
+    methodsBlackList: Set<MethodId> = hashSetOf(mainMethodId),
 ): TvmContractSymbolicTestResult = BocAnalyzer.analyzeAllMethods(Path(bytecodePath), contractDataHex, methodsBlackList)
 
 /**
@@ -167,7 +167,7 @@ internal fun compareMethodStates(
 ) {
     assertEquals(methodIds, symbolicResult.testSuites.mapTo(hashSetOf()) { it.methodId.toInt() })
 
-    for ((method, tests) in symbolicResult.testSuites) {
+    for ((method, _, tests) in symbolicResult.testSuites) {
         val test = tests.single()
         val methodId = method.toInt()
         val concreteResult = expectedResult(methodId)

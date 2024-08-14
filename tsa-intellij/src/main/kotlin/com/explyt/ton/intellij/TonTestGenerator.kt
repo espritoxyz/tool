@@ -16,9 +16,9 @@ import org.ton.mapping.makeMethodsMapping
 import org.ton.sarif.toSarifReport
 import org.usvm.machine.FiftAnalyzer
 import org.usvm.machine.FuncAnalyzer
+import org.usvm.machine.MethodId
 import org.usvm.machine.TactAnalyzer
 import java.io.File
-import java.math.BigInteger
 import java.nio.file.Path
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -44,7 +44,7 @@ class TonTestGenerator(private val project: Project) {
 
         val sourcesPath = Path.of(generateTestModel.fileUnderTest.path)
         val testFile = withBackgroundProgressOnPooledThread(project, "Generating TON tests") {
-            val methodsMapping = hashMapOf<BigInteger, FuncFunction>()
+            val methodsMapping = hashMapOf<MethodId, FuncFunction>()
             makeMethodsMapping(
                 funcSourcesPath = sourcesPath,
                 project = project,
