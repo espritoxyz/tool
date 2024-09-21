@@ -22,6 +22,7 @@ import org.ton.bytecode.TvmArithmBasicMulInst
 import org.ton.bytecode.TvmArithmBasicMulconstInst
 import org.ton.bytecode.TvmArithmBasicNegateInst
 import org.ton.bytecode.TvmArithmBasicSubInst
+import org.ton.bytecode.TvmArithmBasicSubrInst
 import org.ton.bytecode.TvmArithmDivInst
 import org.ton.bytecode.TvmArithmLogicalAbsInst
 import org.ton.bytecode.TvmArithmLogicalAndInst
@@ -279,6 +280,7 @@ import org.usvm.machine.state.defineC3
 import org.usvm.machine.state.defineC4
 import org.usvm.machine.state.defineC5
 import org.usvm.machine.state.defineC7
+import org.usvm.machine.state.doSwap
 import org.usvm.machine.state.getSliceRemainingBitsCount
 import org.usvm.machine.state.getSliceRemainingRefsCount
 import org.usvm.machine.state.initC7
@@ -764,18 +766,6 @@ class TvmInterpreter(
                     mkBvAddExpr(firstOperand, secondOperand)
                 }
 
-                is TvmArithmBasicSubInst -> {
-                    val secondOperand = scope.takeLastIntOrThrowTypeError() ?: return
-                    val firstOperand = scope.takeLastIntOrThrowTypeError() ?: return
-                    // TODO optimize using ksmt implementation?
-                    val resNoOverflow = mkBvSubNoOverflowExpr(firstOperand, secondOperand)
-                    checkOverflow(resNoOverflow, scope) ?: return
-                    val resNoUnderflow = mkBvSubNoUnderflowExpr(firstOperand, secondOperand, isSigned = true)
-                    checkUnderflow(resNoUnderflow, scope) ?: return
-
-                    mkBvSubExpr(firstOperand, secondOperand)
-                }
-
                 is TvmArithmBasicMulInst -> {
                     val secondOperand = scope.takeLastIntOrThrowTypeError() ?: return
                     val firstOperand = scope.takeLastIntOrThrowTypeError() ?: return
@@ -787,7 +777,6 @@ class TvmInterpreter(
 
                     mkBvMulExpr(firstOperand, secondOperand)
                 }
-//            else -> error("Unknown stmt: $stmt")
                 is TvmArithmBasicAddconstInst -> {
                     val firstOperand = scope.takeLastIntOrThrowTypeError() ?: return
                     val secondOperand = stmt.c.toBv257()
@@ -840,14 +829,23 @@ class TvmInterpreter(
                 is TvmArithmBasicNegateInst -> {
                     val operand = scope.takeLastIntOrThrowTypeError() ?: return
 
+                    val noPossibleOverflow = operand neq min257BitValue
                     scope.fork(
-                        operand eq min257BitValue,
+                        noPossibleOverflow,
                         blockOnFalseState = throwIntegerOverflowError
                     ) ?: return
 
                     mkBvNegationExpr(operand)
                 }
-                else -> TODO("$stmt")
+                is TvmArithmBasicSubInst -> {
+                    doSubtraction(scope)
+                        ?: return
+                }
+                is TvmArithmBasicSubrInst -> {
+                    doSwap(scope)
+                    doSubtraction(scope)
+                        ?: return
+                }
             }
 
             scope.doWithState {
@@ -855,6 +853,26 @@ class TvmInterpreter(
                 newStmt(stmt.nextStmt())
             }
         }
+    }
+
+    context(TvmContext)
+    private fun doSubtraction(
+        scope: TvmStepScope,
+    ): UExpr<TvmInt257Sort>? {
+        val secondOperand = scope.takeLastIntOrThrowTypeError()
+            ?: return null
+        val firstOperand = scope.takeLastIntOrThrowTypeError()
+            ?: return null
+
+        // TODO optimize using ksmt implementation?
+        val resNoOverflow = mkBvSubNoOverflowExpr(firstOperand, secondOperand)
+        checkOverflow(resNoOverflow, scope)
+            ?: return null
+        val resNoUnderflow = mkBvSubNoUnderflowExpr(firstOperand, secondOperand, isSigned = true)
+        checkUnderflow(resNoUnderflow, scope)
+            ?: return null
+
+        return mkBvSubExpr(firstOperand, secondOperand)
     }
 
     private fun visitArithmeticLogicalInst(scope: TvmStepScope, stmt: TvmArithmLogicalInst): Unit = with(ctx) {
