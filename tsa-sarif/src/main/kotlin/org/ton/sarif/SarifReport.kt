@@ -18,7 +18,9 @@ import org.ton.bytecode.TvmMethod
 import org.usvm.machine.MethodId
 import org.usvm.machine.state.TvmMethodResult.TvmFailure
 import org.usvm.test.resolver.TvmContractSymbolicTestResult
+import org.usvm.test.resolver.TvmExecutionWithStructuralError
 import org.usvm.test.resolver.TvmMethodFailure
+import org.usvm.test.resolver.TvmSuccessfulExecution
 import org.usvm.test.resolver.TvmSymbolicTestSuite
 
 fun TvmContractSymbolicTestResult.toSarifReport(methodsMapping: Map<MethodId, String>): String = SarifSchema210(
@@ -38,18 +40,28 @@ fun TvmContractSymbolicTestResult.toSarifReport(methodsMapping: Map<MethodId, St
 ).let { TvmContractCode.json.encodeToString(it) }
 
 private fun TvmSymbolicTestSuite.toSarifResult(methodsMapping: Map<MethodId, String>): List<Result> {
-    val allErroneousTests = tests.filter { it.result is TvmMethodFailure }
-
-    return allErroneousTests.map {
-        val methodFailure = it.result as TvmMethodFailure
+    return tests.mapNotNull {
+        val (ruleId, message) = when (it.result) {
+            is TvmMethodFailure -> {
+                val methodFailure = it.result as TvmMethodFailure
+                resolveRuleId(methodFailure.failure) to methodFailure.failure.toString()
+            }
+            is TvmExecutionWithStructuralError -> {
+                val exit = (it.result as TvmExecutionWithStructuralError).exit
+                exit.ruleId to exit.toString()
+            }
+            is TvmSuccessfulExecution -> {
+                return@mapNotNull null
+            }
+        }
 
         val methodId = it.methodId
         val methodName = methodsMapping[methodId]
 
         Result(
-            ruleID = resolveRuleId(methodFailure.failure),
+            ruleID = ruleId,
             level = TsaSarifSchema.TsaSarifResult.LEVEL,
-            message = Message(text = methodFailure.failure.toString()),
+            message = Message(text = message),
             locations = listOf(
                 Location(
                     logicalLocations = listOf(

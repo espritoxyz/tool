@@ -56,6 +56,7 @@ class TvmStepScope(
     fun stepResult() = StepResult(forkedStates.asSequence(), alive)
 
     val isDead: Boolean get() = stepScopeState === DEAD
+    val canBeProcessed: Boolean get() = stepScopeState == CAN_BE_PROCESSED
 
     /**
      * Executes [block] on a state.
@@ -127,9 +128,25 @@ class TvmStepScope(
         blockOnFalseState: TvmState.() -> Unit = {},
     ): Unit? {
         val clonedState = originalState.clone()
-        val clonedStepScope = TvmStepScope(clonedState, forkBlackList)
 
-        val result = assert(condition, unsatBlock = blockOnUnsatTrueState, unknownBlock = blockOnUnknownTrueState)
+        assert(condition, unsatBlock = blockOnUnsatTrueState, unknownBlock = blockOnUnknownTrueState)
+            ?: run {
+                /**
+                 * Hack: change [stepScopeState] to make assert with opposite constraint possible.
+                 *
+                 * If we got here, it means that [condition] was UNSAT or UNKNOWN,
+                 * and that means that the original model in [originalState] did not satisfy [condition],
+                 * and that means that asserting opposite constraint might result only in SAT.
+                 * */
+                stepScopeState = CAN_BE_PROCESSED
+                assert(ctx.mkNot(condition), satBlock = blockOnFalseState)
+
+                // fix current step scope
+                stepScopeState = CANNOT_BE_PROCESSED
+                return null
+            }
+
+        val clonedStepScope = TvmStepScope(clonedState, forkBlackList)
 
         clonedStepScope.assert(ctx.mkNot(condition))
         if (clonedStepScope.alive) {
@@ -137,7 +154,7 @@ class TvmStepScope(
             forkedStates += clonedStepScope.originalState
         }
 
-        return result
+        return Unit
     }
 
     /**
@@ -240,7 +257,17 @@ class TvmStepScope(
                 }
 
                 is UUnknownResult -> {
-                    originalState.pathConstraints += constraint
+                    /**
+                     * The following line was removed from here:
+                     * "originalState.pathConstraints += constraint"
+                     *
+                     * That line invalidates [originalState], because after that we get
+                     * a state with models that do not satisfy pathConstraints.
+                     * Originally, that state was not used anymore, so that didn't make any effect.
+                     *
+                     * Now, [originalState] might be used even after this StepScope is dead.
+                     * This happens in [forkWithCheckerStatusKnowledge].
+                     * */
                     originalState.unknownBlock()
                     stepScopeState = DEAD
                     return null
@@ -257,6 +284,16 @@ class TvmStepScope(
         originalState.satBlock()
 
         return Unit
+    }
+
+    fun filterForkedStatesOnCondition(constraint: UBoolExpr) {
+        val forkedStatesCopy = forkedStates.toList()
+        forkedStatesCopy.forEach { forkedState ->
+            val newStateScope = TvmStepScope(forkedState, forkBlackList)
+            newStateScope.assert(constraint) ?: run {
+                forkedStates.remove(forkedState)
+            }
+        }
     }
 
     /**
@@ -349,6 +386,33 @@ class TvmStepScope(
         return when (solverResult) {
             is USatResult -> originalState.models += solverResult.model
             is UUnknownResult, is UUnsatResult -> null
+        }
+    }
+
+    // TODO what to return?
+    // TODO docs
+    fun doWithConditions(
+        conditionsWithActions: List<Pair<UBoolExpr, TvmState.() -> Unit>>,
+        doForAllBlock: TvmStepScope.() -> Unit,
+    ) {
+        check(canProcessFurtherOnCurrentStep)
+
+        val states = ctx.statesForkProvider.forkMulti(originalState, conditionsWithActions.map { it.first })
+        states.forEachIndexed { idx, state ->
+            state?.let {
+                val action = conditionsWithActions[idx].second
+                action(state)
+                val newScope = TvmStepScope(state, forkBlackList)
+                doForAllBlock(newScope)
+
+                if (newScope.alive) {
+                    if (state !== originalState) {
+                        forkedStates += state
+                    }
+
+                    forkedStates += newScope.forkedStates
+                }
+            }
         }
     }
 

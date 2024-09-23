@@ -2,7 +2,8 @@ package org.usvm.test.resolver
 
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
-import org.usvm.machine.types.Endian
+import org.ton.Endian
+import org.usvm.machine.TvmContext.Companion.stdMsgAddrSize
 import java.math.BigInteger
 
 @Serializable
@@ -24,7 +25,18 @@ data class TvmTestDataCellValue(
     val data: String = "",
     val refs: List<TvmTestCellValue> = listOf(),
     val knownTypes: List<TvmCellDataTypeLoad> = listOf()
-): TvmTestCellValue
+): TvmTestCellValue {
+    fun dataCellDepth(): Int =
+        if (refs.isEmpty()) {
+            0
+        } else {
+            val childrenDepths = refs.mapNotNull {
+                // null for dict cells
+                (it as? TvmTestDataCellValue)?.dataCellDepth()
+            }
+            1 + (childrenDepths.maxOrNull() ?: 0)
+        }
+}
 
 @Serializable
 data class TvmTestBuilderValue(
@@ -60,9 +72,10 @@ data object TvmCellDataMaybeConstructorBit: TvmCellDataType {
     override val bitSize: Int = 1
 }
 
+// TODO: only stdAddr is supported now
 @Serializable
 data object TvmCellDataMsgAddr: TvmCellDataType {
-    override val bitSize: Int = 2
+    override val bitSize: Int = stdMsgAddrSize
 }
 
 @Serializable

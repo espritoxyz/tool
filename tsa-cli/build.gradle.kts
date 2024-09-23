@@ -6,6 +6,7 @@ dependencies {
     implementation(project(":tsa-core"))
     implementation(project(":tsa-sarif"))
     implementation("com.github.ajalt.clikt:clikt:${Versions.clikt}")
+
 }
 
 tasks.register<JavaExec>("run") {

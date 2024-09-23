@@ -5,6 +5,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.encodeToStream
 import mu.KLogging
+import org.ton.TvmInputInfo
 import org.ton.bytecode.TvmContractCode
 import org.ton.cell.Cell
 import org.usvm.machine.FuncAnalyzer.Companion.FIFT_EXECUTABLE
@@ -35,7 +36,9 @@ sealed interface TvmAnalyzer {
     fun analyzeAllMethods(
         sourcesPath: Path,
         contractDataHex: String? = null,
-        methodsBlackList: Set<MethodId> = hashSetOf(mainMethodId)
+        methodsBlackList: Set<MethodId> = hashSetOf(mainMethodId),
+        inputInfo: Map<BigInteger, TvmInputInfo> = emptyMap(),
+        tvmOptions: TvmOptions = TvmOptions(),
     ): TvmContractSymbolicTestResult
 }
 
@@ -44,7 +47,9 @@ data object TactAnalyzer : TvmAnalyzer {
     override fun analyzeAllMethods(
         sourcesPath: Path,
         contractDataHex: String?,
-        methodsBlackList: Set<MethodId>
+        methodsBlackList: Set<MethodId>,
+        inputInfo: Map<BigInteger, TvmInputInfo>,
+        tvmOptions: TvmOptions,
     ): TvmContractSymbolicTestResult {
         val outputDir = createTempDirectory(CONFIG_OUTPUT_PREFIX)
         val sourcesInOutputDir = sourcesPath.copyTo(outputDir.resolve(sourcesPath.fileName))
@@ -56,7 +61,13 @@ data object TactAnalyzer : TvmAnalyzer {
             val bocFile = outputDir.walk().singleOrNull { it.toFile().extension == "boc" }
                 ?: error("Cannot find .boc file after compiling the Tact source $sourcesPath")
 
-            return BocAnalyzer.analyzeAllMethods(bocFile, contractDataHex, methodsBlackList)
+            return BocAnalyzer.analyzeAllMethods(
+                bocFile,
+                contractDataHex,
+                methodsBlackList,
+                inputInfo,
+                tvmOptions,
+            )
         } finally {
             outputDir.deleteRecursively()
             configFile.deleteIfExists()
@@ -122,12 +133,20 @@ class FuncAnalyzer(
     override fun analyzeAllMethods(
         sourcesPath: Path,
         contractDataHex: String?,
-        methodsBlackList: Set<MethodId>
+        methodsBlackList: Set<MethodId>,
+        inputInfo: Map<BigInteger, TvmInputInfo>,
+        tvmOptions: TvmOptions,
     ): TvmContractSymbolicTestResult {
         val tmpBocFile = createTempFile(suffix = ".boc")
         try {
             compileFuncSourceToBoc(sourcesPath, tmpBocFile)
-            return BocAnalyzer.analyzeAllMethods(tmpBocFile, contractDataHex, methodsBlackList)
+            return BocAnalyzer.analyzeAllMethods(
+                tmpBocFile,
+                contractDataHex,
+                methodsBlackList,
+                inputInfo,
+                tvmOptions,
+            )
         } finally {
             tmpBocFile.deleteIfExists()
         }
@@ -180,12 +199,20 @@ class FiftAnalyzer(
     override fun analyzeAllMethods(
         sourcesPath: Path,
         contractDataHex: String?,
-        methodsBlackList: Set<MethodId>
+        methodsBlackList: Set<MethodId>,
+        inputInfo: Map<BigInteger, TvmInputInfo>,
+        tvmOptions: TvmOptions,
     ): TvmContractSymbolicTestResult {
         val tmpBocFile = createTempFile(suffix = ".boc")
         try {
             compileFiftToBoc(sourcesPath, tmpBocFile)
-            return BocAnalyzer.analyzeAllMethods(tmpBocFile, contractDataHex, methodsBlackList)
+            return BocAnalyzer.analyzeAllMethods(
+                tmpBocFile,
+                contractDataHex,
+                methodsBlackList,
+                inputInfo,
+                tvmOptions,
+            )
         } finally {
             tmpBocFile.deleteIfExists()
         }
@@ -343,10 +370,12 @@ data object BocAnalyzer : TvmAnalyzer {
     override fun analyzeAllMethods(
         sourcesPath: Path,
         contractDataHex: String?,
-        methodsBlackList: Set<MethodId>
+        methodsBlackList: Set<MethodId>,
+        inputInfo: Map<BigInteger, TvmInputInfo>,
+        tvmOptions: TvmOptions,
     ): TvmContractSymbolicTestResult {
         val contract = loadContractFromBoc(sourcesPath)
-        return analyzeAllMethods(contract, methodsBlackList, contractDataHex)
+        return analyzeAllMethods(contract, methodsBlackList, contractDataHex, inputInfo, tvmOptions)
     }
 
     fun loadContractFromBoc(bocFilePath: Path): TvmContractCode {
@@ -382,10 +411,11 @@ data object BocAnalyzer : TvmAnalyzer {
 fun analyzeAllMethods(
     contract: TvmContractCode,
     methodsBlackList: Set<MethodId> = hashSetOf(mainMethodId),
-    contractDataHex: String? = null
+    contractDataHex: String? = null,
+    inputInfo: Map<BigInteger, TvmInputInfo> = emptyMap(),
+    tvmOptions: TvmOptions = TvmOptions(),
 ): TvmContractSymbolicTestResult {
     val contractData = Cell.Companion.of(contractDataHex ?: DEFAULT_CONTRACT_DATA_HEX)
-    val tvmOptions = TvmOptions(enableVarAddress = false)
     val machine = TvmMachine(tvmOptions = tvmOptions)
     val methodsExceptDictPushConst = contract.methods.filterKeys { it !in methodsBlackList }
     val methodStates = methodsExceptDictPushConst.values.associateWith { method ->
@@ -394,8 +424,9 @@ fun analyzeAllMethods(
             val states = machine.analyze(
                 contract,
                 contractData,
-                method.id,
                 coverageStatistics,
+                method.id,
+                inputInfo[method.id] ?: TvmInputInfo()
             )
             val coverage = TvmMethodCoverage(
                 coverageStatistics.getMethodCoveragePercents(method),
@@ -433,7 +464,7 @@ data class FiftInterpreterResult(
     val stack: List<String>
 )
 
-private const val DEFAULT_CONTRACT_DATA_HEX = "b5ee9c7241010101000a00001000000185d258f59ccfc59500"
+const val DEFAULT_CONTRACT_DATA_HEX = "b5ee9c7241010101000a00001000000185d258f59ccfc59500"
 private const val COMPILER_TIMEOUT = 5.toLong() // seconds
 
 typealias MethodId = BigInteger

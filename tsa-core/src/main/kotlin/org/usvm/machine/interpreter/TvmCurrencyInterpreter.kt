@@ -13,6 +13,7 @@ import org.usvm.machine.state.builderCopy
 import org.usvm.machine.state.builderStoreGrams
 import org.usvm.machine.state.consumeDefaultGas
 import org.usvm.machine.state.doWithStateCtx
+import org.usvm.machine.state.loadDataBitsFromCellWithoutChecks
 import org.usvm.machine.state.newStmt
 import org.usvm.machine.state.nextStmt
 import org.usvm.machine.state.sliceCopy
@@ -41,12 +42,13 @@ class TvmCurrencyInterpreter(private val ctx: TvmContext) {
             }
 
             val updatedSlice = memory.allocConcrete(TvmSliceType).also { sliceCopy(slice, it) }
-            val grams = scope.sliceLoadGrams(updatedSlice) ?: return@doWithStateCtx
+            sliceLoadGrams(scope, slice, updatedSlice) { grams ->
 
-            addOnStack(grams, TvmIntegerType)
-            addOnStack(updatedSlice, TvmSliceType)
+                addOnStack(grams, TvmIntegerType)
+                addOnStack(updatedSlice, TvmSliceType)
 
-            newStmt(stmt.nextStmt())
+                newStmt(stmt.nextStmt())
+            }
         }
     }
 

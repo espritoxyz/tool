@@ -5,6 +5,7 @@ import org.ton.bytecode.TvmMethod
 import org.usvm.machine.MethodId
 import org.usvm.machine.state.TvmMethodResult.TvmFailure
 import org.usvm.machine.state.TvmState
+import org.usvm.machine.types.TvmStructuralExit
 
 data object TvmTestResolver {
     fun resolve(method: TvmMethod, state: TvmState): TvmSymbolicTest {
@@ -62,6 +63,9 @@ data class TvmSymbolicTest(
 
 sealed interface TvmMethodSymbolicResult {
     val stack: List<TvmTestValue>
+}
+
+sealed interface TvmTerminalMethodSymbolicResult : TvmMethodSymbolicResult {
     val exitCode: UInt
 }
 
@@ -70,6 +74,15 @@ data class TvmMethodFailure(
     val lastStmt: TvmInst,
     override val exitCode: UInt,
     override val stack: List<TvmTestValue>
-) : TvmMethodSymbolicResult
+) : TvmTerminalMethodSymbolicResult
 
-data class TvmSuccessfulExecution(override val exitCode: UInt, override val stack: List<TvmTestValue>) : TvmMethodSymbolicResult
+data class TvmSuccessfulExecution(
+    override val exitCode: UInt,
+    override val stack: List<TvmTestValue>,
+) : TvmTerminalMethodSymbolicResult
+
+data class TvmExecutionWithStructuralError(
+    val lastStmt: TvmInst,
+    override val stack: List<TvmTestValue>,
+    val exit: TvmStructuralExit<TvmCellDataType>,
+) : TvmMethodSymbolicResult

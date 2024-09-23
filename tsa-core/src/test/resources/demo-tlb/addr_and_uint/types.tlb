@@ -1,0 +1,3 @@
+// (uses definitions from block.tlb)
+
+_ addr:MsgAddress a:uint32 b:uint32 = InternalMsgBody;

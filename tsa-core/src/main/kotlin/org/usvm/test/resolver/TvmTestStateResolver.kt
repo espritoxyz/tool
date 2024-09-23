@@ -3,8 +3,11 @@ package org.usvm.test.resolver
 import io.ksmt.expr.KBitVecValue
 import io.ksmt.utils.BvUtils.toBigIntegerSigned
 import kotlinx.collections.immutable.persistentListOf
+import org.ton.TvmAtomicDataCellLabel
+import org.ton.TvmCompositeDataCellLabel
+import org.ton.TvmParameterInfo
 import org.ton.bytecode.TvmCodeBlock
-import org.usvm.machine.types.TvmType
+import org.ton.bytecode.TvmInst
 import org.usvm.NULL_ADDRESS
 import org.usvm.UAddressSort
 import org.usvm.UConcreteHeapAddress
@@ -17,28 +20,35 @@ import org.usvm.isTrue
 import org.usvm.machine.TvmContext
 import org.usvm.machine.TvmSizeSort
 import org.usvm.machine.intValue
-import org.usvm.machine.state.TvmMethodResult
-import org.usvm.machine.types.TvmSymbolicCellMaybeDictConstructorBit
-import org.usvm.machine.types.TvmSymbolicCellDataInteger
-import org.usvm.machine.types.TvmSymbolicCellDataType
-import org.usvm.machine.types.CellDataTypeInfo
 import org.usvm.machine.state.TvmCellRefsRegionValueInfo
+import org.usvm.machine.state.TvmMethodResult
 import org.usvm.machine.state.TvmRefsMemoryRegion
 import org.usvm.machine.state.TvmStack
 import org.usvm.machine.state.TvmStack.TvmStackTupleValue
 import org.usvm.machine.state.TvmStack.TvmStackTupleValueConcreteNew
 import org.usvm.machine.state.TvmState
-import org.usvm.machine.types.TvmSymbolicCellDataBitArray
 import org.usvm.machine.state.calcConsumedGas
 import org.usvm.machine.state.ensureSymbolicBuilderInitialized
 import org.usvm.machine.state.ensureSymbolicCellInitialized
 import org.usvm.machine.state.ensureSymbolicSliceInitialized
 import org.usvm.machine.state.lastStmt
 import org.usvm.machine.state.tvmCellRefsRegion
+import org.usvm.machine.types.TvmDataCellLoadedTypeInfo
 import org.usvm.machine.types.TvmDataCellType
 import org.usvm.machine.types.TvmDictCellType
+import org.usvm.machine.types.TvmReadingOfUnexpectedType
+import org.usvm.machine.types.TvmReadingOutOfSwitchBounds
+import org.usvm.machine.types.TvmSymbolicCellDataBitArray
 import org.usvm.machine.types.TvmSymbolicCellDataCoins
+import org.usvm.machine.types.TvmSymbolicCellDataInteger
 import org.usvm.machine.types.TvmSymbolicCellDataMsgAddr
+import org.usvm.machine.types.TvmSymbolicCellDataType
+import org.usvm.machine.types.TvmSymbolicCellMaybeConstructorBit
+import org.usvm.machine.types.TvmType
+import org.usvm.machine.types.TvmUnexpectedEndOfReading
+import org.usvm.machine.types.TvmUnexpectedDataReading
+import org.usvm.machine.types.TvmUnexpectedRefReading
+import org.usvm.machine.types.defaultCellValueOfMinimalLength
 import org.usvm.machine.types.getPossibleTypes
 import org.usvm.memory.UMemory
 import org.usvm.model.UModelBase
@@ -71,12 +81,33 @@ class TvmTestStateResolver(
             TvmMethodResult.NoCall -> error("Missed result for state $state")
             is TvmMethodResult.TvmFailure -> TvmMethodFailure(it, state.lastStmt, it.exit.exitCode, resolvedResults)
             is TvmMethodResult.TvmSuccess -> TvmSuccessfulExecution(it.exit.exitCode, resolvedResults)
+            is TvmMethodResult.TvmStructuralError -> resolveTvmStructuralError(state.lastStmt, resolvedResults, it)
         }
+    }
+
+    private fun resolveTvmStructuralError(
+        lastStmt: TvmInst,
+        stack: List<TvmTestValue>,
+        exit: TvmMethodResult.TvmStructuralError,
+    ): TvmExecutionWithStructuralError {
+        val resolvedExit = when (val structuralExit = exit.exit) {
+            is TvmUnexpectedDataReading -> TvmUnexpectedDataReading(
+                resolveCellDataType(structuralExit.readingType),
+            )
+            is TvmReadingOfUnexpectedType -> TvmReadingOfUnexpectedType(
+                labelType = structuralExit.labelType,
+                actualType = resolveCellDataType(structuralExit.actualType),
+            )
+            is TvmUnexpectedEndOfReading -> TvmUnexpectedEndOfReading
+            is TvmUnexpectedRefReading -> TvmUnexpectedRefReading
+            is TvmReadingOutOfSwitchBounds -> TvmReadingOutOfSwitchBounds(resolveCellDataType(structuralExit.readingType))
+        }
+        return TvmExecutionWithStructuralError(lastStmt, stack, resolvedExit)
     }
 
     fun resolveGasUsage(): Int = model.eval(state.calcConsumedGas()).intValue()
 
-    fun resolveStackValue(stackValue: TvmStack.TvmStackValue): TvmTestValue {
+    private fun resolveStackValue(stackValue: TvmStack.TvmStackValue): TvmTestValue {
         return when (stackValue) {
             is TvmStack.TvmStackIntValue -> resolveInt257(stackValue.intValue)
             is TvmStack.TvmStackCellValue -> resolveCell(stackValue.cellValue.also { state.ensureSymbolicCellInitialized(it) })
@@ -145,7 +176,7 @@ class TvmTestStateResolver(
         val storedRefs = mutableMapOf<Int, TvmTestCellValue>()
         val updateNode = memory.tvmCellRefsRegion().getRefsUpdateNode(ref)
 
-        resolveRefUpdates(updateNode, storedRefs)
+        resolveRefUpdates(updateNode, storedRefs, refsLength)
 
         for (idx in 0 until refsLength) {
             val refCell = storedRefs[idx]
@@ -154,11 +185,35 @@ class TvmTestStateResolver(
             refs.add(refCell)
         }
 
-        val knownLoads = state.cellDataTypeInfo.addressToActions[ref] ?: persistentListOf()
-        val tvmCellValue = TvmTestDataCellValue(data, refs, resolveTypeLoad(knownLoads))
+        val knownActions = state.dataCellLoadedTypeInfo.addressToActions[ref] ?: persistentListOf()
+        val tvmCellValue = TvmTestDataCellValue(data, refs, resolveTypeLoad(knownActions))
 
         tvmCellValue.also { resolvedCache[ref.address] = tvmCellValue }
     }
+
+    private fun buildDefaultCell(cellInfo: TvmParameterInfo.CellInfo): TvmTestCellValue =
+        when (cellInfo) {
+            is TvmParameterInfo.UnknownCellInfo -> {
+                TvmTestDataCellValue()
+            }
+            is TvmParameterInfo.DictCellInfo -> {
+                TvmTestDictCellValue
+            }
+            is TvmParameterInfo.DataCellInfo -> {
+                when (val label = cellInfo.dataCellStructure) {
+                    is TvmAtomicDataCellLabel -> {
+                        TvmTestDataCellValue(data = label.defaultCellValueOfMinimalLength())
+                    }
+                    is TvmCompositeDataCellLabel -> {
+                        val defaultValue = state.dataCellInfoStorage.mapper.calculatedTlbLabelInfo.getDefaultCell(label)
+                        check(defaultValue != null) {
+                            "Default cell for label ${label.name} must be calculated"
+                        }
+                        defaultValue
+                    }
+                }
+            }
+        }
 
     private fun resolveCell(cell: UHeapRef): TvmTestCellValue = with(ctx) {
         val ref = evaluateInModel(cell) as UConcreteHeapRef
@@ -168,6 +223,17 @@ class TvmTestStateResolver(
 
         val cached = resolvedCache[ref.address]
         if (cached != null) return cached
+
+        val mapper = state.dataCellInfoStorage.mapper
+
+        // This is a special situation for a case when a child of some cell with TL-B scheme
+        // was requested for the first time only during test resolving process.
+        // Since structural constraints are generated lazily, they were not generated for
+        // this child yet. To avoid generation of a test that violates TL-B scheme
+        // we provide [TvmTestCellValue] with default contents for the scheme.
+        if (!mapper.structuralConstraintsWereCalculated(ref) && mapper.addressWasGiven(ref)) {
+            return buildDefaultCell(mapper.getLabelFromModel(model, ref))
+        }
 
         val typeVariants = state.getPossibleTypes(ref)
 
@@ -185,7 +251,8 @@ class TvmTestStateResolver(
 
     private fun resolveRefUpdates(
         updateNode: TvmRefsMemoryRegion.TvmRefsRegionUpdateNode<TvmSizeSort, UAddressSort>?,
-        storedRefs: MutableMap<Int, TvmTestCellValue>
+        storedRefs: MutableMap<Int, TvmTestCellValue>,
+        refsLength: Int,
     ) {
         @Suppress("NAME_SHADOWING")
         var updateNode = updateNode
@@ -194,24 +261,31 @@ class TvmTestStateResolver(
             when (updateNode) {
                 is TvmRefsMemoryRegion.TvmRefsRegionInputNode -> {
                     val idx = resolveInt(updateNode.key)
-                    val value = TvmCellRefsRegionValueInfo(state).actualizeSymbolicValue(updateNode.value)
-                    val refCell = resolveCell(value)
-                    storedRefs.putIfAbsent(idx, refCell)
+                    // [idx] might be >= [refsLength]
+                    // because we read refs when generating structural constraints
+                    // without checking actual number of refs in a cell
+                    if (idx < refsLength) {
+                        val value = TvmCellRefsRegionValueInfo(state).actualizeSymbolicValue(updateNode.value)
+                        val refCell = resolveCell(value)
+                        storedRefs.putIfAbsent(idx, refCell)
+                    }
                 }
 
                 is TvmRefsMemoryRegion.TvmRefsRegionEmptyUpdateNode -> {}
                 is TvmRefsMemoryRegion.TvmRefsRegionCopyUpdateNode -> {
                     val guardValue = evaluateInModel(updateNode.guard)
                     if (guardValue.isTrue) {
-                        resolveRefUpdates(updateNode.updates, storedRefs)
+                        resolveRefUpdates(updateNode.updates, storedRefs, refsLength)
                     }
                 }
                 is TvmRefsMemoryRegion.TvmRefsRegionPinpointUpdateNode -> {
                     val guardValue = evaluateInModel(updateNode.guard)
                     if (guardValue.isTrue) {
                         val idx = resolveInt(updateNode.key)
-                        val refCell = resolveCell(updateNode.value)
-                        storedRefs.putIfAbsent(idx, refCell)
+                        if (idx < refsLength) {
+                            val refCell = resolveCell(updateNode.value)
+                            storedRefs.putIfAbsent(idx, refCell)
+                        }
                     }
                 }
             }
@@ -220,9 +294,9 @@ class TvmTestStateResolver(
         }
     }
 
-    private fun resolveTypeLoad(loads: List<CellDataTypeInfo.Load>): List<TvmCellDataTypeLoad> =
+    private fun resolveTypeLoad(loads: List<TvmDataCellLoadedTypeInfo.Action>): List<TvmCellDataTypeLoad> =
         loads.mapNotNull {
-            if (model.eval(it.guard).isTrue) {
+            if (it is TvmDataCellLoadedTypeInfo.LoadData && model.eval(it.guard).isTrue) {
                 TvmCellDataTypeLoad(resolveCellDataType(it.type), resolveInt(it.offset))
             } else {
                 null
@@ -232,7 +306,7 @@ class TvmTestStateResolver(
     private fun resolveCellDataType(type: TvmSymbolicCellDataType): TvmCellDataType =
         when (type) {
             is TvmSymbolicCellDataInteger -> TvmCellDataInteger(resolveInt(type.sizeBits), type.isSigned, type.endian)
-            is TvmSymbolicCellMaybeDictConstructorBit -> TvmCellDataMaybeConstructorBit
+            is TvmSymbolicCellMaybeConstructorBit -> TvmCellDataMaybeConstructorBit
             is TvmSymbolicCellDataBitArray -> TvmCellDataBitArray(resolveInt(type.sizeBits))
             is TvmSymbolicCellDataMsgAddr -> TvmCellDataMsgAddr
             is TvmSymbolicCellDataCoins -> TvmCellDataCoins(resolveInt(type.coinsPrefix))

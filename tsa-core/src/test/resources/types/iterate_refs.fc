@@ -1,0 +1,13 @@
+#include "../imports/stdlib.fc";
+
+() recv_internal(int msg_value, cell in_msg_cell, slice in_msg) impure {
+    (int left_bits, int left_refs) = in_msg.slice_bits_refs();
+    int cnt = 0;
+    while ((cnt < 10) & (left_refs > 0)) {
+        cnt += 1;
+        cell next_cell = in_msg~load_ref();
+        next_cell~impure_touch();
+        in_msg = next_cell.begin_parse();
+        (left_bits, left_refs) = in_msg.slice_bits_refs();
+    }
+}

@@ -2,18 +2,17 @@ package org.usvm.machine
 
 import io.ksmt.KContext
 import io.ksmt.expr.KBitVecValue
+import io.ksmt.expr.KBvLogicalShiftRightExpr
 import io.ksmt.expr.KExpr
 import io.ksmt.sort.KBvCustomSizeSort
 import io.ksmt.sort.KBvSort
 import io.ksmt.utils.BvUtils.bvMaxValueUnsigned
+import io.ksmt.utils.BvUtils.toBigIntegerSigned
 import io.ksmt.utils.asExpr
 import io.ksmt.utils.toBigInteger
-import org.usvm.machine.types.TvmCellType
 import org.ton.bytecode.TvmField
 import org.ton.bytecode.TvmFieldImpl
 import org.ton.bytecode.TvmQuitContinuation
-import org.usvm.machine.types.TvmSliceType
-import org.usvm.machine.types.TvmType
 import org.usvm.NULL_ADDRESS
 import org.usvm.UBoolExpr
 import org.usvm.UBv32Sort
@@ -32,8 +31,13 @@ import org.usvm.machine.state.TvmTypeCheckError
 import org.usvm.machine.state.bvMaxValueSignedExtended
 import org.usvm.machine.state.bvMinValueSignedExtended
 import org.usvm.machine.state.setFailure
+import org.usvm.machine.types.TvmCellType
+import org.usvm.machine.types.TvmSliceType
+import org.usvm.machine.types.TvmType
+import org.usvm.machine.types.dp.AbstractGuard
 import org.usvm.mkSizeExpr
 import org.usvm.sizeSort
+import java.math.BigInteger
 
 // TODO: There is no size sort in TVM because of absence of arrays, but we need to represent cell data as boolean arrays
 //  with size no more than 1023
@@ -56,6 +60,7 @@ class TvmContext(
     val falseValue: KBitVecValue<TvmInt257Sort> = 0.toBv257()
     val oneValue: KBitVecValue<TvmInt257Sort> = 1.toBv257()
     val twoValue: KBitVecValue<TvmInt257Sort> = 2.toBv257()
+    val fourValue: KBitVecValue<TvmInt257Sort> = 4.toBv257()
     val eightValue: KBitVecValue<TvmInt257Sort> = 8.toBv257()
     val zeroValue: KBitVecValue<TvmInt257Sort> = falseValue
     val minusOneValue: KBitVecValue<TvmInt257Sort> = trueValue
@@ -70,6 +75,9 @@ class TvmContext(
     val masterchain: KBitVecValue<TvmInt257Sort> = minusOneValue
     val baseChain: KBitVecValue<TvmInt257Sort> = zeroValue
 
+    val abstractTrue = AbstractGuard { trueExpr }
+    val abstractFalse = AbstractGuard { falseExpr }
+
     val zeroSizeExpr: UExpr<TvmSizeSort> = mkSizeExpr(0)
     val oneSizeExpr: UExpr<TvmSizeSort> = mkSizeExpr(1)
     val threeSizeExpr: UExpr<TvmSizeSort> = mkSizeExpr(3)
@@ -77,6 +85,7 @@ class TvmContext(
     val sixSizeExpr: UExpr<TvmSizeSort> = mkSizeExpr(6)
     val maxDataLengthSizeExpr: UExpr<TvmSizeSort> = mkSizeExpr(MAX_DATA_LENGTH)
     val maxRefsLengthSizeExpr: UExpr<TvmSizeSort> = mkSizeExpr(MAX_REFS_NUMBER)
+    val stdMsgAddrSizeExpr = mkSizeExpr(stdMsgAddrSize)
 
     val zeroBit = mkBv(0, 1u)
     val oneBit = mkBv(1, 1u)
@@ -151,6 +160,22 @@ class TvmContext(
         else -> super.mkBvSort(sizeBits)
     }
 
+    override fun <T : KBvSort> mkBvExtractExpr(high: Int, low: Int, value: KExpr<T>): KExpr<KBvSort> {
+        if (value is KBvLogicalShiftRightExpr && value.shift is KBitVecValue) {
+            val maxSizeBits = value.sort.sizeBits.toInt()
+            val shiftBI = (value.shift as KBitVecValue).toBigIntegerSigned()
+            if (shiftBI < maxSizeBits.toBigInteger() && shiftBI >= BigInteger.ZERO) {
+                val shift = shiftBI.toInt()
+                val newHigh = high + shift
+                val newLow = low + shift
+                if (newLow >= 0 && newHigh < maxSizeBits) {
+                    return super.mkBvExtractExpr(newHigh, newLow, value.arg)
+                }
+            }
+        }
+        return super.mkBvExtractExpr(high, low, value)
+    }
+
     companion object {
         const val MAX_DATA_LENGTH: Int = 1023
         const val MAX_REFS_NUMBER: Int = 4
@@ -182,6 +207,8 @@ class TvmContext(
         val sliceDataPosField: TvmField = TvmFieldImpl(TvmSliceType, "dataPos")
         val sliceRefPosField: TvmField = TvmFieldImpl(TvmSliceType, "refPos")
         val sliceCellField: TvmField = TvmFieldImpl(TvmSliceType, "cell")
+
+        const val stdMsgAddrSize = 2 + 1 + 8 + 256
     }
 
     class TvmInt257Sort(ctx: KContext) : KBvCustomSizeSort(ctx, INT_BITS)

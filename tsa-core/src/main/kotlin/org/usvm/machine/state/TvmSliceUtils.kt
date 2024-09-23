@@ -4,6 +4,7 @@ import io.ksmt.KContext
 import io.ksmt.expr.KBitVecValue
 import io.ksmt.utils.uncheckedCast
 import io.ksmt.expr.KInterpretedValue
+import io.ksmt.sort.KBvSort
 import org.ton.bytecode.TvmCell
 import org.ton.bytecode.TvmSubSliceSerializedLoader
 import org.usvm.machine.types.TvmCellType
@@ -220,6 +221,35 @@ fun TvmStepScope.assertRefsLengthConstraint(
     assert(correctnessConstraint, unsatBlock = unsatBlock)
 }
 
+private fun TvmState.loadDataBitsFromCellWithoutChecks(
+    cell: UHeapRef,
+    offset: UExpr<TvmSizeSort>,
+    sizeBits: UExpr<TvmSizeSort>
+): UExpr<TvmCellDataSort> = with(ctx) {
+    val cellData = memory.readField(cell, cellDataField, cellDataSort)
+    val endOffset = mkSizeAddExpr(offset, sizeBits)
+    val offsetDataPos = mkSizeSubExpr(maxDataLengthSizeExpr, endOffset)
+    mkBvLogicalShiftRightExpr(cellData, offsetDataPos.zeroExtendToSort(cellDataSort))
+}
+
+fun TvmState.loadDataBitsFromCellWithoutChecks(
+    cell: UHeapRef,
+    offset: UExpr<TvmSizeSort>,
+    sizeBits: Int,
+): UExpr<KBvSort> = with(ctx) {
+    val shiftedData = loadDataBitsFromCellWithoutChecks(cell, offset, mkSizeExpr(sizeBits))
+    return mkBvExtractExpr(high = sizeBits - 1, low = 0, shiftedData)
+}
+
+fun TvmState.loadDataBitsFromCellWithoutChecks(
+    slice: UHeapRef,
+    sizeBits: Int,
+): UExpr<KBvSort> = with(ctx) {
+    val cell = memory.readField(slice, sliceCellField, addressSort)
+    val dataPosition = memory.readField(slice, sliceDataPosField, sizeSort)
+   return loadDataBitsFromCellWithoutChecks(cell, dataPosition, sizeBits)
+}
+
 /**
  * @return bv 1023 with undefined high-order bits
  */
@@ -236,27 +266,50 @@ fun TvmStepScope.slicePreloadDataBits(
         unsatBlock = { error("Cannot ensure correctness for data length in cell $cell") }
     ) ?: return@calcOnStateCtx  null
 
-    val cellData = memory.readField(cell, cellDataField, cellDataSort)
     val dataPosition = memory.readField(slice, sliceDataPosField, sizeSort)
-    val offset = mkBvAddExpr(dataPosition, sizeBits)
-    val offsetDataPos = mkBvSubExpr(maxDataLengthSizeExpr, offset)
     val readingEnd = mkBvAddExpr(dataPosition, sizeBits)
 
     checkCellDataUnderflow(this@slicePreloadDataBits, cell, minSize = readingEnd, quietBlock = quietBlock)
         ?: return@calcOnStateCtx null
 
-    mkBvLogicalShiftRightExpr(cellData, offsetDataPos.zeroExtendToSort(cellDataSort))
+    loadDataBitsFromCellWithoutChecks(cell, dataPosition, sizeBits)
 }
 
 fun TvmStepScope.slicePreloadDataBits(
     slice: UHeapRef,
     bits: Int,
     quietBlock: (TvmState.() -> Unit)? = null
-): UExpr<UBvSort>? {
-    val data = calcOnStateCtx { slicePreloadDataBits(slice, mkSizeExpr(bits), quietBlock) }
-        ?: return null
+): UExpr<UBvSort>? = doWithCtx {
+    val data = slicePreloadDataBits(slice, mkSizeExpr(bits), quietBlock)
+        ?: return@doWithCtx null
 
-    return calcOnStateCtx { mkBvExtractExpr(high = bits - 1, low = 0, data) }
+    mkBvExtractExpr(high = bits - 1, low = 0, data)
+}
+
+private fun TvmContext.extractIntFromShiftedData(
+    shiftedData: UExpr<TvmCellDataSort>,
+    sizeBits: UExpr<TvmInt257Sort>,
+    isSigned: Boolean,
+): UExpr<TvmInt257Sort> {
+    val extractedBits = shiftedData.extractToInt257Sort()
+    val trashBits = mkBvSubExpr(intBitsValue, sizeBits)
+    val shiftedBits = mkBvShiftLeftExpr(extractedBits, trashBits)
+
+    return if (!isSigned) {
+        mkBvLogicalShiftRightExpr(shiftedBits, trashBits)
+    } else {
+        mkBvArithShiftRightExpr(shiftedBits, trashBits)
+    }
+}
+
+fun TvmState.loadIntFromCellWithoutChecks(
+    cell: UHeapRef,
+    offset: UExpr<TvmSizeSort>,
+    sizeBits: UExpr<TvmInt257Sort>,
+    isSigned: Boolean
+): UExpr<TvmInt257Sort> = with(ctx) {
+    val shiftedData = loadDataBitsFromCellWithoutChecks(cell, offset, sizeBits.extractToSizeSort())
+    return extractIntFromShiftedData(shiftedData, sizeBits, isSigned)
 }
 
 /**
@@ -272,15 +325,7 @@ fun TvmStepScope.slicePreloadInt(
         ?: return null
 
     return calcOnStateCtx {
-        val extractedBits = shiftedData.extractToInt257Sort()
-        val trashBits = mkBvSubExpr(intBitsValue, sizeBits)
-        val shiftedBits = mkBvShiftLeftExpr(extractedBits, trashBits)
-
-        if (!isSigned) {
-            mkBvLogicalShiftRightExpr(shiftedBits, trashBits)
-        } else {
-            mkBvArithShiftRightExpr(shiftedBits, trashBits)
-        }
+        extractIntFromShiftedData(shiftedData, sizeBits, isSigned)
     }
 }
 
@@ -406,22 +451,32 @@ fun TvmStepScope.slicePreloadAddrLength(slice: UHeapRef): UExpr<TvmSizeSort>? = 
     length
 }
 
-fun TvmStepScope.sliceLoadGrams(
-    slice: UHeapRef
-): UExpr<TvmInt257Sort>? = calcOnStateCtx {
-    val length = slicePreloadDataBits(slice, bits = 4)?.zeroExtendToSort(sizeSort)
-        ?: return@calcOnStateCtx null
+fun sliceLoadGrams(
+    scope: TvmStepScope,
+    oldSlice: UHeapRef,
+    newSlice: UConcreteHeapRef,
+    doWithGrams: TvmStepScope.(UExpr<TvmInt257Sort>) -> Unit
+) = scope.calcOnStateCtx {
+    val peekedLength = loadDataBitsFromCellWithoutChecks(newSlice, sizeBits = 4).zeroExtendToSort(sizeSort)
+    scope.makeSliceTypeLoad(oldSlice, TvmSymbolicCellDataCoins(ctx, peekedLength), newSlice) {
 
-    makeSliceTypeLoad(slice, TvmSymbolicCellDataCoins(ctx, length))
-    sliceMoveDataPtr(slice, bits = 4)
+        // hide the original [scope] from this closure
+        @Suppress("NAME_SHADOWING", "UNUSED_VARIABLE")
+        val scope = Unit
 
-    val extendedLength = mkBvShiftLeftExpr(length, shift = threeSizeExpr)
-    val grams = slicePreloadInt(slice, extendedLength.zeroExtendToSort(int257sort), isSigned = false)
-        ?: return@calcOnStateCtx null
+        val length = slicePreloadDataBits(newSlice, bits = 4)?.zeroExtendToSort(sizeSort)
+            ?: return@makeSliceTypeLoad
 
-    sliceMoveDataPtr(slice, extendedLength)
+        sliceMoveDataPtr(newSlice, bits = 4)
 
-    grams
+        val extendedLength = mkBvShiftLeftExpr(length, shift = threeSizeExpr)
+        val grams = slicePreloadInt(newSlice, extendedLength.zeroExtendToSort(int257sort), isSigned = false)
+            ?: return@makeSliceTypeLoad
+
+        sliceMoveDataPtr(newSlice, extendedLength)
+
+        doWithGrams(grams)
+    }
 }
 
 fun TvmStepScope.slicePreloadRef(

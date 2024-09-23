@@ -1,7 +1,10 @@
 package org.ton.examples
 
+import org.ton.TvmInputInfo
+import org.ton.TvmParameterInfo
 import org.ton.bytecode.TvmContractCode
-import org.usvm.machine.types.TvmIntegerType
+import org.ton.examples.types.InputParameterInfoTests
+import org.ton.tlb.readFromJson
 import org.usvm.machine.BocAnalyzer
 import org.usvm.machine.FiftAnalyzer
 import org.usvm.machine.FiftInterpreterResult
@@ -9,15 +12,20 @@ import org.usvm.machine.FuncAnalyzer
 import org.usvm.machine.MethodId
 import org.usvm.machine.TactAnalyzer
 import org.usvm.machine.mainMethodId
+import org.usvm.machine.TvmOptions
 import org.usvm.machine.intValue
 import org.usvm.machine.state.TvmStack
+import org.usvm.machine.types.TvmIntegerType
 import org.usvm.test.resolver.TvmContractSymbolicTestResult
+import org.usvm.test.resolver.TvmExecutionWithStructuralError
 import org.usvm.test.resolver.TvmSymbolicTest
 import org.usvm.test.resolver.TvmSymbolicTestSuite
+import org.usvm.test.resolver.TvmTerminalMethodSymbolicResult
 import org.usvm.test.resolver.TvmTestIntegerValue
 import org.usvm.test.resolver.TvmTestNullValue
 import org.usvm.test.resolver.TvmTestTupleValue
 import org.usvm.test.resolver.TvmTestValue
+import java.math.BigInteger
 import java.nio.file.Path
 import kotlin.io.path.Path
 import kotlin.test.assertEquals
@@ -35,30 +43,42 @@ fun tactCompileAndAnalyzeAllMethods(
     tactSourcesPath: Path,
     contractDataHex: String? = null,
     methodsBlackList: Set<MethodId> = hashSetOf(mainMethodId),
+    inputInfo: Map<MethodId, TvmInputInfo> = emptyMap(),
+    tvmOptions: TvmOptions = TvmOptions(),
 ): TvmContractSymbolicTestResult = TactAnalyzer.analyzeAllMethods(
     tactSourcesPath,
     contractDataHex,
-    methodsBlackList
+    methodsBlackList,
+    inputInfo,
+    tvmOptions,
 )
 
 fun funcCompileAndAnalyzeAllMethods(
     funcSourcesPath: Path,
     contractDataHex: String? = null,
     methodsBlackList: Set<MethodId> = hashSetOf(mainMethodId),
+    inputInfo: Map<MethodId, TvmInputInfo> = emptyMap(),
+    tvmOptions: TvmOptions = TvmOptions(),
 ): TvmContractSymbolicTestResult = FuncAnalyzer(funcStdlibPath = FUNC_STDLIB_RESOURCE, fiftStdlibPath = FIFT_STDLIB_RESOURCE).analyzeAllMethods(
     funcSourcesPath,
     contractDataHex,
-    methodsBlackList
+    methodsBlackList,
+    inputInfo,
+    tvmOptions,
 )
 
 fun compileAndAnalyzeFift(
     fiftPath: Path,
     contractDataHex: String? = null,
     methodsBlackList: Set<MethodId> = hashSetOf(mainMethodId),
+    inputInfo: Map<MethodId, TvmInputInfo> = emptyMap(),
+    tvmOptions: TvmOptions = TvmOptions(),
 ): TvmContractSymbolicTestResult = FiftAnalyzer(fiftStdlibPath = FIFT_STDLIB_RESOURCE).analyzeAllMethods(
     fiftPath,
     contractDataHex,
     methodsBlackList,
+    inputInfo,
+    tvmOptions,
 )
 
 /**
@@ -77,7 +97,9 @@ fun analyzeAllMethods(
     bytecodePath: String,
     contractDataHex: String? = null,
     methodsBlackList: Set<MethodId> = hashSetOf(mainMethodId),
-): TvmContractSymbolicTestResult = BocAnalyzer.analyzeAllMethods(Path(bytecodePath), contractDataHex, methodsBlackList)
+    inputInfo: Map<MethodId, TvmInputInfo> = emptyMap(),
+): TvmContractSymbolicTestResult =
+    BocAnalyzer.analyzeAllMethods(Path(bytecodePath), contractDataHex, methodsBlackList, inputInfo)
 
 /**
  * Run method with [methodId].
@@ -97,7 +119,11 @@ internal fun TvmStack.loadIntegers(n: Int) = List(n) {
     takeLast(TvmIntegerType) { error("Impossible") }.intValue.intValue()
 }.reversed()
 
-internal fun TvmSymbolicTest.executionCode(): Int = result.exitCode.toInt()
+internal fun TvmSymbolicTest.executionCode(): Int? =
+    when (val casted = result) {
+        is TvmTerminalMethodSymbolicResult -> casted.exitCode.toInt()
+        is TvmExecutionWithStructuralError -> null  // execution interrupted
+    }
 
 internal fun compareSymbolicAndConcreteResults(
     methodIds: Set<Int>,
@@ -213,4 +239,17 @@ internal fun checkInvariants(
         }
     }
     assertTrue(failedInvariants.isEmpty(), "Invariants $failedInvariants were violated")
+}
+
+internal fun extractTlbInfo(typesPath: String): Map<MethodId, TvmInputInfo> {
+    val path = InputParameterInfoTests::class.java.getResource(typesPath)?.path
+        ?: error("Cannot find resource bytecode $typesPath")
+    val struct = readFromJson(Path(path), "InternalMsgBody")
+        ?: error("Couldn't parse TL-B structure")
+    val info = TvmParameterInfo.SliceInfo(
+        TvmParameterInfo.DataCellInfo(
+            struct
+        )
+    )
+    return mapOf(BigInteger.ZERO to TvmInputInfo(mapOf(0 to info)))
 }

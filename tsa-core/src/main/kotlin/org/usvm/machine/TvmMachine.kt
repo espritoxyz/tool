@@ -1,6 +1,7 @@
 package org.usvm.machine
 
 import mu.KLogging
+import org.ton.TvmInputInfo
 import org.ton.bytecode.TvmCodeBlock
 import org.ton.bytecode.TvmContractCode
 import org.ton.bytecode.TvmInst
@@ -19,10 +20,11 @@ import org.usvm.statistics.StepsStatistics
 import org.usvm.statistics.collectors.AllStatesCollector
 import org.usvm.stopstrategies.StepLimitStopStrategy
 import org.usvm.stopstrategies.StopStrategy
+import java.math.BigInteger
 
 class TvmMachine(
     private val options: UMachineOptions = defaultOptions,
-    tvmOptions: TvmOptions = TvmOptions(),
+    private val tvmOptions: TvmOptions = TvmOptions(),
 ) : UMachine<TvmState>() {
     override fun close() {
         // Do nothing
@@ -34,10 +36,18 @@ class TvmMachine(
     fun analyze(
         contractCode: TvmContractCode,
         contractData: Cell,
-        methodId: MethodId,
         coverageStatistics: TvmCoverageStatistics,
+        methodId: BigInteger,
+        inputInfo: TvmInputInfo = TvmInputInfo()
     ): List<TvmState> {
-        val interpreter = TvmInterpreter(ctx, contractCode, typeSystem = components.typeSystem)
+        val interpreter = TvmInterpreter(
+            ctx,
+            contractCode,
+            typeSystem = components.typeSystem,
+            inputInfo = inputInfo,
+            checkDataCellContentTypes = tvmOptions.checkDataCellContentTypes,
+            excludeInputsThatDoNotMatchGivenScheme = tvmOptions.excludeInputsThatDoNotMatchGivenScheme,
+        )
         logger.debug("{}.analyze({})", this, contractCode)
         val initialState = interpreter.getInitialState(contractCode, contractData, methodId)
 

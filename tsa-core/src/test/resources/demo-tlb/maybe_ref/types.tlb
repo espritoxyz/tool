@@ -1,0 +1,3 @@
+// (uses definitions from block.tlb)
+
+_ ref:(Maybe ^Cell) = InternalMsgBody;

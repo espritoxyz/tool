@@ -1,9 +1,12 @@
 package org.usvm.machine.state
 
 import kotlinx.serialization.Serializable
-import org.usvm.machine.state.TvmMethodResult.*
 import org.usvm.UBv32Sort
 import org.usvm.UExpr
+import org.usvm.machine.state.TvmMethodResult.TvmErrorExit
+import org.usvm.machine.state.TvmMethodResult.TvmSuccessfulExit
+import org.usvm.machine.types.TvmStructuralExit
+import org.usvm.machine.types.TvmSymbolicCellDataType
 
 /**
  * Represents a result of a method invocation.
@@ -41,6 +44,11 @@ sealed interface TvmMethodResult {
     interface TvmErrorExit : TvmExit {
         val ruleName: String
     }
+
+    @JvmInline
+    value class TvmStructuralError(
+        val exit: TvmStructuralExit<TvmSymbolicCellDataType>,
+    ) : TvmMethodResult
 }
 
 object TvmNormalExit : TvmSuccessfulExit {
@@ -146,5 +154,3 @@ data class TvmUnknownFailure(override val exitCode: UInt): TvmErrorExit {
 
     override fun toString(): String = "TVM user defined error with exit code $exitCode"
 }
-
-// TODO add remaining

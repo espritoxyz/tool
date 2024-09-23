@@ -1,8 +1,8 @@
 package org.ton.examples.types
 
+import org.ton.Endian
 import org.ton.examples.funcCompileAndAnalyzeAllMethods
 import org.ton.examples.propertiesFound
-import org.usvm.machine.types.Endian
 import org.usvm.test.resolver.TvmCellDataBitArray
 import org.usvm.test.resolver.TvmCellDataMaybeConstructorBit
 import org.usvm.test.resolver.TvmCellDataInteger

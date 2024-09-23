@@ -174,7 +174,7 @@ import org.usvm.machine.types.TvmDictCellType
 import org.usvm.machine.types.TvmIntegerType
 import org.usvm.machine.types.TvmNullType
 import org.usvm.machine.types.TvmSliceType
-import org.usvm.machine.types.TvmSymbolicCellMaybeDictConstructorBit
+import org.usvm.machine.types.TvmSymbolicCellMaybeConstructorBit
 import org.usvm.machine.types.makeSliceTypeLoad
 
 class TvmDictOperationInterpreter(private val ctx: TvmContext) {
@@ -356,38 +356,46 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
             return
         }
 
-        val maybeConstructorTypeBit = scope.slicePreloadDataBits(slice, bits = 1) ?: return
-        scope.doWithState { makeSliceTypeLoad(slice, TvmSymbolicCellMaybeDictConstructorBit(ctx)) }
+        val updatedSlice = scope.calcOnState { memory.allocConcrete(TvmSliceType) }
+        scope.makeSliceTypeLoad(slice, TvmSymbolicCellMaybeConstructorBit(ctx), updatedSlice) {
 
-        val isNotEmpty = scope.calcOnStateCtx { mkEq(maybeConstructorTypeBit, mkBv(value = 1, sizeBits = 1u)) }
+            // hide the original [scope] from this closure
+            @Suppress("NAME_SHADOWING", "UNUSED_VARIABLE")
+            val scope = Unit
 
-        scope.fork(
-            isNotEmpty,
-            blockOnFalseState = {
-                addOnStack(ctx.nullValue, TvmNullType)
+            val maybeConstructorTypeBit = slicePreloadDataBits(slice, bits = 1)
+                ?: return@makeSliceTypeLoad
+
+            val isNotEmpty = calcOnStateCtx { mkEq(maybeConstructorTypeBit, mkBv(value = 1, sizeBits = 1u)) }
+
+            fork(
+                isNotEmpty,
+                blockOnFalseState = {
+                    addOnStack(ctx.nullValue, TvmNullType)
+
+                    if (returnUpdatedSlice) {
+                        updatedSlice.also { sliceCopy(slice, it) }
+                        sliceMoveDataPtr(updatedSlice, bits = 1)
+                        addOnStack(updatedSlice, TvmSliceType)
+                    }
+
+                    newStmt(inst.nextStmt())
+                },
+            ) ?: return@makeSliceTypeLoad
+
+            doWithStateCtx {
+                val dictCellRef = slicePreloadNextRef(slice) ?: return@doWithStateCtx
+                addOnStack(dictCellRef, TvmCellType)
 
                 if (returnUpdatedSlice) {
-                    val updatedSlice = memory.allocConcrete(TvmSliceType).also { sliceCopy(slice, it) }
+                    updatedSlice.also { sliceCopy(slice, it) }
                     sliceMoveDataPtr(updatedSlice, bits = 1)
+                    sliceMoveRefPtr(updatedSlice)
                     addOnStack(updatedSlice, TvmSliceType)
                 }
 
                 newStmt(inst.nextStmt())
-            },
-        ) ?: return
-
-        scope.doWithStateCtx {
-            val dictCellRef = scope.slicePreloadNextRef(slice) ?: return@doWithStateCtx
-            addOnStack(dictCellRef, TvmCellType)
-
-            if (returnUpdatedSlice) {
-                val updatedSlice = memory.allocConcrete(TvmSliceType).also { sliceCopy(slice, it) }
-                sliceMoveDataPtr(updatedSlice, bits = 1)
-                sliceMoveRefPtr(updatedSlice)
-                addOnStack(updatedSlice, TvmSliceType)
             }
-
-            newStmt(inst.nextStmt())
         }
     }
 

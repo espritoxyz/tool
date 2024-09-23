@@ -18,7 +18,9 @@ import org.usvm.UState
 import org.usvm.constraints.UPathConstraints
 import org.usvm.isStaticHeapRef
 import org.usvm.machine.TvmContext
-import org.usvm.machine.types.CellDataTypeInfo
+import org.usvm.machine.types.GlobalStructuralConstraintsHolder
+import org.usvm.machine.types.TvmDataCellInfoStorage
+import org.usvm.machine.types.TvmDataCellLoadedTypeInfo
 import org.usvm.machine.types.TvmRealReferenceType
 import org.usvm.machine.types.TvmType
 import org.usvm.machine.types.TvmTypeSystem
@@ -44,9 +46,11 @@ class TvmState(
     forkPoints: PathNode<PathNode<TvmInst>> = PathNode.root(),
     var methodResult: TvmMethodResult = TvmMethodResult.NoCall,
     targets: UTargetsSet<TvmTarget, TvmInst> = UTargetsSet.empty(),
-    val cellDataTypeInfo: CellDataTypeInfo = CellDataTypeInfo.empty(),
     val typeSystem: TvmTypeSystem,
     var commitedState: TvmCommitedState? = null,
+    val dataCellLoadedTypeInfo: TvmDataCellLoadedTypeInfo = TvmDataCellLoadedTypeInfo.empty(),
+    var stateInitialized: Boolean = false,
+    val globalStructuralConstraintsHolder: GlobalStructuralConstraintsHolder = GlobalStructuralConstraintsHolder(),
 ) : UState<TvmType, TvmCodeBlock, TvmInst, TvmContext, TvmTarget, TvmState>(
     ctx,
     callStack,
@@ -58,7 +62,9 @@ class TvmState(
     targets,
 ) {
     override val isExceptional: Boolean
-        get() = methodResult is TvmMethodResult.TvmFailure
+        get() = methodResult is TvmMethodResult.TvmFailure || methodResult is TvmMethodResult.TvmStructuralError
+
+    lateinit var dataCellInfoStorage: TvmDataCellInfoStorage
 
     /**
      * All visited last instructions in all visited continuations in the LIFO order.
@@ -110,10 +116,14 @@ class TvmState(
             forkPoints = forkPoints,
             methodResult = methodResult,
             targets = targets.clone(),
-            cellDataTypeInfo = cellDataTypeInfo.clone(),
             typeSystem = typeSystem,
             commitedState = commitedState,
-        )
+            dataCellLoadedTypeInfo = dataCellLoadedTypeInfo.clone(),
+            stateInitialized = stateInitialized,
+            globalStructuralConstraintsHolder = globalStructuralConstraintsHolder,
+        ).also { newState ->
+            newState.dataCellInfoStorage = dataCellInfoStorage.clone()
+        }
     }
 
     override fun toString(): String = buildString {

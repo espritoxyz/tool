@@ -1,0 +1,13 @@
+#include "../stdlib.fc";
+
+
+() recv_internal(int msg_value, cell in_msg_cell, slice in_msg) impure {
+    int has_msg = in_msg~load_int(1);
+
+    if (has_msg != 0) {
+        var ref = in_msg~load_ref();
+        ref~impure_touch();
+    }
+
+    in_msg.end_parse();
+}

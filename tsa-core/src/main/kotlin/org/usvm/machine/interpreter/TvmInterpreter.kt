@@ -5,6 +5,7 @@ import io.ksmt.utils.BvUtils.bvMaxValueSigned
 import io.ksmt.utils.BvUtils.bvMinValueSigned
 import kotlinx.collections.immutable.persistentListOf
 import mu.KLogging
+import org.ton.TvmInputInfo
 import org.ton.bytecode.TvmAliasInst
 import org.ton.bytecode.TvmAppActionsInst
 import org.ton.bytecode.TvmAppAddrInst
@@ -46,11 +47,11 @@ import org.ton.bytecode.TvmArithmLogicalUbitsizeInst
 import org.ton.bytecode.TvmArithmLogicalUfitsInst
 import org.ton.bytecode.TvmArithmLogicalUfitsxInst
 import org.ton.bytecode.TvmArithmLogicalXorInst
+import org.ton.bytecode.TvmArtificialExecuteContInst
 import org.ton.bytecode.TvmArtificialImplicitRetInst
-import org.usvm.machine.types.TvmBuilderType
+import org.ton.bytecode.TvmArtificialJmpToContInst
 import org.ton.bytecode.TvmCellBuildInst
 import org.ton.bytecode.TvmCellParseInst
-import org.usvm.machine.types.TvmCellType
 import org.ton.bytecode.TvmCellValue
 import org.ton.bytecode.TvmCodeBlock
 import org.ton.bytecode.TvmCodepageInst
@@ -70,10 +71,16 @@ import org.ton.bytecode.TvmCompareIntNeqInst
 import org.ton.bytecode.TvmCompareIntNeqintInst
 import org.ton.bytecode.TvmCompareIntSgnInst
 import org.ton.bytecode.TvmCompareOtherInst
+import org.ton.bytecode.TvmCompareOtherSdcnttrail0Inst
+import org.ton.bytecode.TvmCompareOtherSdemptyInst
+import org.ton.bytecode.TvmCompareOtherSdeqInst
 import org.ton.bytecode.TvmCompareOtherSemptyInst
+import org.ton.bytecode.TvmCompareOtherSremptyInst
 import org.ton.bytecode.TvmConstDataInst
 import org.ton.bytecode.TvmConstDataPushcontInst
 import org.ton.bytecode.TvmConstDataPushcontShortInst
+import org.ton.bytecode.TvmConstDataPushrefInst
+import org.ton.bytecode.TvmConstDataPushrefsliceInst
 import org.ton.bytecode.TvmConstDataPushsliceInst
 import org.ton.bytecode.TvmConstIntInst
 import org.ton.bytecode.TvmConstIntOneAliasInst
@@ -93,19 +100,34 @@ import org.ton.bytecode.TvmContBasicCallrefInst
 import org.ton.bytecode.TvmContBasicExecuteInst
 import org.ton.bytecode.TvmContBasicInst
 import org.ton.bytecode.TvmContBasicRetInst
+import org.ton.bytecode.TvmContBasicRetaltInst
 import org.ton.bytecode.TvmContConditionalIfInst
 import org.ton.bytecode.TvmContConditionalIfelseInst
+import org.ton.bytecode.TvmContConditionalIfelserefInst
 import org.ton.bytecode.TvmContConditionalIfjmpInst
+import org.ton.bytecode.TvmContConditionalIfjmprefInst
+import org.ton.bytecode.TvmContConditionalIfnotInst
+import org.ton.bytecode.TvmContConditionalIfnotjmpInst
+import org.ton.bytecode.TvmContConditionalIfnotjmprefInst
+import org.ton.bytecode.TvmContConditionalIfnotrefInst
 import org.ton.bytecode.TvmContConditionalIfrefInst
 import org.ton.bytecode.TvmContConditionalIfrefelseInst
+import org.ton.bytecode.TvmContConditionalIfrefelserefInst
 import org.ton.bytecode.TvmContConditionalIfretInst
 import org.ton.bytecode.TvmContConditionalInst
 import org.ton.bytecode.TvmContDictCalldictInst
 import org.ton.bytecode.TvmContDictInst
 import org.ton.bytecode.TvmContLoopsInst
+import org.ton.bytecode.TvmContRegistersComposInst
+import org.ton.bytecode.TvmContRegistersComposaltInst
+import org.ton.bytecode.TvmContRegistersComposbothInst
 import org.ton.bytecode.TvmContRegistersInst
 import org.ton.bytecode.TvmContRegistersPopctrInst
 import org.ton.bytecode.TvmContRegistersPushctrInst
+import org.ton.bytecode.TvmContRegistersSamealtInst
+import org.ton.bytecode.TvmContRegistersSamealtsaveInst
+import org.ton.bytecode.TvmContRegistersSaveInst
+import org.ton.bytecode.TvmContRegistersSetcontctrInst
 import org.ton.bytecode.TvmContinuation
 import org.ton.bytecode.TvmContractCode
 import org.ton.bytecode.TvmDebugInst
@@ -115,8 +137,10 @@ import org.ton.bytecode.TvmDictSpecialDictpushconstInst
 import org.ton.bytecode.TvmDictSpecialInst
 import org.ton.bytecode.TvmExceptionsInst
 import org.ton.bytecode.TvmInst
+import org.ton.bytecode.TvmInstList
+import org.ton.bytecode.TvmInstMethodLocation
 import org.ton.bytecode.TvmLambda
-import org.usvm.machine.types.TvmSliceType
+import org.ton.bytecode.TvmOrdContinuation
 import org.ton.bytecode.TvmStackBasicInst
 import org.ton.bytecode.TvmStackBasicNopInst
 import org.ton.bytecode.TvmStackBasicPopInst
@@ -168,7 +192,6 @@ import org.ton.bytecode.TvmStackComplexXcpu2Inst
 import org.ton.bytecode.TvmStackComplexXcpuInst
 import org.ton.bytecode.TvmStackComplexXcpuxcInst
 import org.ton.bytecode.TvmTupleInst
-import org.usvm.machine.types.TvmType
 import org.ton.cell.Cell
 import org.ton.targets.TvmTarget
 import org.usvm.StepResult
@@ -180,6 +203,7 @@ import org.usvm.api.readField
 import org.usvm.api.writeField
 import org.usvm.constraints.UPathConstraints
 import org.usvm.forkblacklists.UForkBlackList
+import org.usvm.machine.MethodId
 import org.usvm.machine.TvmContext
 import org.usvm.machine.TvmContext.Companion.MAX_DATA_LENGTH
 import org.usvm.machine.TvmContext.Companion.cellDataField
@@ -189,90 +213,39 @@ import org.usvm.machine.TvmContext.Companion.sliceCellField
 import org.usvm.machine.TvmContext.Companion.sliceDataPosField
 import org.usvm.machine.TvmContext.Companion.sliceRefPosField
 import org.usvm.machine.TvmContext.TvmInt257Sort
-import org.usvm.machine.intValue
-import org.usvm.machine.state.C4Register
-import org.usvm.machine.state.TvmRefEmptyValue
-import org.usvm.machine.state.TvmRegisters
-import org.usvm.machine.state.TvmStack
-import org.usvm.machine.state.TvmState
-import org.usvm.machine.state.bvMaxValueSignedExtended
-import org.usvm.machine.state.bvMaxValueUnsignedExtended
-import org.usvm.machine.state.bvMinValueSignedExtended
-import org.usvm.machine.state.consumeDefaultGas
-import org.usvm.machine.state.consumeGas
-import org.usvm.machine.state.doBlkSwap
-import org.usvm.machine.state.doPop
-import org.usvm.machine.state.doPush
-import org.usvm.machine.state.doPuxc
-import org.usvm.machine.state.doWithStateCtx
-import org.usvm.machine.state.doXchg
-import org.usvm.machine.state.doXchg2
-import org.usvm.machine.state.doXchg3
-import org.usvm.machine.state.generateSymbolicCell
-import org.usvm.machine.state.allocSliceFromData
-import org.usvm.machine.state.newStmt
-import org.usvm.machine.state.nextStmt
-import org.usvm.machine.state.signedIntegerFitsBits
-import org.usvm.machine.state.takeLastCell
-import org.usvm.machine.state.takeLastContinuation
-import org.usvm.machine.state.takeLastIntOrThrowTypeError
-import org.usvm.machine.state.takeLastSlice
-import org.usvm.machine.state.unsignedIntegerFitsBits
-import org.usvm.memory.UMemory
-import org.usvm.memory.UWritableMemory
-import org.usvm.mkSizeExpr
-import org.usvm.mkSizeGeExpr
-import org.usvm.sizeSort
-import org.usvm.solver.USatResult
-import org.usvm.targets.UTargetsSet
-import org.ton.bytecode.TvmArtificialExecuteContInst
-import org.ton.bytecode.TvmArtificialJmpToContInst
-import org.ton.bytecode.TvmCompareOtherSdcnttrail0Inst
-import org.ton.bytecode.TvmCompareOtherSdemptyInst
-import org.ton.bytecode.TvmCompareOtherSdeqInst
-import org.ton.bytecode.TvmCompareOtherSremptyInst
-import org.ton.bytecode.TvmConstDataPushrefInst
-import org.ton.bytecode.TvmConstDataPushrefsliceInst
-import org.ton.bytecode.TvmContBasicRetaltInst
-import org.ton.bytecode.TvmContConditionalIfelserefInst
-import org.ton.bytecode.TvmContConditionalIfjmprefInst
-import org.ton.bytecode.TvmContConditionalIfnotInst
-import org.ton.bytecode.TvmContConditionalIfnotjmpInst
-import org.ton.bytecode.TvmContConditionalIfnotjmprefInst
-import org.ton.bytecode.TvmContConditionalIfnotrefInst
-import org.ton.bytecode.TvmContConditionalIfrefelserefInst
-import org.ton.bytecode.TvmContRegistersComposInst
-import org.ton.bytecode.TvmContRegistersComposaltInst
-import org.ton.bytecode.TvmContRegistersComposbothInst
-import org.ton.bytecode.TvmContRegistersSamealtInst
-import org.ton.bytecode.TvmContRegistersSamealtsaveInst
-import org.ton.bytecode.TvmContRegistersSaveInst
-import org.ton.bytecode.TvmContRegistersSetcontctrInst
-import org.ton.bytecode.TvmInstList
-import org.ton.bytecode.TvmInstMethodLocation
-import org.ton.bytecode.TvmOrdContinuation
-import org.usvm.machine.MethodId
 import org.usvm.machine.TvmStepScope
 import org.usvm.machine.bigIntValue
+import org.usvm.machine.intValue
 import org.usvm.machine.mainMethodId
 import org.usvm.machine.state.C0Register
 import org.usvm.machine.state.C1Register
 import org.usvm.machine.state.C2Register
 import org.usvm.machine.state.C3Register
+import org.usvm.machine.state.C4Register
 import org.usvm.machine.state.C5Register
 import org.usvm.machine.state.C7Register
+import org.usvm.machine.state.TvmRefEmptyValue
+import org.usvm.machine.state.TvmRegisters
+import org.usvm.machine.state.TvmStack
 import org.usvm.machine.state.TvmStack.TvmStackTupleValueConcreteNew
-import org.usvm.machine.state.addInt
+import org.usvm.machine.state.TvmState
 import org.usvm.machine.state.addContinuation
+import org.usvm.machine.state.addInt
 import org.usvm.machine.state.addOnStack
 import org.usvm.machine.state.addTuple
 import org.usvm.machine.state.allocEmptyCell
 import org.usvm.machine.state.allocSliceFromCell
+import org.usvm.machine.state.allocSliceFromData
 import org.usvm.machine.state.allocateCell
 import org.usvm.machine.state.bitsToBv
+import org.usvm.machine.state.bvMaxValueSignedExtended
+import org.usvm.machine.state.bvMaxValueUnsignedExtended
+import org.usvm.machine.state.bvMinValueSignedExtended
 import org.usvm.machine.state.checkOutOfRange
 import org.usvm.machine.state.checkOverflow
 import org.usvm.machine.state.checkUnderflow
+import org.usvm.machine.state.consumeDefaultGas
+import org.usvm.machine.state.consumeGas
 import org.usvm.machine.state.defineC0
 import org.usvm.machine.state.defineC1
 import org.usvm.machine.state.defineC2
@@ -280,19 +253,48 @@ import org.usvm.machine.state.defineC3
 import org.usvm.machine.state.defineC4
 import org.usvm.machine.state.defineC5
 import org.usvm.machine.state.defineC7
+import org.usvm.machine.state.doBlkSwap
+import org.usvm.machine.state.doPop
+import org.usvm.machine.state.doPush
+import org.usvm.machine.state.doPuxc
 import org.usvm.machine.state.doSwap
+import org.usvm.machine.state.doWithStateCtx
+import org.usvm.machine.state.doXchg
+import org.usvm.machine.state.doXchg2
+import org.usvm.machine.state.doXchg3
+import org.usvm.machine.state.generateSymbolicCell
 import org.usvm.machine.state.getSliceRemainingBitsCount
 import org.usvm.machine.state.getSliceRemainingRefsCount
 import org.usvm.machine.state.initC7
 import org.usvm.machine.state.jump
 import org.usvm.machine.state.lastStmt
+import org.usvm.machine.state.newStmt
+import org.usvm.machine.state.nextStmt
 import org.usvm.machine.state.returnAltFromContinuation
-import org.usvm.machine.state.switchToContinuation
 import org.usvm.machine.state.returnFromContinuation
+import org.usvm.machine.state.signedIntegerFitsBits
 import org.usvm.machine.state.slicePreloadDataBits
+import org.usvm.machine.state.switchToContinuation
+import org.usvm.machine.state.takeLastCell
+import org.usvm.machine.state.takeLastContinuation
+import org.usvm.machine.state.takeLastIntOrThrowTypeError
+import org.usvm.machine.state.takeLastSlice
 import org.usvm.machine.state.takeLastTuple
+import org.usvm.machine.state.unsignedIntegerFitsBits
 import org.usvm.machine.toMethodId
+import org.usvm.machine.types.TvmBuilderType
+import org.usvm.machine.types.TvmCellType
+import org.usvm.machine.types.TvmDataCellInfoStorage
+import org.usvm.machine.types.TvmSliceType
+import org.usvm.machine.types.TvmType
 import org.usvm.machine.types.TvmTypeSystem
+import org.usvm.memory.UMemory
+import org.usvm.memory.UWritableMemory
+import org.usvm.mkSizeExpr
+import org.usvm.mkSizeGeExpr
+import org.usvm.sizeSort
+import org.usvm.solver.USatResult
+import org.usvm.targets.UTargetsSet
 import java.math.BigInteger
 
 // TODO there are a lot of `scope.calcOnState` and `scope.doWithState` invocations that are not inline - optimize it
@@ -300,6 +302,9 @@ class TvmInterpreter(
     private val ctx: TvmContext,
     private val contractCode: TvmContractCode,
     val typeSystem: TvmTypeSystem,
+    private val inputInfo: TvmInputInfo,
+    private val checkDataCellContentTypes: Boolean,
+    private val excludeInputsThatDoNotMatchGivenScheme: Boolean,
     var forkBlackList: UForkBlackList<TvmState, TvmInst> = UForkBlackList.createDefault(),
 ) : UInterpreter<TvmState>() {
     companion object {
@@ -369,8 +374,21 @@ class TvmInterpreter(
             emptyRefValue = refEmptyValue,
             gasUsage = persistentListOf(),
             targets = UTargetsSet.from(targets),
-            typeSystem = typeSystem
+            typeSystem = typeSystem,
         )
+
+        val dataCellInfoStorage = TvmDataCellInfoStorage.build(
+            checkDataCellContentTypes,
+            excludeInputsThatDoNotMatchGivenScheme,
+            state,
+            inputInfo
+        )
+        state.dataCellInfoStorage = dataCellInfoStorage
+
+        if (excludeInputsThatDoNotMatchGivenScheme) {
+            val structuralConstraints = dataCellInfoStorage.mapper.getInitialStructuralConstraints(state)
+            state.pathConstraints += structuralConstraints
+        }
 
         state.registers.c4 = C4Register(TvmCellValue(state.generateSymbolicCell()))
         state.registers.c5 = C5Register(TvmCellValue(state.allocEmptyCell()))
@@ -378,11 +396,15 @@ class TvmInterpreter(
 
         val solver = ctx.solver<TvmType>()
 
-        val model = (solver.check(state.pathConstraints) as USatResult).model
+        val kModel = solver.check(state.pathConstraints) as? USatResult
+            ?: error("Cannot construct model for initial state")
+        val model = kModel.model
         state.models = listOf(model)
 
         state.callStack.push(method, returnSite = null)
         state.newStmt(method.instList.first())
+
+        state.stateInitialized = true
 
         return state
     }
@@ -423,6 +445,9 @@ class TvmInterpreter(
 //        }
 
         visit(scope, stmt)
+
+        state.globalStructuralConstraintsHolder.applyTo(scope)
+            ?: error("Could not apply structural constraints")  // TODO: add special exit for that
 
         return scope.stepResult().apply {
             if (state.gasUsage === initialGasUsage || forkedStates.any { it.gasUsage === initialGasUsage }) {
@@ -1676,7 +1701,9 @@ class TvmInterpreter(
                     val neqZero = mkEq(operand, zeroValue).not()
                     scope.fork(
                         neqZero,
-                        blockOnFalseState = { newStmt(stmt.nextStmt()) }
+                        blockOnFalseState = {
+                            newStmt(stmt.nextStmt())
+                        }
                     ) ?: return@with
 
                     // TODO check NaN for integer overflow exception

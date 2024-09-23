@@ -1,0 +1,28 @@
+#include "../stdlib.fc";
+
+
+() recv_internal(int msg_value, cell in_msg_cell, slice in_msg) impure {
+    int op = in_msg~load_int(2);
+
+    if (op == 0) {
+        int param = in_msg~load_int(64);
+
+        var msg = begin_cell()
+            .store_int(op, 2)
+            .store_int(param, 64)
+            .end_cell();
+
+        msg~impure_touch();
+    }
+
+    if (op == 1) {
+        int param = in_msg~load_int(32);
+
+        var msg = begin_cell()
+            .store_int(op, 2)
+            .store_int(param, 32)
+            .end_cell();
+
+        msg~impure_touch();
+    }
+}

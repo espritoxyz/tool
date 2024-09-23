@@ -30,6 +30,13 @@ import org.usvm.types.USingleTypeStream
 import java.math.BigInteger
 import org.ton.bytecode.TvmArtificialJmpToContInst
 import org.ton.bytecode.TvmExceptionContinuation
+import org.usvm.machine.TvmContext.Companion.cellDataField
+import org.usvm.machine.TvmContext.Companion.cellDataLengthField
+import org.usvm.machine.TvmContext.Companion.cellRefsLengthField
+import org.usvm.machine.TvmContext.Companion.sliceCellField
+import org.usvm.machine.TvmContext.Companion.sliceDataPosField
+import org.usvm.machine.TvmContext.Companion.sliceRefPosField
+import org.usvm.memory.UWritableMemory
 
 val TvmState.lastStmt get() = pathNode.statement
 fun TvmState.newStmt(stmt: TvmInst) {
@@ -68,11 +75,16 @@ fun <R> TvmStepScope.calcOnStateCtx(block: context(TvmContext) TvmState.() -> R)
     block(ctx, this)
 }
 
+fun <R> TvmStepScope.doWithCtx(block: context(TvmContext) TvmStepScope.() -> R): R {
+    val ctx = calcOnState { ctx }
+    return block(ctx, this)
+}
+
 fun TvmStepScope.doWithStateCtx(block: context(TvmContext) TvmState.() -> Unit) = doWithState {
     block(ctx, this)
 }
 
-fun TvmState.generateSymbolicCell(): UHeapRef = generateSymbolicRef(TvmCellType).also { initializeSymbolicCell(it) }
+fun TvmState.generateSymbolicCell(): UConcreteHeapRef = generateSymbolicRef(TvmCellType).also { initializeSymbolicCell(it) }
 
 fun TvmState.ensureSymbolicCellInitialized(ref: UHeapRef) =
     ensureSymbolicRefInitialized(ref, TvmCellType) { initializeSymbolicCell(it) }

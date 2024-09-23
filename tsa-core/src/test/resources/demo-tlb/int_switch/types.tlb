@@ -1,0 +1,2 @@
+long_int$00 x:int64 = InternalMsgBody;
+short_int$01 x:int32 = InternalMsgBody;

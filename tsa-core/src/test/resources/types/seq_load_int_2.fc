@@ -1,0 +1,16 @@
+#include "../imports/stdlib.fc";
+
+
+() recv_internal(int msg_value, cell in_msg_cell, slice in_msg) impure {
+    int a = in_msg~load_int(16);
+    int b = in_msg~load_int(16);
+    int c = in_msg~load_int(32);
+
+    var msg = begin_cell()
+        .store_int(a, 16)
+        .store_int(b, 16)
+        .store_int(c, 32)
+        .end_cell();
+
+    msg~impure_touch();
+}
