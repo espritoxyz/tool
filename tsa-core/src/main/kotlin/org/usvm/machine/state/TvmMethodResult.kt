@@ -140,6 +140,14 @@ object TvmCellUnderflowError : TvmErrorExit {
     override fun toString(): String = "TVM cell underflow, exit code: $exitCode"
 }
 
+@Serializable
+object TvmDictError : TvmErrorExit {
+    override val exitCode: UInt = 10u
+    override val ruleName: String = "dict-error"
+
+    override fun toString(): String = "TVM dictionary error, exit code: $exitCode"
+}
+
 data class TvmOutOfGas(val consumedGas: UExpr<UBv32Sort>, val gasLimit: UExpr<UBv32Sort>) : TvmErrorExit {
     override val exitCode: UInt = 13u
     override val ruleName: String = "out-of-gas"

@@ -23,6 +23,7 @@ import org.usvm.UContext
 import org.usvm.UExpr
 import org.usvm.machine.state.TvmCellOverflowError
 import org.usvm.machine.state.TvmCellUnderflowError
+import org.usvm.machine.state.TvmDictError
 import org.usvm.machine.state.TvmFailureType
 import org.usvm.machine.state.TvmIntegerOutOfRangeError
 import org.usvm.machine.state.TvmIntegerOverflowError
@@ -32,6 +33,7 @@ import org.usvm.machine.state.bvMaxValueSignedExtended
 import org.usvm.machine.state.bvMinValueSignedExtended
 import org.usvm.machine.state.setFailure
 import org.usvm.machine.types.TvmCellType
+import org.usvm.machine.types.TvmDictCellType
 import org.usvm.machine.types.TvmSliceType
 import org.usvm.machine.types.TvmType
 import org.usvm.machine.types.dp.AbstractGuard
@@ -108,6 +110,7 @@ class TvmContext(
     val throwSymbolicStructuralCellUnderflowError: (TvmState) -> Unit =
         setFailure(TvmCellUnderflowError, TvmFailureType.SymbolicStructuralError)
     val throwRealCellUnderflowError: (TvmState) -> Unit = setFailure(TvmCellUnderflowError, TvmFailureType.RealError)
+    val throwRealDictError: (TvmState) -> Unit = setFailure(TvmDictError, TvmFailureType.RealError)
 
     val sendMsgActionTag = mkBvHex("0ec3c86d", 32u)
     val reserveActionTag = mkBvHex("36e6b809", 32u)
@@ -207,6 +210,8 @@ class TvmContext(
         val sliceDataPosField: TvmField = TvmFieldImpl(TvmSliceType, "dataPos")
         val sliceRefPosField: TvmField = TvmFieldImpl(TvmSliceType, "refPos")
         val sliceCellField: TvmField = TvmFieldImpl(TvmSliceType, "cell")
+
+        val dictKeyLengthField: TvmField = TvmFieldImpl(TvmDictCellType, "keyLength")
 
         const val stdMsgAddrSize = 2 + 1 + 8 + 256
     }

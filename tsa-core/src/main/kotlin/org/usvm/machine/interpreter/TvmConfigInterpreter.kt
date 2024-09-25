@@ -129,7 +129,8 @@ class TvmConfigInterpreter(private val ctx: TvmContext) {
             unsatBlock = { error("Config doesn't contain idx: $absIdx") },
         ) ?: return@with
 
-        val result = scope.calcOnState { getConfigParam(absIdx) }
+        val result = scope.getConfigParam(absIdx)
+            ?: return@with
 
         scope.doWithState {
             scope.addOnStack(result, TvmCellType)

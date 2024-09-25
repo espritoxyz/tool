@@ -87,7 +87,7 @@ private fun getDefaultCell(
                     TvmTestDataCellValue()
                 }
                 is TvmParameterInfo.DictCellInfo -> {
-                    TvmTestDictCellValue
+                    TvmTestDictCellValue(struct.ref.keySize, emptyMap())
                 }
                 is TvmParameterInfo.DataCellInfo -> {
                     when (struct.ref.dataCellStructure) {

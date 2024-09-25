@@ -9,8 +9,9 @@ import java.math.BigInteger
 @Serializable
 sealed interface TvmTestValue
 
+@JvmInline
 @Serializable
-data class TvmTestIntegerValue(
+value class TvmTestIntegerValue(
     val value: @Contextual BigInteger
 ): TvmTestValue
 
@@ -18,7 +19,10 @@ data class TvmTestIntegerValue(
 sealed interface TvmTestCellValue: TvmTestValue
 
 @Serializable
-data object TvmTestDictCellValue: TvmTestCellValue  // TODO: contents
+data class TvmTestDictCellValue(
+    val keyLength: Int,
+    val entries: Map<TvmTestIntegerValue, TvmTestSliceValue>,
+): TvmTestCellValue
 
 @Serializable
 data class TvmTestDataCellValue(
