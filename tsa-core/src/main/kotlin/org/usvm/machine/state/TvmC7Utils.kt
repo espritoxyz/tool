@@ -116,13 +116,19 @@ private fun TvmState.initContractInfo(): TvmStackTupleValue = with(ctx) {
             TvmStackNullValue.toStackEntry(),
         )
     )
+    val workchain = makeSymbolicPrimitive(mkBv8Sort())
+    val extendedWorkchain = workchain.signedExtendToInteger()
     val addr = TvmStackCellValue(
         allocCellFromData(
             mkBvConcatExpr(
-                // addr_std$10 anycast:(Maybe Anycast)
-                mkBv("100", 3u),
-                // workchain_id:int8 address:bits256
-                makeSymbolicPrimitive(mkBvSort(8u + 256u))
+                mkBvConcatExpr(
+                    // addr_std$10 anycast:(Maybe Anycast)
+                    mkBv("100", 3u),
+                    // workchain_id:int8
+                    workchain
+                ),
+                // address:bits256
+                makeSymbolicPrimitive(mkBvSort(ADDRESS_BITS.toUInt()))
             )
         )
     )
@@ -141,6 +147,7 @@ private fun TvmState.initContractInfo(): TvmStackTupleValue = with(ctx) {
     pathConstraints += mkBvSignedGreaterOrEqualExpr(blockLogicTime.intValue, zeroValue)
     pathConstraints += mkBvSignedGreaterOrEqualExpr(transactionLogicTime.intValue, zeroValue)
     pathConstraints += mkBvSignedGreaterOrEqualExpr(storagePhaseFees.intValue, zeroValue)
+    pathConstraints += mkAnd((extendedWorkchain eq masterchain) or (extendedWorkchain eq baseChain))
 
     val paramList = listOf(
         tag, actions, msgsSent, unixTime, blockLogicTime, transactionLogicTime, randomSeed,

@@ -10,6 +10,7 @@ import io.ksmt.utils.BvUtils.bvMaxValueUnsigned
 import io.ksmt.utils.BvUtils.toBigIntegerSigned
 import io.ksmt.utils.asExpr
 import io.ksmt.utils.toBigInteger
+import java.math.BigInteger
 import org.ton.bytecode.TvmField
 import org.ton.bytecode.TvmFieldImpl
 import org.ton.bytecode.TvmQuitContinuation
@@ -39,7 +40,6 @@ import org.usvm.machine.types.TvmType
 import org.usvm.machine.types.dp.AbstractGuard
 import org.usvm.mkSizeExpr
 import org.usvm.sizeSort
-import java.math.BigInteger
 
 // TODO: There is no size sort in TVM because of absence of arrays, but we need to represent cell data as boolean arrays
 //  with size no more than 1023
@@ -62,6 +62,7 @@ class TvmContext(
     val falseValue: KBitVecValue<TvmInt257Sort> = 0.toBv257()
     val oneValue: KBitVecValue<TvmInt257Sort> = 1.toBv257()
     val twoValue: KBitVecValue<TvmInt257Sort> = 2.toBv257()
+    val threeValue: KBitVecValue<TvmInt257Sort> = 3.toBv257()
     val fourValue: KBitVecValue<TvmInt257Sort> = 4.toBv257()
     val eightValue: KBitVecValue<TvmInt257Sort> = 8.toBv257()
     val zeroValue: KBitVecValue<TvmInt257Sort> = falseValue
@@ -91,6 +92,9 @@ class TvmContext(
 
     val zeroBit = mkBv(0, 1u)
     val oneBit = mkBv(1, 1u)
+
+    val minMessageCurrencyValue = MIN_MESSAGE_CURRENCY.toBv257()
+    val maxMessageCurrencyValue = MAX_MESSAGE_CURRENCY.toBv257()
 
     private var inputStackEntryCounter: Int = 0
     fun nextInputStackEntryId(): Int = inputStackEntryCounter++
@@ -202,6 +206,12 @@ class TvmContext(
         // Utility bit sizes for arith operations
         val INT_EXT1_BITS: UInt = INT_BITS + 1u
         val INT_EXT256_BITS: UInt = INT_BITS + 256u
+
+        const val MIN_MESSAGE_CURRENCY: Long = 10_000_000
+        val MAX_MESSAGE_CURRENCY: BigInteger = BigInteger.TEN.pow(20)
+
+        val RECEIVE_INTERNAL_ID: MethodId = 0.toMethodId()
+        val RECEIVE_EXTERNAL_ID: MethodId = (-1).toMethodId()
 
         val cellDataField: TvmField = TvmFieldImpl(TvmCellType, "data")
         val cellDataLengthField: TvmField = TvmFieldImpl(TvmCellType, "dataLength")

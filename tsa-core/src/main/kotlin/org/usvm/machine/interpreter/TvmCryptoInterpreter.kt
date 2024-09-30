@@ -43,8 +43,14 @@ class TvmCryptoInterpreter(private val ctx: TvmContext) {
 
         scope.consumeDefaultGas(stmt)
 
+        // kill current state, as the implementation is incorrect
+        with(ctx) {
+            scope.assert(falseExpr) ?: return
+        }
+
         scope.calcOnState {
             stack.popHashableStackValue(operandType)
+                ?: return@calcOnState
 
             // TODO hash must be deterministic - make a region for representation hashes?
             val hash = makeSymbolicPrimitive(ctx.int257sort)

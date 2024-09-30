@@ -13,7 +13,6 @@ import org.usvm.machine.state.builderCopy
 import org.usvm.machine.state.builderStoreGrams
 import org.usvm.machine.state.consumeDefaultGas
 import org.usvm.machine.state.doWithStateCtx
-import org.usvm.machine.state.loadDataBitsFromCellWithoutChecks
 import org.usvm.machine.state.newStmt
 import org.usvm.machine.state.nextStmt
 import org.usvm.machine.state.sliceCopy

@@ -454,6 +454,8 @@ fun analyzeAllMethods(
         logger.debug("=====".repeat(20))
     }
 
+    machine.close()
+
     return TvmTestResolver.resolve(methodStates)
 }
 

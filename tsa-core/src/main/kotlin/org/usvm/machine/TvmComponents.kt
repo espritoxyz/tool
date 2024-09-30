@@ -19,6 +19,7 @@ import org.usvm.types.UTypeSystem
 import kotlin.time.Duration.Companion.milliseconds
 
 class TvmComponents : UComponents<TvmType, TvmSizeSort> {
+    private val closeableResources = mutableListOf<AutoCloseable>()
     override val useSolverForForks: Boolean
         get() = true
 
@@ -46,11 +47,17 @@ class TvmComponents : UComponents<TvmType, TvmSizeSort> {
             ),
         )
 
+        closeableResources += solver
+
         val typeSolver = UTypeSolver(typeSystem)
         return USolverBase(ctx, solver, typeSolver, translator, decoder, 1000.milliseconds)
     }
 
     override fun mkTypeSystem(ctx: UContext<TvmSizeSort>): UTypeSystem<TvmType> {
         return typeSystem
+    }
+
+    fun close() {
+        closeableResources.forEach(AutoCloseable::close)
     }
 }

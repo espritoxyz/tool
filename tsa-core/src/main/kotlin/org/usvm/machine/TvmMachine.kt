@@ -26,10 +26,6 @@ class TvmMachine(
     private val options: UMachineOptions = defaultOptions,
     private val tvmOptions: TvmOptions = TvmOptions(),
 ) : UMachine<TvmState>() {
-    override fun close() {
-        // Do nothing
-    }
-
     private val components = TvmComponents()
     private val ctx = TvmContext(tvmOptions, components)
 
@@ -131,5 +127,9 @@ class TvmMachine(
             loopIterationLimit = LOOP_ITERATIONS_LIMIT,
             stepLimit = null,
         )
+    }
+
+    override fun close() {
+        components.close()
     }
 }

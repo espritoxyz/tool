@@ -51,6 +51,7 @@ class TvmState(
     val dataCellLoadedTypeInfo: TvmDataCellLoadedTypeInfo = TvmDataCellLoadedTypeInfo.empty(),
     var stateInitialized: Boolean = false,
     val globalStructuralConstraintsHolder: GlobalStructuralConstraintsHolder = GlobalStructuralConstraintsHolder(),
+    var initialData: TvmInitialStateData? = null,
 ) : UState<TvmType, TvmCodeBlock, TvmInst, TvmContext, TvmTarget, TvmState>(
     ctx,
     callStack,
@@ -121,6 +122,7 @@ class TvmState(
             dataCellLoadedTypeInfo = dataCellLoadedTypeInfo.clone(),
             stateInitialized = stateInitialized,
             globalStructuralConstraintsHolder = globalStructuralConstraintsHolder,
+            initialData = initialData,
         ).also { newState ->
             newState.dataCellInfoStorage = dataCellInfoStorage.clone()
         }

@@ -4,6 +4,7 @@ import org.usvm.machine.types.TvmBuilderType
 import org.usvm.machine.types.TvmCellType
 import org.usvm.machine.types.TvmContinuationType
 import org.ton.bytecode.TvmContinuation
+import org.ton.bytecode.TvmMethod
 import org.usvm.UAddressSort
 import org.usvm.machine.types.TvmIntegerType
 import org.usvm.machine.types.TvmRealReferenceType
@@ -11,6 +12,10 @@ import org.usvm.machine.types.TvmSliceType
 import org.usvm.UExpr
 import org.usvm.UHeapRef
 import org.usvm.USort
+import org.usvm.api.makeSymbolicPrimitive
+import org.usvm.api.writeField
+import org.usvm.machine.TvmContext
+import org.usvm.machine.TvmContext.Companion.cellDataField
 import org.usvm.machine.TvmContext.TvmInt257Sort
 import org.usvm.machine.TvmStepScope
 import org.usvm.machine.state.TvmStack.TvmConcreteStackEntry
@@ -57,9 +62,9 @@ fun TvmStack.addTuple(value: TvmStackTupleValue) {
 
 fun TvmStackValue.toStackEntry(): TvmConcreteStackEntry = TvmConcreteStackEntry(this)
 
-fun TvmStack.takeLastIntOrNull(): UExpr<TvmInt257Sort>? {
-    val intStackValue = takeLast(TvmIntegerType) { id ->
-        ctx.mkRegisterReading(id, ctx.int257sort)
+fun TvmState.takeLastIntOrNull(): UExpr<TvmInt257Sort>? {
+    val intStackValue = stack.takeLast(TvmIntegerType) { id ->
+        initializeInputInt(ctx.mkRegisterReading(id, ctx.int257sort))
     }
 
     if (intStackValue !is TvmStack.TvmStackIntValue) {
@@ -70,7 +75,7 @@ fun TvmStack.takeLastIntOrNull(): UExpr<TvmInt257Sort>? {
 }
 
 fun TvmState.takeLastIntOrThrowTypeError(): UExpr<TvmInt257Sort>? =
-    stack.takeLastIntOrNull() ?: run {
+    takeLastIntOrNull() ?: run {
         ctx.throwTypeCheckError(this)
         null
     }
@@ -78,13 +83,10 @@ fun TvmState.takeLastIntOrThrowTypeError(): UExpr<TvmInt257Sort>? =
 fun TvmStepScope.takeLastIntOrThrowTypeError(): UExpr<TvmInt257Sort>? =
     calcOnState { takeLastIntOrThrowTypeError() }
 
-context(TvmState)
-fun TvmStack.takeLastCell(): UHeapRef? =
-    takeLastRef(this, TvmCellType, TvmStackValue::cellValue) {
-        generateSymbolicCell()
+fun TvmState.takeLastCell(): UHeapRef? =
+    takeLastRef(stack, TvmCellType, TvmStackValue::cellValue) {
+        initializeInputCell(generateSymbolicCell())
     }?.also { ensureSymbolicCellInitialized(it) }
-
-fun TvmState.takeLastCell(): UHeapRef? = stack.takeLastCell()
 
 fun TvmStepScope.takeLastCell(): UHeapRef? =
     calcOnState { takeLastCell() }
@@ -147,6 +149,50 @@ private fun takeLastRef(
 ): UHeapRef? {
     val lastRefValue = stack.takeLast(referenceType, generateSymbolicRef)
     return lastRefValue.extractValue()?.also { assertType(it, referenceType) }
+}
+
+private fun TvmState.initializeInputInt(
+    symbolicArg: UExpr<TvmInt257Sort>
+): UExpr<TvmInt257Sort> = with(ctx) {
+    if (entrypoint !is TvmMethod || entrypoint.id != TvmContext.RECEIVE_INTERNAL_ID) {
+        return symbolicArg
+    }
+
+    // arg is the msg_value or the balance
+    val result = mkBvAddExpr(minMessageCurrencyValue, symbolicArg)
+    val constraint = mkAnd(
+        mkBvSignedLessOrEqualExpr(minMessageCurrencyValue, result),
+        mkBvSignedLessOrEqualExpr(result, maxMessageCurrencyValue)
+    )
+
+    // We can add this constraint manually to path constraints because default values (0) in models are valid
+    pathConstraints += constraint
+
+    result
+}
+
+private fun TvmState.initializeInputCell(
+    symbolicCell: UHeapRef
+): UHeapRef = with(ctx) {
+    if (entrypoint !is TvmMethod || entrypoint.id != TvmContext.RECEIVE_INTERNAL_ID) {
+        return symbolicCell
+    }
+
+    // arg is the in_msg_full
+    val internalMsgTag = zeroBit
+    val msgFlags = makeSymbolicPrimitive(mkBvSort(3u))
+    val srcAddressTag = mkBv("10", 2u)
+    val messageSuffixLength = TvmContext.CELL_DATA_BITS - 1u - 3u - 2u
+    val messageSuffix = makeSymbolicPrimitive(mkBvSort(messageSuffixLength))
+
+    val msgData = mkBvConcatExpr(
+        mkBvConcatExpr(internalMsgTag, msgFlags),
+        mkBvConcatExpr(srcAddressTag, messageSuffix)
+    )
+
+    memory.writeField(symbolicCell, cellDataField, cellDataSort, msgData, guard = trueExpr)
+
+    symbolicCell
 }
 
 fun doXchg(scope: TvmStepScope, first: Int, second: Int) {

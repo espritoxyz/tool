@@ -32,7 +32,7 @@ fun TvmContractSymbolicTestResult.toSarifReport(methodsMapping: Map<MethodId, St
             results = testSuites.flatMap { it.toSarifResult(methodsMapping) },
             properties = PropertyBag(
                 mapOf(
-                    "coverage" to testSuites.associate { it.methodId to it.methodCoverage.transitiveCoverage }
+                    "coverage" to testSuites.associate { it.methodId.toString() to it.methodCoverage.transitiveCoverage }
                 )
             )
         )

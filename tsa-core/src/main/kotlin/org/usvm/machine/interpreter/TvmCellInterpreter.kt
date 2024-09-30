@@ -1001,7 +1001,7 @@ class TvmCellInterpreter(private val ctx: TvmContext) {
                         unsatBlock = {
                             error("Cannot make the cell depth not negative")
                         }
-                    )
+                    ) ?: return@doWithStateCtx
                 }
             } else {
                 zeroValue

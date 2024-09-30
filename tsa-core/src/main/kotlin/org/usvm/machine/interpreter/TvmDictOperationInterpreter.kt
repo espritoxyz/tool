@@ -917,18 +917,18 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
         scope: TvmStepScope,
         keyType: DictKeyType,
         keyLength: Int
-    ): UExpr<UBvSort>? = scope.calcOnStateCtx {
+    ): UExpr<UBvSort>? = with(ctx) {
         // todo: handle keyLength errors
         when (keyType) {
-            DictKeyType.SIGNED_INT -> takeLastIntOrThrowTypeError()
+            DictKeyType.SIGNED_INT -> scope.takeLastIntOrThrowTypeError()
                 ?.let { mkBvExtractExpr(high = keyLength - 1, low = 0, it) }
-            DictKeyType.UNSIGNED_INT -> takeLastIntOrThrowTypeError()
+            DictKeyType.UNSIGNED_INT -> scope.takeLastIntOrThrowTypeError()
                 ?.let { mkBvExtractExpr(high = keyLength - 1, low = 0, it) }
             DictKeyType.SLICE -> {
-                val slice = stack.takeLastSlice()
+                val slice = scope.calcOnState { stack.takeLastSlice() }
                 if (slice == null) {
-                    throwTypeCheckError(this)
-                    return@calcOnStateCtx null
+                    scope.doWithState(throwTypeCheckError)
+                    return null
                 }
 
                 scope.slicePreloadDataBits(slice, keyLength)

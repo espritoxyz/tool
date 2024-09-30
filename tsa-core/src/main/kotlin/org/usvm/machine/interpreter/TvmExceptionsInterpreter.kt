@@ -41,7 +41,7 @@ class TvmExceptionsInterpreter(private val ctx: TvmContext) {
             is TvmExceptionsThrowargInst -> scope.doWithState {
                 scope.consumeDefaultGas(stmt)
 
-                val param = stack.takeLastIntOrNull() ?: return@doWithState
+                val param = takeLastIntOrNull() ?: return@doWithState
                 throwException(code = stmt.n, param = param)
             }
             is TvmExceptionsThrowShortInst -> scope.doWithState {
@@ -90,7 +90,7 @@ class TvmExceptionsInterpreter(private val ctx: TvmContext) {
                 scope.consumeDefaultGas(stmt)
 
                 scope.doWithState {
-                    val code = stack.takeLastIntOrNull()?.intValueOrNull
+                    val code = takeLastIntOrNull()?.intValueOrNull
                         ?: error("Cannot extract concrete code exception from the stack")
 
                     throwException(code)
@@ -155,7 +155,7 @@ class TvmExceptionsInterpreter(private val ctx: TvmContext) {
         override fun code(state: TvmState): Int = code
     }
     private data object StackCodeExtractor : ExceptionCodeExtractor {
-        override fun code(state: TvmState): Int = state.stack.takeLastIntOrNull()?.intValueOrNull
+        override fun code(state: TvmState): Int = state.takeLastIntOrNull()?.intValueOrNull
             ?: error("Cannot extract concrete code exception from the stack")
     }
 }

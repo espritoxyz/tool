@@ -13,6 +13,7 @@ import org.usvm.machine.state.builderStoreDataBits
 import org.usvm.machine.state.builderStoreGrams
 import org.usvm.machine.state.builderStoreInt
 import org.usvm.machine.state.builderStoreNextRef
+import org.usvm.machine.state.checkCellOverflow
 import org.usvm.machine.state.checkOutOfRange
 import org.usvm.machine.state.consumeDefaultGas
 import org.usvm.machine.state.doWithStateCtx
@@ -37,7 +38,7 @@ class TvmActionsInterpreter(private val ctx: TvmContext) {
     private fun visitSendRawMsgInst(scope: TvmStepScope, stmt: TvmAppActionsSendrawmsgInst) = with(ctx) {
         val mode = scope.takeLastIntOrThrowTypeError()
             ?: return@with
-        val msg = scope.calcOnState { stack.takeLastCell() }
+        val msg = scope.calcOnState { takeLastCell() }
             ?: return@with scope.doWithState(throwTypeCheckError)
 
         val notOutOfRangeExpr = unsignedIntegerFitsBits(mode, 8u)
@@ -71,6 +72,9 @@ class TvmActionsInterpreter(private val ctx: TvmContext) {
         val valueNotOutOfRangeExpr = mkBvSignedLessOrEqualExpr(zeroValue, grams)
         checkOutOfRange(modeNotOutOfRangeExpr and valueNotOutOfRangeExpr, scope) ?: return
 
+        val notOutOfRangeGrams = unsignedIntegerFitsBits(grams, TvmContext.MAX_GRAMS_BITS)
+        checkCellOverflow(notOutOfRangeGrams, scope) ?: return
+
         scope.doWithState {
             val actions = registers.c5.value.value
             val updatedActions = allocEmptyCell()
@@ -92,7 +96,8 @@ class TvmActionsInterpreter(private val ctx: TvmContext) {
 
     private fun visitSetCodeInst(scope: TvmStepScope, stmt: TvmAppActionsSetcodeInst) {
         scope.doWithState {
-            val cell = stack.takeLastCell()
+            val cell = takeLastCell()
+                ?: ctx.throwTypeCheckError(this)
 
             // TODO make a real implementation
             newStmt(stmt.nextStmt())

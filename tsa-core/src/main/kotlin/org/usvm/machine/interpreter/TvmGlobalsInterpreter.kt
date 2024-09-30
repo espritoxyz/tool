@@ -38,7 +38,7 @@ class TvmGlobalsInterpreter(private val ctx: TvmContext) {
                 scope.consumeDefaultGas(stmt)
 
                 scope.doWithState {
-                    val index = stack.takeLastIntOrNull()?.intValueOrNull
+                    val index = takeLastIntOrNull()?.intValueOrNull
                         ?: TODO("Get global variable with symbolic index")
                     val value = getGlobalVariable(index, stack)
                     stack.addStackEntry(value.toStackEntry())
@@ -64,7 +64,7 @@ class TvmGlobalsInterpreter(private val ctx: TvmContext) {
                 scope.doWithState { consumeGas(26) }
 
                 scope.doWithState {
-                    val index = stack.takeLastIntOrNull()?.intValueOrNull
+                    val index = takeLastIntOrNull()?.intValueOrNull
                         ?: TODO("Set global variable with symbolic index")
                     val value = stack.takeLastEntry()
 

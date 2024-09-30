@@ -77,6 +77,20 @@ class TvmTestStateResolver(
 
     fun resolveParameters(): List<TvmTestValue> = stack.inputValues.filterNotNull().map { resolveStackValue(it) }.reversed()
 
+    fun resolveInitialData(): TvmTestCellValue =
+        resolveCell(state.initialData?.persistentData ?: error("Unexpected initial persistent data value"))
+
+    fun resolveContractAddress(): TvmTestDataCellValue {
+        val contractInfo = (state.initialData?.c7?.value?.get(0, stack)?.cell(stack) as? TvmStackTupleValue)
+            ?: error("Unexpected initial contract info")
+        val addressCell = contractInfo[8, stack].cell(stack)
+            ?: error("Unexpected contract address")
+        val contractAddress = (resolveStackValue(addressCell) as? TvmTestDataCellValue)
+            ?: error("Unexpected address type")
+
+        return contractAddress
+    }
+
     fun resolveResultStack(): TvmMethodSymbolicResult {
         val results = state.stack.results
 

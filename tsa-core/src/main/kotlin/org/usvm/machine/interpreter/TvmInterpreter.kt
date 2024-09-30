@@ -296,6 +296,7 @@ import org.usvm.sizeSort
 import org.usvm.solver.USatResult
 import org.usvm.targets.UTargetsSet
 import java.math.BigInteger
+import org.usvm.machine.state.TvmInitialStateData
 
 // TODO there are a lot of `scope.calcOnState` and `scope.doWithState` invocations that are not inline - optimize it
 class TvmInterpreter(
@@ -390,9 +391,13 @@ class TvmInterpreter(
             state.pathConstraints += structuralConstraints
         }
 
-        state.registers.c4 = C4Register(TvmCellValue(state.generateSymbolicCell()))
+        val persistentData = state.generateSymbolicCell()
+
+        state.registers.c4 = C4Register(TvmCellValue(persistentData))
         state.registers.c5 = C5Register(TvmCellValue(state.allocEmptyCell()))
         state.registers.c7 = C7Register(state.initC7())
+
+        state.initialData = TvmInitialStateData(persistentData, state.registers.c7)
 
         val solver = ctx.solver<TvmType>()
 
@@ -1524,13 +1529,13 @@ class TvmInterpreter(
             1 -> cont.defineC1(stack.takeLastContinuation())
             2 -> cont.defineC2(stack.takeLastContinuation())
             4 -> {
-                val cell = stack.takeLastCell()
+                val cell = takeLastCell()
                     ?: return@doWithStateCtx throwTypeCheckError(this)
 
                 cont.defineC4(cell)
             }
             5 -> {
-                val cell = stack.takeLastCell()
+                val cell = takeLastCell()
                     ?: return@doWithStateCtx throwTypeCheckError(this)
 
                 cont.defineC5(cell)
@@ -1567,13 +1572,13 @@ class TvmInterpreter(
                 registers.c2 = C2Register(cont)
             }
             4 -> {
-                val newData = stack.takeLastCell()
+                val newData = takeLastCell()
                     ?: return@doWithStateCtx throwTypeCheckError(this)
 
                 registers.c4 = C4Register(TvmCellValue(newData))
             }
             5 -> {
-                val newData = stack.takeLastCell()
+                val newData = takeLastCell()
                     ?: return@doWithStateCtx throwTypeCheckError(this)
 
                 registers.c5 = C5Register(TvmCellValue(newData))

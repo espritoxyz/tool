@@ -10,7 +10,7 @@ import org.usvm.UExpr
 import org.usvm.machine.TvmContext
 import org.usvm.machine.TvmSizeSort
 import org.usvm.machine.state.TvmState
-import org.usvm.machine.state.loadDataBitsFromCellWithoutChecks
+import org.usvm.machine.state.preloadDataBitsFromCellWithoutChecks
 import org.usvm.machine.types.offset
 import org.usvm.mkSizeAddExpr
 import org.usvm.mkSizeExpr
@@ -180,7 +180,7 @@ fun TvmContext.getKnownTypePrefixDataOffset(
 
 context(TvmContext)
 fun generateSwitchGuard(switchSize: Int, key: String) = AbstractGuard { (address, prefixSize, state) ->
-    val actualPrefix = state.loadDataBitsFromCellWithoutChecks(address, prefixSize, switchSize)
+    val actualPrefix = state.preloadDataBitsFromCellWithoutChecks(address, prefixSize, switchSize)
     val expectedPrefix = mkBv(key, switchSize.toUInt())
     actualPrefix eq expectedPrefix
 }

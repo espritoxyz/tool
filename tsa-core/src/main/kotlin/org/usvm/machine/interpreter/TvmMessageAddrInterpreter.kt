@@ -19,8 +19,8 @@ import org.usvm.machine.state.newStmt
 import org.usvm.machine.state.nextStmt
 import org.usvm.machine.state.sliceCopy
 import org.usvm.machine.state.sliceMoveDataPtr
-import org.usvm.machine.state.slicePreloadDataBits
 import org.usvm.machine.state.slicePreloadAddrLength
+import org.usvm.machine.state.slicePreloadDataBits
 import org.usvm.machine.state.takeLastSlice
 import org.usvm.machine.types.TvmSliceType
 import org.usvm.machine.types.TvmSymbolicCellDataMsgAddr
