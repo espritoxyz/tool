@@ -3,10 +3,13 @@ Symbolic analyzer for TVM (The Telegram Open Network Virtual Machine) based on U
 ## How to build
 
 1. Clone this repo with all submodules (using `IntelliJ Idea` or `git clone git clone --recurse-submodules https://github.com/explyt/tsa`).
-2. Build the submodule:
+2. Build the submodule with a required branch:
 
     ```bash
     cd tvm-disasm
+    git reset --hard origin/disasm-methods
+    git clone -b disasm-methods --recursive https://github.com/explyt/tvm-spec-example
+    cd tvm-spec-example
     npm i
     npm run build
     ```
