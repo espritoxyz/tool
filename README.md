@@ -7,9 +7,6 @@ Symbolic analyzer for TVM (The Telegram Open Network Virtual Machine) based on U
 
     ```bash
     cd tvm-disasm
-    git reset --hard origin/disasm-methods
-    git clone -b disasm-methods --recursive https://github.com/explyt/tvm-spec-example
-    cd tvm-spec-example
     npm i
     npm run build
     ```
