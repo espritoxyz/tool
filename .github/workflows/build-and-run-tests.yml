@@ -19,11 +19,12 @@ jobs:
         with:
           submodules: recursive
 
-      - uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-          cache: 'gradle'
+#        We don't need to setup Java because it is manually installed in the Docker image
+#      - uses: actions/setup-java@v4
+#        with:
+#          distribution: 'temurin'
+#          java-version: '17'
+#          cache: 'gradle'
 
       - name: 'Build tvm disasm'
         working-directory: ./tvm-disasm
