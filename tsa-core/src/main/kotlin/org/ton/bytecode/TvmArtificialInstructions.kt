@@ -21,37 +21,6 @@ data class TvmArtificialLoopEntranceInst(
     override val mnemonic: String get() = "artificial_loop_entrance"
 }
 
-sealed interface TvmArtificialLoadAddrInst : TvmArtificialInst, TvmAppAddrInst {
-    val originalInst: TvmAppAddrLdmsgaddrInst
-
-    override val location: TvmInstLocation
-        get() = originalInst.location
-}
-
-@Serializable
-data class TvmArtificialLoadAddrNoneInst(override val originalInst: TvmAppAddrLdmsgaddrInst) : TvmArtificialLoadAddrInst {
-    override val mnemonic: String
-        get() = "artificial_addr_none_${originalInst.mnemonic}"
-}
-
-@Serializable
-data class TvmArtificialLoadAddrExternInst(override val originalInst: TvmAppAddrLdmsgaddrInst) : TvmArtificialLoadAddrInst {
-    override val mnemonic: String
-        get() = "artificial_addr_extern_${originalInst.mnemonic}"
-}
-
-@Serializable
-data class TvmArtificialLoadAddrStdInst(override val originalInst: TvmAppAddrLdmsgaddrInst) : TvmArtificialLoadAddrInst {
-    override val mnemonic: String
-        get() = "artificial_addr_std_${originalInst.mnemonic}"
-}
-
-@Serializable
-data class TvmArtificialLoadAddrVarInst(override val originalInst: TvmAppAddrLdmsgaddrInst) : TvmArtificialLoadAddrInst {
-    override val mnemonic: String
-        get() = "artificial_addr_var_${originalInst.mnemonic}"
-}
-
 @Serializable
 data class TvmArtificialImplicitRetInst(
     override val location: TvmInstLocation
@@ -78,13 +47,4 @@ data class TvmArtificialExecuteContInst(
     override val location: TvmInstLocation,
 ) : TvmArtificialContInst {
     override val mnemonic: String get() = "artificial_execute_$cont"
-}
-
-fun SerializersModuleBuilder.registerTvmArtificialLoadAddrInstSerializer() {
-    polymorphic(TvmArtificialLoadAddrInst::class) {
-        subclass(TvmArtificialLoadAddrExternInst::class)
-        subclass(TvmArtificialLoadAddrNoneInst::class)
-        subclass(TvmArtificialLoadAddrStdInst::class)
-        subclass(TvmArtificialLoadAddrVarInst::class)
-    }
 }

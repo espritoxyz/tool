@@ -5,11 +5,12 @@ import org.ton.examples.compileAndAnalyzeFift
 import org.ton.examples.runFiftMethod
 import org.usvm.machine.TvmComponents
 import org.usvm.machine.TvmContext
+import org.usvm.machine.TvmOptions
 import kotlin.io.path.Path
 import kotlin.test.Test
 
 class ExceptionsTest {
-    private val ctx = TvmContext(TvmComponents())
+    private val ctx = TvmContext(TvmOptions(), TvmComponents())
 
     private val exceptionsFiftPath: String = "/exceptions/Exceptions.fif"
 

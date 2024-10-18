@@ -1,0 +1,10 @@
+#include "stdlib.fc";
+
+int main() impure method_id (0) {
+    var new_data = begin_cell().store_int(5, 10).end_cell();
+    set_data(new_data);
+
+    slice loaded_data = get_data().begin_parse();
+    int loaded_int = loaded_data~load_int(10);
+    return loaded_int;
+}

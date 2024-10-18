@@ -101,6 +101,7 @@ import org.usvm.machine.TvmContext.TvmInt257Ext256Sort
 import org.usvm.machine.TvmContext.TvmInt257Sort
 import org.usvm.machine.TvmStepScope
 import org.usvm.machine.state.addInt
+import org.usvm.machine.state.checkOverflow
 import org.usvm.machine.state.consumeDefaultGas
 import org.usvm.machine.state.newStmt
 import org.usvm.machine.state.nextStmt
@@ -831,11 +832,6 @@ class TvmArithDivInterpreter(private val ctx: TvmContext) {
             blockOnFalseState = throwIntegerOverflowError
         )
     }
-
-    private fun checkOverflow(noOverflowExpr: UBoolExpr, scope: TvmStepScope): Unit? = scope.fork(
-        noOverflowExpr,
-        blockOnFalseState = ctx.throwIntegerOverflowError
-    )
 
     private fun checkInRange(expr: UExpr<TvmInt257Sort>, scope: TvmStepScope, min: Int, max: Int) = with(ctx) {
         val cond = mkBvSignedLessOrEqualExpr(min.toBv257(), expr) and mkBvSignedLessOrEqualExpr(expr, max.toBv257())

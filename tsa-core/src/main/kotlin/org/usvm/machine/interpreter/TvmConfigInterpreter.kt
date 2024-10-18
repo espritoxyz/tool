@@ -1,16 +1,12 @@
 package org.usvm.machine.interpreter
 
-import kotlinx.collections.immutable.persistentListOf
 import org.ton.bytecode.TvmAppConfigConfigoptparamInst
 import org.ton.bytecode.TvmAppConfigGetparamInst
 import org.ton.bytecode.TvmAppConfigInst
 import org.usvm.api.makeSymbolicPrimitive
-import org.usvm.api.writeField
 import org.usvm.machine.TvmContext
-import org.usvm.machine.TvmContext.Companion.cellDataLengthField
 import org.usvm.machine.TvmStepScope
-import org.usvm.machine.state.TvmStack
-import org.usvm.machine.state.TvmStack.TvmStackTupleValueConcreteNew
+import org.usvm.machine.state.TvmStack.TvmStackIntValue
 import org.usvm.machine.state.addInt
 import org.usvm.machine.state.addOnStack
 import org.usvm.machine.state.addTuple
@@ -18,17 +14,15 @@ import org.usvm.machine.state.allocSliceFromCell
 import org.usvm.machine.state.configContainsParam
 import org.usvm.machine.state.consumeDefaultGas
 import org.usvm.machine.state.doWithStateCtx
-import org.usvm.machine.state.ensureSymbolicCellInitialized
-import org.usvm.machine.state.generateSymbolicCell
 import org.usvm.machine.state.getConfigParam
+import org.usvm.machine.state.getContractInfoParam
 import org.usvm.machine.state.newStmt
 import org.usvm.machine.state.nextStmt
+import org.usvm.machine.state.setContractInfoParam
 import org.usvm.machine.state.takeLastIntOrThrowTypeError
 import org.usvm.machine.state.toStackEntry
 import org.usvm.machine.types.TvmCellType
 import org.usvm.machine.types.TvmSliceType
-import org.usvm.mkSizeExpr
-import org.usvm.sizeSort
 
 class TvmConfigInterpreter(private val ctx: TvmContext) {
     fun visitConfigInst(scope: TvmStepScope, stmt: TvmAppConfigInst) {
@@ -46,11 +40,21 @@ class TvmConfigInterpreter(private val ctx: TvmContext) {
             val i = stmt.i
 
             when (i) {
+                0 -> { // TAG
+                    val tag = getContractInfoParam(i).intValue
+                    stack.addInt(tag)
+                }
+                1 -> { // ACTIONS
+                    val actionNum = getContractInfoParam(i).intValue
+                    stack.addInt(actionNum)
+                }
+                2 -> { // MSGS_SENT
+                    val messagesSent = getContractInfoParam(i).intValue
+                    stack.addInt(messagesSent)
+                }
                 3 -> { // NOW
-                    val now = scope.calcOnState { makeSymbolicPrimitive(int257sort) }
-
-                    val c7 = scope.calcOnState { registers.c7 }
-                    val previousValue = c7.now ?: unitTimeMinValue
+                    val now = makeSymbolicPrimitive(int257sort)
+                    val previousValue = getContractInfoParam(i).intValue
 
                     scope.assert(
                         mkBvSignedGreaterExpr(now, previousValue),
@@ -62,15 +66,21 @@ class TvmConfigInterpreter(private val ctx: TvmContext) {
                         unsatBlock = { error("Cannot make NOW less than 2^64") }
                     ) ?: return@doWithStateCtx
 
-                    c7.now = now
+                    setContractInfoParam(i, TvmStackIntValue(now).toStackEntry())
                     stack.addInt(now)
                 }
-                5 -> { // LTIME
-                    val logicalTime = scope.calcOnState { makeSymbolicPrimitive(int257sort) }
+                4 -> { // BLOCK_LTIME
+                    val blockLogicalTime = getContractInfoParam(i).intValue
+
                     scope.assert(
-                        mkBvSignedGreaterExpr(logicalTime, zeroValue),
-                        unsatBlock = { error("Cannot make positive LTIME") }
+                        mkBvSignedGreaterExpr(maxTimestampValue, blockLogicalTime),
+                        unsatBlock = { error("Cannot make BLOCK_LTIME less than 2^64") }
                     ) ?: return@doWithStateCtx
+
+                    stack.addInt(blockLogicalTime)
+                }
+                5 -> { // LTIME
+                    val logicalTime = getContractInfoParam(i).intValue
 
                     scope.assert(
                         mkBvSignedGreaterExpr(maxTimestampValue, logicalTime),
@@ -79,38 +89,27 @@ class TvmConfigInterpreter(private val ctx: TvmContext) {
 
                     stack.addInt(logicalTime)
                 }
+                6 -> { // RAND_SEED
+                    val randomSeed = getContractInfoParam(i).intValue
+                    stack.addInt(randomSeed)
+                }
                 7 -> { // BALANCE
-                    val c7 = scope.calcOnState { registers.c7 }
-                    val balanceValue = c7.balance ?: run {
-                        val balance = makeSymbolicPrimitive(int257sort)
-                        scope.assert(
-                            mkBvSignedGreaterOrEqualExpr(balance, zeroValue),
-                            unsatBlock = { error("Cannot make balance >= 0") }
-                        ) ?: return@doWithStateCtx
-
-                        TvmStackTupleValueConcreteNew(
-                            ctx,
-                            persistentListOf(
-                                TvmStack.TvmStackIntValue(balance).toStackEntry(),
-                                TvmStack.TvmStackNullValue.toStackEntry()
-                            )
-                        ).also { c7.balance = it }
-                    }
+                    val balanceValue = getContractInfoParam(i).tupleValue
 
                     stack.addTuple(balanceValue)
                 }
                 8 -> { // MYADDR
-                    // TODO really make a slice with MsgAddressInt from the real contract address?
-                    // MsgAddressInt contains at least (2 + 1 + 8 + 256 = 267 bits) -
-                    // 2 for constructor, 1 for Nothing Anycast, int8 for workchain id and 256 bits for address
-                    val cell = scope.calcOnState {
-                        generateSymbolicCell().also { ensureSymbolicCellInitialized(it) }
-                    }
-                    memory.writeField(cell, cellDataLengthField, sizeSort, mkSizeExpr(267), guard = trueExpr)
-                    // TODO write 10 for constructor and 0 for Nothing Anycast to the cell data?
+                    val cell = getContractInfoParam(i).cellValue
+                        ?: error("Unexpected address value")
 
                     val slice = scope.calcOnState { allocSliceFromCell(cell) }
                     addOnStack(slice, TvmSliceType)
+                }
+                9 -> { // GLOBAL_CONFIG
+                    val cell = getContractInfoParam(i).cellValue
+                        ?: error("Unexpected config value")
+
+                    addOnStack(cell, TvmCellType)
                 }
                 else -> TODO("$i GETPARAM")
             }
@@ -121,17 +120,16 @@ class TvmConfigInterpreter(private val ctx: TvmContext) {
 
     private fun visitConfigParamInst(scope: TvmStepScope, stmt: TvmAppConfigConfigoptparamInst) = with(ctx) {
         val idx = scope.takeLastIntOrThrowTypeError() ?: return@with
-        val configDict = scope.calcOnState { registers.c7.configRoot }
 
         val absIdx = mkIte(mkBvSignedGreaterOrEqualExpr(idx, zeroValue), idx, mkBvNegationExpr(idx))
 
-        val configContainsIdx = scope.calcOnState { configContainsParam(configDict, absIdx) }
+        val configContainsIdx = scope.calcOnState { configContainsParam(absIdx) }
         scope.assert(
             configContainsIdx,
             unsatBlock = { error("Config doesn't contain idx: $absIdx") },
         ) ?: return@with
 
-        val result = scope.calcOnState { getConfigParam(configDict, absIdx) }
+        val result = scope.calcOnState { getConfigParam(absIdx) }
 
         scope.doWithState {
             scope.addOnStack(result, TvmCellType)

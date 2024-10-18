@@ -8847,8 +8847,8 @@ data class TvmConstDataPushcontInst(
     override val location: TvmInstLocation,
     val r: Int, // uint
     val x: Int, // uint
-    val s: TvmInstList, // subslice
-): TvmInst, TvmConstDataInst {
+    override val c: TvmInstList, // subslice
+): TvmInst, TvmConstDataInst, TvmContOperand1Inst {
     override val mnemonic: String get() = MNEMONIC
     override val gasConsumption get() = TvmFixedGas(value = 26)
          
@@ -8866,8 +8866,8 @@ data class TvmConstDataPushcontInst(
 data class TvmConstDataPushcontShortInst(
     override val location: TvmInstLocation,
     val x: Int, // uint
-    val s: TvmInstList, // subslice
-): TvmInst, TvmConstDataInst {
+    override val c: TvmInstList, // subslice
+): TvmInst, TvmConstDataInst, TvmContOperand1Inst {
     override val mnemonic: String get() = MNEMONIC
     override val gasConsumption get() = TvmFixedGas(value = 18)
          
@@ -8902,8 +8902,8 @@ data class TvmConstDataPushrefInst(
 @SerialName(TvmConstDataPushrefcontInst.MNEMONIC)
 data class TvmConstDataPushrefcontInst(
     override val location: TvmInstLocation,
-    val c: TvmInstList, // ref
-): TvmInst, TvmConstDataInst, TvmRefOperandLoader {
+    override val c: TvmInstList, // ref
+): TvmInst, TvmConstDataInst, TvmRefOperandLoader, TvmContOperand1Inst {
     override val mnemonic: String get() = MNEMONIC
     override val gasConsumption get() = TvmComplexGas(this, description = "118/43")
          
@@ -9235,8 +9235,8 @@ data class TvmContBasicCallccvarargsInst(
 @SerialName(TvmContBasicCallrefInst.MNEMONIC)
 data class TvmContBasicCallrefInst(
     override val location: TvmInstLocation,
-    val c: TvmInstList, // ref
-): TvmInst, TvmContBasicInst, TvmRefOperandLoader {
+    override val c: TvmInstList, // ref
+): TvmInst, TvmContBasicInst, TvmRefOperandLoader, TvmContOperand1Inst {
     override val mnemonic: String get() = MNEMONIC
     override val gasConsumption get() = TvmComplexGas(this, description = "126/51")
          
@@ -9610,8 +9610,8 @@ data class TvmContConditionalIfbitjmpInst(
 data class TvmContConditionalIfbitjmprefInst(
     override val location: TvmInstLocation,
     val n: Int, // uint
-    val c: TvmInstList, // ref
-): TvmInst, TvmContConditionalInst, TvmRefOperandLoader {
+    override val c: TvmInstList, // ref
+): TvmInst, TvmContConditionalInst, TvmRefOperandLoader, TvmContOperand1Inst {
     override val mnemonic: String get() = MNEMONIC
     override val gasConsumption get() = TvmComplexGas(this, description = "126/51")
          
@@ -9644,8 +9644,8 @@ data class TvmContConditionalIfelseInst(
 @SerialName(TvmContConditionalIfelserefInst.MNEMONIC)
 data class TvmContConditionalIfelserefInst(
     override val location: TvmInstLocation,
-    val c: TvmInstList, // ref
-): TvmInst, TvmContConditionalInst, TvmRefOperandLoader {
+    override val c: TvmInstList, // ref
+): TvmInst, TvmContConditionalInst, TvmRefOperandLoader, TvmContOperand1Inst {
     override val mnemonic: String get() = MNEMONIC
     override val gasConsumption get() = TvmComplexGas(this, description = "26/126/51")
          
@@ -9677,8 +9677,8 @@ data class TvmContConditionalIfjmpInst(
 @SerialName(TvmContConditionalIfjmprefInst.MNEMONIC)
 data class TvmContConditionalIfjmprefInst(
     override val location: TvmInstLocation,
-    val c: TvmInstList, // ref
-): TvmInst, TvmContConditionalInst, TvmRefOperandLoader {
+    override val c: TvmInstList, // ref
+): TvmInst, TvmContConditionalInst, TvmRefOperandLoader, TvmContOperand1Inst {
     override val mnemonic: String get() = MNEMONIC
     override val gasConsumption get() = TvmComplexGas(this, description = "26/126/51")
          
@@ -9712,8 +9712,8 @@ data class TvmContConditionalIfnbitjmpInst(
 data class TvmContConditionalIfnbitjmprefInst(
     override val location: TvmInstLocation,
     val n: Int, // uint
-    val c: TvmInstList, // ref
-): TvmInst, TvmContConditionalInst, TvmRefOperandLoader {
+    override val c: TvmInstList, // ref
+): TvmInst, TvmContConditionalInst, TvmRefOperandLoader, TvmContOperand1Inst {
     override val mnemonic: String get() = MNEMONIC
     override val gasConsumption get() = TvmComplexGas(this, description = "126/51")
          
@@ -9761,8 +9761,8 @@ data class TvmContConditionalIfnotjmpInst(
 @SerialName(TvmContConditionalIfnotjmprefInst.MNEMONIC)
 data class TvmContConditionalIfnotjmprefInst(
     override val location: TvmInstLocation,
-    val c: TvmInstList, // ref
-): TvmInst, TvmContConditionalInst, TvmRefOperandLoader {
+    override val c: TvmInstList, // ref
+): TvmInst, TvmContConditionalInst, TvmRefOperandLoader, TvmContOperand1Inst {
     override val mnemonic: String get() = MNEMONIC
     override val gasConsumption get() = TvmComplexGas(this, description = "26/126/51")
          
@@ -9778,8 +9778,8 @@ data class TvmContConditionalIfnotjmprefInst(
 @SerialName(TvmContConditionalIfnotrefInst.MNEMONIC)
 data class TvmContConditionalIfnotrefInst(
     override val location: TvmInstLocation,
-    val c: TvmInstList, // ref
-): TvmInst, TvmContConditionalInst, TvmRefOperandLoader {
+    override val c: TvmInstList, // ref
+): TvmInst, TvmContConditionalInst, TvmRefOperandLoader, TvmContOperand1Inst {
     override val mnemonic: String get() = MNEMONIC
     override val gasConsumption get() = TvmComplexGas(this, description = "26/126/51")
          
@@ -9831,8 +9831,8 @@ data class TvmContConditionalIfnotretaltInst(
 @SerialName(TvmContConditionalIfrefInst.MNEMONIC)
 data class TvmContConditionalIfrefInst(
     override val location: TvmInstLocation,
-    val c: TvmInstList, // ref
-): TvmInst, TvmContConditionalInst, TvmRefOperandLoader {
+    override val c: TvmInstList, // ref
+): TvmInst, TvmContConditionalInst, TvmRefOperandLoader, TvmContOperand1Inst {
     override val mnemonic: String get() = MNEMONIC
     override val gasConsumption get() = TvmComplexGas(this, description = "26/126/51")
          
@@ -9850,8 +9850,8 @@ data class TvmContConditionalIfrefInst(
 @SerialName(TvmContConditionalIfrefelseInst.MNEMONIC)
 data class TvmContConditionalIfrefelseInst(
     override val location: TvmInstLocation,
-    val c: TvmInstList, // ref
-): TvmInst, TvmContConditionalInst, TvmRefOperandLoader {
+    override val c: TvmInstList, // ref
+): TvmInst, TvmContConditionalInst, TvmRefOperandLoader, TvmContOperand1Inst {
     override val mnemonic: String get() = MNEMONIC
     override val gasConsumption get() = TvmComplexGas(this, description = "26/126/51")
          
@@ -9867,9 +9867,9 @@ data class TvmContConditionalIfrefelseInst(
 @SerialName(TvmContConditionalIfrefelserefInst.MNEMONIC)
 data class TvmContConditionalIfrefelserefInst(
     override val location: TvmInstLocation,
-    val c1: TvmInstList, // ref
-    val c2: TvmInstList, // ref
-): TvmInst, TvmContConditionalInst, TvmRefOperandLoader {
+    override val c1: TvmInstList, // ref
+    override val c2: TvmInstList, // ref
+): TvmInst, TvmContConditionalInst, TvmRefOperandLoader, TvmContOperand2Inst {
     override val mnemonic: String get() = MNEMONIC
     override val gasConsumption get() = TvmComplexGas(this, description = "126/51")
          

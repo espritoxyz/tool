@@ -105,7 +105,7 @@ class TestResolverTest {
     private fun findMethodTest(
         symbolicResult: TvmContractSymbolicTestResult,
         predicate: (TvmSymbolicTest) -> Boolean
-    ): Pair<Int, TvmSymbolicTest> = symbolicResult.firstNotNullOf { (method, tests) ->
+    ): Pair<Int, TvmSymbolicTest> = symbolicResult.firstNotNullOf { (method, _, tests) ->
         val test = tests.firstOrNull(predicate)
             ?: return@firstNotNullOf null
 

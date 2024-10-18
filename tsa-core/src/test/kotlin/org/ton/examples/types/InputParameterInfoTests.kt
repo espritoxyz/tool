@@ -11,7 +11,7 @@ import org.ton.TvmParameterInfo.SliceInfo
 import org.ton.examples.checkInvariants
 import org.ton.examples.funcCompileAndAnalyzeAllMethods
 import org.ton.examples.propertiesFound
-import org.usvm.machine.TvmMachineOptions
+import org.usvm.machine.TvmOptions
 import org.usvm.machine.types.TvmReadingOfUnexpectedType
 import org.usvm.machine.types.TvmUnexpectedEndOfReading
 import org.usvm.machine.types.TvmUnexpectedDataReading
@@ -115,7 +115,7 @@ class InputParameterInfoTests {
 
         val inputInfo =
             TvmInputInfo(mapOf(0 to SliceInfo(DataCellInfo(TvmDataCellStructure.Empty))))
-        val options = TvmMachineOptions(
+        val options = TvmOptions(
             checkDataCellContentTypes = false,
             excludeInputsThatDoNotMatchGivenScheme = false,
         )

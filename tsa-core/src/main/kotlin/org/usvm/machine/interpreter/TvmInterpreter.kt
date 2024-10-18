@@ -225,7 +225,6 @@ import org.usvm.mkSizeGeExpr
 import org.usvm.sizeSort
 import org.usvm.solver.USatResult
 import org.usvm.targets.UTargetsSet
-import java.math.BigInteger
 import org.ton.bytecode.TvmArtificialExecuteContInst
 import org.ton.bytecode.TvmArtificialJmpToContInst
 import org.ton.bytecode.TvmCompareOtherSdcnttrail0Inst
@@ -250,38 +249,51 @@ import org.ton.bytecode.TvmContRegistersSamealtsaveInst
 import org.ton.bytecode.TvmContRegistersSaveInst
 import org.ton.bytecode.TvmContRegistersSetcontctrInst
 import org.ton.bytecode.TvmInstList
+import org.ton.bytecode.TvmInstMethodLocation
 import org.ton.bytecode.TvmOrdContinuation
+import org.usvm.machine.MethodId
 import org.usvm.machine.TvmStepScope
 import org.usvm.machine.bigIntValue
+import org.usvm.machine.mainMethodId
 import org.usvm.machine.state.C0Register
 import org.usvm.machine.state.C1Register
 import org.usvm.machine.state.C2Register
 import org.usvm.machine.state.C3Register
 import org.usvm.machine.state.C5Register
 import org.usvm.machine.state.C7Register
+import org.usvm.machine.state.TvmStack.TvmStackTupleValueConcreteNew
 import org.usvm.machine.state.addInt
 import org.usvm.machine.state.addContinuation
 import org.usvm.machine.state.addOnStack
+import org.usvm.machine.state.addTuple
 import org.usvm.machine.state.allocEmptyCell
 import org.usvm.machine.state.allocSliceFromCell
 import org.usvm.machine.state.allocateCell
 import org.usvm.machine.state.bitsToBv
+import org.usvm.machine.state.checkOutOfRange
+import org.usvm.machine.state.checkOverflow
+import org.usvm.machine.state.checkUnderflow
 import org.usvm.machine.state.defineC0
 import org.usvm.machine.state.defineC1
 import org.usvm.machine.state.defineC2
+import org.usvm.machine.state.defineC3
 import org.usvm.machine.state.defineC4
+import org.usvm.machine.state.defineC5
+import org.usvm.machine.state.defineC7
 import org.usvm.machine.state.getSliceRemainingBitsCount
 import org.usvm.machine.state.getSliceRemainingRefsCount
-import org.usvm.machine.state.initConfigRoot
+import org.usvm.machine.state.initC7
 import org.usvm.machine.state.jump
 import org.usvm.machine.state.lastStmt
 import org.usvm.machine.state.returnAltFromContinuation
 import org.usvm.machine.state.switchToContinuation
 import org.usvm.machine.state.returnFromContinuation
 import org.usvm.machine.state.slicePreloadDataBits
+import org.usvm.machine.state.takeLastTuple
+import org.usvm.machine.toMethodId
 import org.usvm.machine.types.TvmDataCellInfoStorage
 import org.usvm.machine.types.TvmTypeSystem
-
+import java.math.BigInteger
 
 // TODO there are a lot of `scope.calcOnState` and `scope.doWithState` invocations that are not inline - optimize it
 class TvmInterpreter(
@@ -310,8 +322,9 @@ class TvmInterpreter(
     private val cryptoInterpreter = TvmCryptoInterpreter(ctx)
     private val gasInterpreter = TvmGasInterpreter(ctx)
     private val globalsInterpreter = TvmGlobalsInterpreter(ctx)
+    private val transactionInterpreter = TvmTransactionInterpreter(ctx)
 
-    fun getInitialState(contractCode: TvmContractCode, contractData: Cell, methodId: BigInteger, targets: List<TvmTarget> = emptyList()): TvmState {
+    fun getInitialState(contractCode: TvmContractCode, contractData: Cell, methodId: MethodId, targets: List<TvmTarget> = emptyList()): TvmState {
         /*val contract = contractCode.methods[0]!!
         val registers = TvmRegisters()
         val currentContinuation = TvmContinuationValue(
@@ -336,7 +349,7 @@ class TvmInterpreter(
         return state*/
         val method = contractCode.methods[methodId] ?: error("Unknown method $methodId")
 
-        val mainMethod = contractCode.methods[Int.MAX_VALUE.toBigInteger()]
+        val mainMethod = contractCode.methods[mainMethodId]
             ?: error("No main method found")
         val c3 = C3Register(TvmOrdContinuation(mainMethod))
 
@@ -376,7 +389,7 @@ class TvmInterpreter(
 
         state.registers.c4 = C4Register(TvmCellValue(state.generateSymbolicCell()))
         state.registers.c5 = C5Register(TvmCellValue(state.allocEmptyCell()))
-        state.registers.c7 = C7Register(ctx, configRoot = state.initConfigRoot())
+        state.registers.c7 = C7Register(state.initC7())
 
         val solver = ctx.solver<TvmType>()
 
@@ -734,7 +747,7 @@ class TvmInterpreter(
                 }
             }
             is TvmConstDataPushcontInst -> scope.doWithStateCtx {
-                val continuationValue = TvmOrdContinuation(TvmLambda(stmt.s.toMutableList()))
+                val continuationValue = TvmOrdContinuation(TvmLambda(stmt.c.toMutableList()))
                 stack.addContinuation(continuationValue)
 
                 newStmt(stmt.nextStmt())
@@ -745,7 +758,7 @@ class TvmInterpreter(
 
     private fun visitPushContShortInst(scope: TvmStepScope, stmt: TvmConstDataPushcontShortInst) {
         scope.doWithState {
-            val lambda = TvmLambda(stmt.s.toMutableList())
+            val lambda = TvmLambda(stmt.c.toMutableList())
             val continuationValue = TvmOrdContinuation(lambda)
 
             stack.addContinuation(continuationValue)
@@ -862,21 +875,6 @@ class TvmInterpreter(
             }
         }
     }
-
-    private fun checkOverflow(noOverflowExpr: UBoolExpr, scope: TvmStepScope): Unit? = scope.fork(
-        noOverflowExpr,
-        blockOnFalseState = ctx.throwIntegerOverflowError
-    )
-
-    private fun checkUnderflow(noUnderflowExpr: UBoolExpr, scope: TvmStepScope): Unit? = scope.fork(
-        noUnderflowExpr,
-        blockOnFalseState = ctx.throwIntegerOverflowError
-    )
-
-    private fun checkOutOfRange(notOutOfRangeExpr: UBoolExpr, scope: TvmStepScope): Unit? = scope.fork(
-        condition = notOutOfRangeExpr,
-        blockOnFalseState = ctx.throwIntegerOutOfRangeError
-    )
 
     private fun visitArithmeticLogicalInst(scope: TvmStepScope, stmt: TvmArithmLogicalInst): Unit = with(ctx) {
         val result: UExpr<TvmInt257Sort> = when (stmt) {
@@ -1469,9 +1467,21 @@ class TvmInterpreter(
                 val c2 = registers.c2.value
                 c0.defineC2(c2)
             }
+            3 -> {
+                val c3 = registers.c3.value
+                c0.defineC3(c3)
+            }
             4 -> {
                 val c4 = registers.c4.value.value
                 c0.defineC4(c4)
+            }
+            5 -> {
+                val c5 = registers.c5.value.value
+                c0.defineC5(c5)
+            }
+            7 -> {
+                val c7 = registers.c7.value
+                c0.defineC7(c7)
             }
             else -> TODO("Not yet implemented: $stmt")
         }
@@ -1494,6 +1504,18 @@ class TvmInterpreter(
                     ?: return@doWithStateCtx throwTypeCheckError(this)
 
                 cont.defineC4(cell)
+            }
+            5 -> {
+                val cell = stack.takeLastCell()
+                    ?: return@doWithStateCtx throwTypeCheckError(this)
+
+                cont.defineC5(cell)
+            }
+            7 -> {
+                val tuple = scope.takeLastTuple()
+                    ?: return@doWithStateCtx throwTypeCheckError(this)
+
+                cont.defineC7(tuple)
             }
             else -> TODO("Not yet implemented: $stmt")
         }
@@ -1527,11 +1549,20 @@ class TvmInterpreter(
                 registers.c4 = C4Register(TvmCellValue(newData))
             }
             5 -> {
-                // TODO is it a correct implementation?
                 val newData = stack.takeLastCell()
                     ?: return@doWithStateCtx throwTypeCheckError(this)
 
                 registers.c5 = C5Register(TvmCellValue(newData))
+            }
+            7 -> {
+                val newC7 = scope.takeLastTuple()
+                    ?: return@doWithStateCtx throwTypeCheckError(this)
+
+                require(newC7 is TvmStackTupleValueConcreteNew) {
+                    TODO("Support non-concrete tuples")
+                }
+
+                registers.c7 = C7Register(newC7)
             }
             else -> TODO("Not yet implemented: $stmt")
         }
@@ -1579,6 +1610,10 @@ class TvmInterpreter(
                     val cell = scope.calcOnState { registers.c5.value.value }
 
                     scope.addOnStack(cell, TvmCellType)
+                    newStmt(stmt.nextStmt())
+                }
+                7 -> {
+                    stack.addTuple(registers.c7.value)
                     newStmt(stmt.nextStmt())
                 }
                 else -> TODO("Not yet implemented: $stmt")
@@ -1808,7 +1843,7 @@ class TvmInterpreter(
 
         when (stmt) {
             is TvmContDictCalldictInst -> {
-                val methodId = stmt.n.toBigInteger()
+                val methodId = stmt.n.toMethodId()
 
 //                    stack += argument.toBv257()
 ////                    val c3Continuation = registers.c3!!.value
@@ -1837,6 +1872,12 @@ class TvmInterpreter(
 
         when (stmt) {
             is TvmDictSpecialDictigetjmpzInst -> {
+                val statementMethod = (stmt.location as? TvmInstMethodLocation)?.methodId
+                val selectorMethodId = mainMethodId
+                require(statementMethod == selectorMethodId) {
+                    "The general case is not supported: $stmt"
+                }
+
                 val methodId = scope.takeLastIntOrThrowTypeError()?.bigIntValue()
                     ?: return
                 val method = contractCode.methods[methodId]!!

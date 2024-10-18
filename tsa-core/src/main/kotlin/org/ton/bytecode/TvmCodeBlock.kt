@@ -3,7 +3,7 @@ package org.ton.bytecode
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import java.math.BigInteger
+import org.usvm.machine.MethodId
 
 // TODO is it a real entity?
 @Serializable
@@ -20,7 +20,7 @@ sealed class TvmCodeBlock {
 @Serializable
 @SerialName("TvmMethod")
 data class TvmMethod(
-    val id: @Contextual BigInteger,
+    val id: @Contextual MethodId,
     @SerialName("instList")
     private val instListRaw: MutableList<TvmInst>
 ) : TvmCodeBlock() {

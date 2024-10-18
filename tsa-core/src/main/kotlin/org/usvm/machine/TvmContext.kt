@@ -41,7 +41,10 @@ import org.usvm.sizeSort
 // TODO make it Bv16
 typealias TvmSizeSort = UBv32Sort
 
-class TvmContext(components: UComponents<TvmType, TvmSizeSort>) : UContext<TvmSizeSort>(components) {
+class TvmContext(
+    val tvmOptions: TvmOptions,
+    components: UComponents<TvmType, TvmSizeSort>,
+) : UContext<TvmSizeSort>(components) {
     val int257sort = TvmInt257Sort(this)
     val cellDataSort = TvmCellDataSort(this)
 
@@ -53,6 +56,7 @@ class TvmContext(components: UComponents<TvmType, TvmSizeSort>) : UContext<TvmSi
     val falseValue: KBitVecValue<TvmInt257Sort> = 0.toBv257()
     val oneValue: KBitVecValue<TvmInt257Sort> = 1.toBv257()
     val twoValue: KBitVecValue<TvmInt257Sort> = 2.toBv257()
+    val eightValue: KBitVecValue<TvmInt257Sort> = 8.toBv257()
     val zeroValue: KBitVecValue<TvmInt257Sort> = falseValue
     val minusOneValue: KBitVecValue<TvmInt257Sort> = trueValue
     val intBitsValue: KBitVecValue<TvmInt257Sort> = INT_BITS.toInt().toBv257()
@@ -63,12 +67,19 @@ class TvmContext(components: UComponents<TvmType, TvmSizeSort>) : UContext<TvmSi
     val maxGramsValue: KExpr<TvmInt257Sort> = bvMaxValueUnsigned<UBvSort>(MAX_GRAMS_BITS).unsignedExtendToInteger()
     val maxTimestampValue = mkBvShiftLeftExpr(oneValue, 64.toBv257())
 
+    val masterchain: KBitVecValue<TvmInt257Sort> = minusOneValue
+    val baseChain: KBitVecValue<TvmInt257Sort> = zeroValue
+
     val zeroSizeExpr: UExpr<TvmSizeSort> = mkSizeExpr(0)
     val oneSizeExpr: UExpr<TvmSizeSort> = mkSizeExpr(1)
     val threeSizeExpr: UExpr<TvmSizeSort> = mkSizeExpr(3)
     val fourSizeExpr: UExpr<TvmSizeSort> = mkSizeExpr(4)
+    val sixSizeExpr: UExpr<TvmSizeSort> = mkSizeExpr(6)
     val maxDataLengthSizeExpr: UExpr<TvmSizeSort> = mkSizeExpr(MAX_DATA_LENGTH)
     val maxRefsLengthSizeExpr: UExpr<TvmSizeSort> = mkSizeExpr(MAX_REFS_NUMBER)
+
+    val zeroBit = mkBv(0, 1u)
+    val oneBit = mkBv(1, 1u)
 
     private var inputStackEntryCounter: Int = 0
     fun nextInputStackEntryId(): Int = inputStackEntryCounter++
@@ -88,6 +99,9 @@ class TvmContext(components: UComponents<TvmType, TvmSizeSort>) : UContext<TvmSi
     val throwSymbolicStructuralCellUnderflowError: (TvmState) -> Unit =
         setFailure(TvmCellUnderflowError, TvmFailureType.SymbolicStructuralError)
     val throwRealCellUnderflowError: (TvmState) -> Unit = setFailure(TvmCellUnderflowError, TvmFailureType.RealError)
+
+    val sendMsgActionTag = mkBvHex("0ec3c86d", 32u)
+    val reserveActionTag = mkBvHex("36e6b809", 32u)
 
     fun UBoolExpr.toBv257Bool(): UExpr<TvmInt257Sort> = with(ctx) {
         mkIte(
@@ -150,9 +164,12 @@ class TvmContext(components: UComponents<TvmType, TvmSizeSort>) : UContext<TvmSi
 
         const val MAX_GRAMS_BITS: UInt = 120u
 
+        const val MAX_ACTIONS = 255
+
         const val CONFIG_KEY_LENGTH: Int = 32
 
-        const val ADDRESS_BITS: UInt = 256u
+        const val STD_WORKCHAIN_BITS: Int = 8
+        const val ADDRESS_BITS: Int = 256
 
         // Utility bit sizes for arith operations
         val INT_EXT1_BITS: UInt = INT_BITS + 1u

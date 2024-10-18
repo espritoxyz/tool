@@ -326,37 +326,28 @@ class TvmStepScope(
     private val UBoolExpr.isConcrete get() = isTrue || isFalse
 
     /**
-     * [assert]s the [condition] on the scope with the cloned [originalState]. Returns this cloned state,
-     * if this [condition] is satisfiable, and returns `null` otherwise.
+     * @return [Unit] if this [condition] is satisfiable, and returns `null` otherwise.
      */
     @Suppress("MoveVariableDeclarationIntoWhen")
-    fun checkSat(condition: UBoolExpr): TvmState? {
-        val conditionalState = originalState.clone()
-        conditionalState.pathConstraints += condition
-
+    fun checkSat(condition: UBoolExpr): Unit? {
         // If this state did not fork at all or was sat at the last fork point, it must be still sat, so we can just
         // check this condition with presented models
-        if (conditionalState.models.isNotEmpty()) {
-            val trueModels = conditionalState.models.filter { it.eval(condition).isTrue }
+        if (originalState.models.isNotEmpty()) {
+            val trueModels = originalState.models.filter { it.eval(condition).isTrue }
 
             if (trueModels.isNotEmpty()) {
-                return conditionalState
+                return Unit
             }
         }
 
-        val solver = conditionalState.ctx.solver<TvmType>()
-        val solverResult = solver.check(conditionalState.pathConstraints)
+        val constraints = originalState.pathConstraints.clone()
+        constraints += condition
+
+        val solver = originalState.ctx.solver<TvmType>()
+        val solverResult = solver.check(constraints)
 
         return when (solverResult) {
-            is USatResult -> {
-                conditionalState.models += solverResult.model
-
-                // If state with the added condition is satisfiable, it means that the original state is satisfiable too,
-                // and we can save a model from the solver
-                originalState.models += solverResult.model
-
-                conditionalState
-            }
+            is USatResult -> originalState.models += solverResult.model
             is UUnknownResult, is UUnsatResult -> null
         }
     }

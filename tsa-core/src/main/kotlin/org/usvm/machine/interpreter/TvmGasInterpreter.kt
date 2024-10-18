@@ -7,6 +7,7 @@ import org.ton.bytecode.TvmAppGasInst
 import org.ton.bytecode.TvmAppGasSetgaslimitInst
 import org.usvm.machine.TvmContext
 import org.usvm.machine.TvmStepScope
+import org.usvm.machine.state.TvmCommitedState
 import org.usvm.machine.state.TvmOutOfGas
 import org.usvm.machine.state.addInt
 import org.usvm.machine.state.calcConsumedGas
@@ -27,8 +28,10 @@ class TvmGasInterpreter(private val ctx: TvmContext) {
                 scope.doWithState { newStmt(stmt.nextStmt()) }
             }
             is TvmAppGasCommitInst -> {
-                // TODO Do nothing for now
-                scope.doWithState { newStmt(stmt.nextStmt()) }
+                scope.doWithState {
+                    commitedState = TvmCommitedState(registers.c4, registers.c5)
+                    newStmt(stmt.nextStmt())
+                }
             }
             is TvmAppGasGasconsumedInst -> visitGasConsumedInst(scope, stmt)
             is TvmAppGasSetgaslimitInst -> visitSetGasLimitInst(scope, stmt)
