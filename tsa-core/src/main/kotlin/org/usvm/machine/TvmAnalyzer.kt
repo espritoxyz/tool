@@ -424,35 +424,37 @@ fun analyzeAllMethods(
             val states = machine.analyze(
                 contract,
                 contractData,
-                method.id,
-                inputInfo[method.id] ?: TvmInputInfo(),
                 coverageStatistics,
+                method.id,
+                inputInfo[method.id] ?: TvmInputInfo()
             )
             val coverage = TvmMethodCoverage(
                 coverageStatistics.getMethodCoveragePercents(method),
                 coverageStatistics.getTransitiveCoveragePercents()
             )
-
+            
             states to coverage
         }.getOrElse {
             logger.error(it) {
                 "Failed analyzing $method"
             }
-
+            
             emptyList<TvmState>() to TvmMethodCoverage(coverage = 0f, transitiveCoverage = 0f)
         }
     }
     methodStates.forEach { (method, analysisResult) ->
         val states = analysisResult.first
         val coverage = analysisResult.second
-
-        logger.debug("Method {}", method)
-        logger.debug("Coverage: ${coverage.coverage}, transitive coverage: ${coverage.transitiveCoverage}")
+        
+        logger.info("Method {}", method)
+        logger.info("Coverage: ${coverage.coverage}, transitive coverage: ${coverage.transitiveCoverage}")
         val exceptionalStates = states.filter { state -> state.isExceptional }
         logger.debug("States: ${states.size}, exceptional: ${exceptionalStates.size}")
         exceptionalStates.forEach { state -> logger.debug(state.methodResult.toString()) }
         logger.debug("=====".repeat(20))
     }
+
+    machine.close()
 
     return TvmTestResolver.resolve(methodStates)
 }
@@ -464,7 +466,7 @@ data class FiftInterpreterResult(
     val stack: List<String>
 )
 
-private const val DEFAULT_CONTRACT_DATA_HEX = "b5ee9c7241010101000a00001000000185d258f59ccfc59500"
+const val DEFAULT_CONTRACT_DATA_HEX = "b5ee9c7241010101000a00001000000185d258f59ccfc59500"
 private const val COMPILER_TIMEOUT = 5.toLong() // seconds
 
 typealias MethodId = BigInteger

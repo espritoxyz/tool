@@ -29,7 +29,9 @@ import org.usvm.sizeSort
 import org.usvm.types.USingleTypeStream
 import java.math.BigInteger
 import org.ton.bytecode.TvmArtificialJmpToContInst
+import org.ton.bytecode.TvmCodeBlock
 import org.ton.bytecode.TvmExceptionContinuation
+import org.ton.bytecode.TvmMethod
 
 val TvmState.lastStmt get() = pathNode.statement
 fun TvmState.newStmt(stmt: TvmInst) {
@@ -66,6 +68,11 @@ fun TvmContext.setFailure(
 
 fun <R> TvmStepScope.calcOnStateCtx(block: context(TvmContext) TvmState.() -> R): R = calcOnState {
     block(ctx, this)
+}
+
+fun <R> TvmStepScope.doWithCtx(block: context(TvmContext) TvmStepScope.() -> R): R {
+    val ctx = calcOnState { ctx }
+    return block(ctx, this)
 }
 
 fun TvmStepScope.doWithStateCtx(block: context(TvmContext) TvmState.() -> Unit) = doWithState {
@@ -234,3 +241,5 @@ fun TvmState.assertType(value: UHeapRef, type: TvmType) {
         }
     }
 }
+
+fun TvmCodeBlock.isReceiveInternal() = this is TvmMethod && id == TvmContext.RECEIVE_INTERNAL_ID

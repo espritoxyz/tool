@@ -1,6 +1,6 @@
 ;; Storage contract fabric
 
-#include "../../imports/stdlib.fc";
+#include "stdlib.fc";
 #include "constants.fc";
 
 const min_deploy_amount = 60000000;

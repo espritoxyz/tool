@@ -19,8 +19,8 @@ import org.usvm.machine.state.newStmt
 import org.usvm.machine.state.nextStmt
 import org.usvm.machine.state.sliceCopy
 import org.usvm.machine.state.sliceMoveDataPtr
-import org.usvm.machine.state.slicePreloadDataBits
 import org.usvm.machine.state.slicePreloadAddrLength
+import org.usvm.machine.state.slicePreloadDataBits
 import org.usvm.machine.state.takeLastSlice
 import org.usvm.machine.types.TvmSliceType
 import org.usvm.machine.types.TvmSymbolicCellDataMsgAddr
@@ -42,23 +42,28 @@ class TvmMessageAddrInterpreter(private val ctx: TvmContext) {
             val slice = scope.calcOnState { stack.takeLastSlice() }
                 ?: return@doWithStateCtx scope.doWithState(throwTypeCheckError)
 
-            val addrLength = scope.slicePreloadAddrLength(slice) ?: return@doWithStateCtx
-            val addrBits = scope.slicePreloadDataBits(slice, addrLength) ?: return@doWithStateCtx
-
             val updatedSlice = scope.calcOnState {
                 memory.allocConcrete(TvmSliceType).also { sliceCopy(slice, it) }
             }
-            scope.makeSliceTypeLoad(updatedSlice, TvmSymbolicCellDataMsgAddr(ctx))
-                ?: return@doWithStateCtx
 
-            sliceMoveDataPtr(updatedSlice, addrLength)
+            scope.makeSliceTypeLoad(slice, TvmSymbolicCellDataMsgAddr(ctx), updatedSlice) {
 
-            val addrSlice = scope.allocSliceFromData(addrBits, addrLength) ?: return@doWithStateCtx
+                // hide the original [scope] from this closure
+                @Suppress("NAME_SHADOWING", "UNUSED_VARIABLE")
+                val scope = Unit
 
-            addOnStack(addrSlice, TvmSliceType)
-            addOnStack(updatedSlice, TvmSliceType)
+                val addrLength = slicePreloadAddrLength(slice) ?: return@makeSliceTypeLoad
+                val addrBits = slicePreloadDataBits(slice, addrLength) ?: return@makeSliceTypeLoad
 
-            newStmt(stmt.nextStmt())
+                sliceMoveDataPtr(updatedSlice, addrLength)
+
+                val addrSlice = allocSliceFromData(addrBits, addrLength) ?: return@makeSliceTypeLoad
+
+                addOnStack(addrSlice, TvmSliceType)
+                addOnStack(updatedSlice, TvmSliceType)
+
+                newStmt(stmt.nextStmt())
+            }
         }
     }
 

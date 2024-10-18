@@ -18,6 +18,7 @@ import org.usvm.UState
 import org.usvm.constraints.UPathConstraints
 import org.usvm.isStaticHeapRef
 import org.usvm.machine.TvmContext
+import org.usvm.machine.types.GlobalStructuralConstraintsHolder
 import org.usvm.machine.types.TvmDataCellInfoStorage
 import org.usvm.machine.types.TvmDataCellLoadedTypeInfo
 import org.usvm.machine.types.TvmRealReferenceType
@@ -45,9 +46,11 @@ class TvmState(
     forkPoints: PathNode<PathNode<TvmInst>> = PathNode.root(),
     var methodResult: TvmMethodResult = TvmMethodResult.NoCall,
     targets: UTargetsSet<TvmTarget, TvmInst> = UTargetsSet.empty(),
-    val dataCellLoadedTypeInfo: TvmDataCellLoadedTypeInfo = TvmDataCellLoadedTypeInfo.empty(),
     val typeSystem: TvmTypeSystem,
     var commitedState: TvmCommitedState? = null,
+    val dataCellLoadedTypeInfo: TvmDataCellLoadedTypeInfo = TvmDataCellLoadedTypeInfo.empty(),
+    var stateInitialized: Boolean = false,
+    val globalStructuralConstraintsHolder: GlobalStructuralConstraintsHolder = GlobalStructuralConstraintsHolder(),
 ) : UState<TvmType, TvmCodeBlock, TvmInst, TvmContext, TvmTarget, TvmState>(
     ctx,
     callStack,
@@ -61,6 +64,7 @@ class TvmState(
     override val isExceptional: Boolean
         get() = methodResult is TvmMethodResult.TvmFailure || methodResult is TvmMethodResult.TvmStructuralError
 
+    lateinit var initialData: TvmInitialStateData
     lateinit var dataCellInfoStorage: TvmDataCellInfoStorage
 
     /**
@@ -113,11 +117,14 @@ class TvmState(
             forkPoints = forkPoints,
             methodResult = methodResult,
             targets = targets.clone(),
-            dataCellLoadedTypeInfo = dataCellLoadedTypeInfo.clone(),
             typeSystem = typeSystem,
             commitedState = commitedState,
+            dataCellLoadedTypeInfo = dataCellLoadedTypeInfo.clone(),
+            stateInitialized = stateInitialized,
+            globalStructuralConstraintsHolder = globalStructuralConstraintsHolder,
         ).also { newState ->
             newState.dataCellInfoStorage = dataCellInfoStorage.clone()
+            newState.initialData = initialData
         }
     }
 

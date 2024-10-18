@@ -2,6 +2,7 @@ package org.usvm.machine
 
 data class TvmOptions(
     val enableVarAddress: Boolean = false,
+    val enableInternalArgsConstraints: Boolean = true,
     val checkDataCellContentTypes: Boolean = true,
     val excludeInputsThatDoNotMatchGivenScheme: Boolean = true,
 ) {
@@ -9,7 +10,7 @@ data class TvmOptions(
         if (excludeInputsThatDoNotMatchGivenScheme) {
             require(checkDataCellContentTypes) {
                 "When option excludeInputsThatDoNotMatchGivenScheme in on, " +
-                        "option checkDataCellContentTypes must be also on."
+                    "option checkDataCellContentTypes must be also on."
             }
         }
     }

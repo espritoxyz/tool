@@ -16,13 +16,20 @@ import org.usvm.UExpr
 import org.usvm.UHeapRef
 import org.usvm.UIteExpr
 import org.usvm.USort
+import org.usvm.api.makeSymbolicPrimitive
 import org.usvm.api.readField
 import org.usvm.api.writeField
 import org.usvm.machine.TvmContext
 import org.usvm.machine.TvmContext.Companion.ADDRESS_BITS
+import org.usvm.machine.TvmContext.Companion.ADDRESS_TAG_BITS
+import org.usvm.machine.TvmContext.Companion.ADDRESS_TAG_LENGTH
 import org.usvm.machine.TvmContext.Companion.CELL_DATA_BITS
+import org.usvm.machine.TvmContext.Companion.EXTERN_ADDRESS_TAG
 import org.usvm.machine.TvmContext.Companion.MAX_DATA_LENGTH
+import org.usvm.machine.TvmContext.Companion.NONE_ADDRESS_TAG
+import org.usvm.machine.TvmContext.Companion.STD_ADDRESS_TAG
 import org.usvm.machine.TvmContext.Companion.STD_WORKCHAIN_BITS
+import org.usvm.machine.TvmContext.Companion.VAR_ADDRESS_TAG
 import org.usvm.machine.TvmContext.Companion.cellDataField
 import org.usvm.machine.TvmContext.Companion.cellDataLengthField
 import org.usvm.machine.TvmContext.Companion.cellRefsLengthField
@@ -221,7 +228,7 @@ fun TvmStepScope.assertRefsLengthConstraint(
     assert(correctnessConstraint, unsatBlock = unsatBlock)
 }
 
-private fun TvmState.loadDataBitsFromCellWithoutChecks(
+private fun TvmState.preloadDataBitsFromCellWithoutChecks(
     cell: UHeapRef,
     offset: UExpr<TvmSizeSort>,
     sizeBits: UExpr<TvmSizeSort>
@@ -232,22 +239,22 @@ private fun TvmState.loadDataBitsFromCellWithoutChecks(
     mkBvLogicalShiftRightExpr(cellData, offsetDataPos.zeroExtendToSort(cellDataSort))
 }
 
-fun TvmState.loadDataBitsFromCellWithoutChecks(
+fun TvmState.preloadDataBitsFromCellWithoutChecks(
     cell: UHeapRef,
     offset: UExpr<TvmSizeSort>,
     sizeBits: Int,
 ): UExpr<KBvSort> = with(ctx) {
-    val shiftedData = loadDataBitsFromCellWithoutChecks(cell, offset, mkSizeExpr(sizeBits))
-    return mkBvExtractExpr(high = sizeBits- 1, low = 0, shiftedData)
+    val shiftedData = preloadDataBitsFromCellWithoutChecks(cell, offset, mkSizeExpr(sizeBits))
+    return mkBvExtractExpr(high = sizeBits - 1, low = 0, shiftedData)
 }
 
-fun TvmState.loadDataBitsFromCellWithoutChecks(
+fun TvmState.slicePreloadDataBitsWithoutChecks(
     slice: UHeapRef,
     sizeBits: Int,
 ): UExpr<KBvSort> = with(ctx) {
     val cell = memory.readField(slice, sliceCellField, addressSort)
     val dataPosition = memory.readField(slice, sliceDataPosField, sizeSort)
-   return loadDataBitsFromCellWithoutChecks(cell, dataPosition, sizeBits)
+   return preloadDataBitsFromCellWithoutChecks(cell, dataPosition, sizeBits)
 }
 
 /**
@@ -272,18 +279,18 @@ fun TvmStepScope.slicePreloadDataBits(
     checkCellDataUnderflow(this@slicePreloadDataBits, cell, minSize = readingEnd, quietBlock = quietBlock)
         ?: return@calcOnStateCtx null
 
-    loadDataBitsFromCellWithoutChecks(cell, dataPosition, sizeBits)
+    preloadDataBitsFromCellWithoutChecks(cell, dataPosition, sizeBits)
 }
 
 fun TvmStepScope.slicePreloadDataBits(
     slice: UHeapRef,
     bits: Int,
     quietBlock: (TvmState.() -> Unit)? = null
-): UExpr<UBvSort>? {
-    val data = calcOnStateCtx { slicePreloadDataBits(slice, mkSizeExpr(bits), quietBlock) }
-        ?: return null
+): UExpr<UBvSort>? = doWithCtx {
+    val data = slicePreloadDataBits(slice, mkSizeExpr(bits), quietBlock)
+        ?: return@doWithCtx null
 
-    return calcOnStateCtx { mkBvExtractExpr(high = bits - 1, low = 0, data) }
+    mkBvExtractExpr(high = bits - 1, low = 0, data)
 }
 
 private fun TvmContext.extractIntFromShiftedData(
@@ -308,7 +315,7 @@ fun TvmState.loadIntFromCellWithoutChecks(
     sizeBits: UExpr<TvmInt257Sort>,
     isSigned: Boolean
 ): UExpr<TvmInt257Sort> = with(ctx) {
-    val shiftedData = loadDataBitsFromCellWithoutChecks(cell, offset, sizeBits.extractToSizeSort())
+    val shiftedData = preloadDataBitsFromCellWithoutChecks(cell, offset, sizeBits.extractToSizeSort())
     return extractIntFromShiftedData(shiftedData, sizeBits, isSigned)
 }
 
@@ -332,23 +339,34 @@ fun TvmStepScope.slicePreloadInt(
 private fun TvmStepScope.slicePreloadInternalAddrLengthConstraint(
     slice: UHeapRef
 ): Pair<UBoolExpr, UExpr<TvmSizeSort>>? = calcOnStateCtx {
-    val data = slicePreloadDataBits(slice, bits = 12) ?: return@calcOnStateCtx null
+    // addr_var$11 anycast:(Maybe Anycast) addr_len:(## 9) workchain_id:int32
+    // addr_std$10 anycast:(Maybe Anycast) workchain_id:int8 ...
+    val prefixLen = 44
+    val data = slicePreloadDataBitsWithoutChecks(slice, sizeBits = prefixLen)
 
-    val tag = mkBvExtractExpr(high = 11, low = 10, data)
-    val tagLength = 2
-    val tagLengthUnsigned = tagLength.toUInt()
+    // addr_std$10
+    // addr_var$11
+    val tag = mkBvExtractExpr(high = prefixLen - 1, low = prefixLen - 2, data)
 
-    val anycastBit = mkBvExtractExpr(high = 9, low = 9, data)
+    // anycast:(Maybe Anycast)
+    val anycastBit = mkBvExtractExpr(high = prefixLen - 3, low = prefixLen - 3, data)
     val noAnycastConstraint = anycastBit eq zeroBit
 
     // addr_std$10
-    val stdConstraint = tag eq mkBv("10", tagLengthUnsigned)
-    val stdLength = mkSizeExpr(tagLength + 1 + STD_WORKCHAIN_BITS + ADDRESS_BITS)
+    val stdConstraint = tag eq mkBv(STD_ADDRESS_TAG, ADDRESS_TAG_BITS)
+    // workchain_id:int8
+    val stdWorkchain = mkBvExtractExpr(high = prefixLen - 4, low = prefixLen - 11, data).signedExtendToInteger()
+    val stdWorkchainConstraint = (stdWorkchain eq baseChain) or (stdWorkchain eq masterchain)
+    val stdLength = mkSizeExpr(ADDRESS_TAG_LENGTH + 1 + STD_WORKCHAIN_BITS + ADDRESS_BITS)
 
     // addr_var$11
-    val varConstraint = tag eq mkBv("11", tagLengthUnsigned)
-    val varAddrLength = mkBvExtractExpr(high = 8, low = 0, data).zeroExtendToSort(sizeSort)
-    val varLength = mkSizeAddExpr(mkSizeExpr(tagLength + 1 + 9 + 32), varAddrLength)
+    val varConstraint = tag eq mkBv(VAR_ADDRESS_TAG, ADDRESS_TAG_BITS)
+    // addr_len:(## 9)
+    val varAddrLength = mkBvExtractExpr(high = prefixLen - 4, low = prefixLen - 12, data).zeroExtendToSort(sizeSort)
+    // workchain_id:int32
+    val varWorkchain = mkBvExtractExpr(high = prefixLen - 13, low = prefixLen - 44, data).signedExtendToInteger()
+    val varWorkchainConstraint = (varWorkchain eq baseChain) or (varWorkchain eq masterchain)
+    val varLength = mkSizeAddExpr(mkSizeExpr(ADDRESS_TAG_LENGTH + 1 + 9 + 32), varAddrLength)
 
     val (constraint, addrLength) = if (tvmOptions.enableVarAddress) {
         Pair(
@@ -365,7 +383,11 @@ private fun TvmStepScope.slicePreloadInternalAddrLengthConstraint(
 
     // TODO assume that there is no `anycast`, since we don't support it
     assert(
-        constraint implies noAnycastConstraint,
+        mkAnd(
+            constraint implies noAnycastConstraint,
+            stdConstraint implies stdWorkchainConstraint,
+            varConstraint implies varWorkchainConstraint
+        ),
         unsatBlock = {
             error("Cannot assume no anycast")
         }
@@ -376,21 +398,23 @@ private fun TvmStepScope.slicePreloadInternalAddrLengthConstraint(
 
 private fun TvmStepScope.slicePreloadExternalAddrLengthConstraint(
     slice: UHeapRef
-): Pair<UBoolExpr, UExpr<TvmSizeSort>>? = calcOnStateCtx {
-    val data = slicePreloadDataBits(slice, bits = 11) ?: return@calcOnStateCtx null
+): Pair<UBoolExpr, UExpr<TvmSizeSort>> = calcOnStateCtx {
+    // addr_extern$01 len:(## 9)
+    // addr_none$00 ...
+    val prefixLen = 11
+    val data = slicePreloadDataBitsWithoutChecks(slice, sizeBits = prefixLen)
 
-    val tag = mkBvExtractExpr(high = 10, low = 9, data)
-    val tagLength = 2
-    val tagLengthUnsigned = tagLength.toUInt()
+    val tag = mkBvExtractExpr(high = prefixLen - 1, low = prefixLen - 2, data)
 
     // addr_none$00
-    val noneConstraint = tag eq mkBv("00", tagLengthUnsigned)
-    val noneLength = mkSizeExpr(tagLength)
+    val noneConstraint = tag eq mkBv(NONE_ADDRESS_TAG, ADDRESS_TAG_BITS)
+    val noneLength = mkSizeExpr(ADDRESS_TAG_LENGTH)
 
     // addr_extern$01
-    val externConstraint = tag eq mkBv("01", tagLengthUnsigned)
-    val externAddrLength = mkBvExtractExpr(high = 8, low = 0, data).zeroExtendToSort(sizeSort)
-    val externLength = mkSizeAddExpr(mkSizeExpr(tagLength + 9), externAddrLength)
+    val externConstraint = tag eq mkBv(EXTERN_ADDRESS_TAG, ADDRESS_TAG_BITS)
+    // len:(## 9)
+    val externAddrLength = mkBvExtractExpr(high = prefixLen - 3, low = prefixLen - 11, data).zeroExtendToSort(sizeSort)
+    val externLength = mkSizeAddExpr(mkSizeExpr(ADDRESS_TAG_LENGTH + 9), externAddrLength)
 
     val addrLength = mkIte(
         noneConstraint,
@@ -434,13 +458,8 @@ fun TvmStepScope.slicePreloadAddrLength(slice: UHeapRef): UExpr<TvmSizeSort>? = 
     val (intConstraint, intLength) = slicePreloadInternalAddrLengthConstraint(slice) ?: return@calcOnStateCtx null
     val (extConstraint, extLength) = slicePreloadExternalAddrLengthConstraint(slice) ?: return@calcOnStateCtx null
 
-    fork(
-        intConstraint or extConstraint,
-        blockOnFalseState = {
-            // TODO tl-b parsing failure
-            ctx.throwUnknownCellUnderflowError(this)
-        }
-    ) ?: return@calcOnStateCtx null
+    assert(intConstraint or extConstraint)
+        ?: return@calcOnStateCtx null
 
     val length = mkIte(
         intConstraint,
@@ -451,25 +470,32 @@ fun TvmStepScope.slicePreloadAddrLength(slice: UHeapRef): UExpr<TvmSizeSort>? = 
     length
 }
 
-fun TvmStepScope.sliceLoadGrams(
-    slice: UHeapRef
-): UExpr<TvmInt257Sort>? = calcOnStateCtx {
-    val lengthPeek = calcOnState { loadDataBitsFromCellWithoutChecks(slice, sizeBits = 4) }
-    makeSliceTypeLoad(slice, TvmSymbolicCellDataCoins(ctx, lengthPeek.zeroExtendToSort(sizeSort)))
-        ?: return@calcOnStateCtx null
+fun sliceLoadGrams(
+    scope: TvmStepScope,
+    oldSlice: UHeapRef,
+    newSlice: UConcreteHeapRef,
+    doWithGrams: TvmStepScope.(UExpr<TvmInt257Sort>) -> Unit
+) = scope.calcOnStateCtx {
+    val peekedLength = slicePreloadDataBitsWithoutChecks(newSlice, sizeBits = 4).zeroExtendToSort(sizeSort)
+    scope.makeSliceTypeLoad(oldSlice, TvmSymbolicCellDataCoins(ctx, peekedLength), newSlice) {
 
-    val length = slicePreloadDataBits(slice, bits = 4)?.zeroExtendToSort(sizeSort)
-        ?: return@calcOnStateCtx null
+        // hide the original [scope] from this closure
+        @Suppress("NAME_SHADOWING", "UNUSED_VARIABLE")
+        val scope = Unit
 
-    sliceMoveDataPtr(slice, bits = 4)
+        val length = slicePreloadDataBits(newSlice, bits = 4)?.zeroExtendToSort(sizeSort)
+            ?: return@makeSliceTypeLoad
 
-    val extendedLength = mkBvShiftLeftExpr(length, shift = threeSizeExpr)
-    val grams = slicePreloadInt(slice, extendedLength.zeroExtendToSort(int257sort), isSigned = false)
-        ?: return@calcOnStateCtx null
+        sliceMoveDataPtr(newSlice, bits = 4)
 
-    sliceMoveDataPtr(slice, extendedLength)
+        val extendedLength = mkBvShiftLeftExpr(length, shift = threeSizeExpr)
+        val grams = slicePreloadInt(newSlice, extendedLength.zeroExtendToSort(int257sort), isSigned = false)
+            ?: return@makeSliceTypeLoad
 
-    grams
+        sliceMoveDataPtr(newSlice, extendedLength)
+
+        doWithGrams(grams)
+    }
 }
 
 fun TvmStepScope.slicePreloadRef(
@@ -640,18 +666,42 @@ fun TvmStepScope.builderStoreGrams(
     value: UExpr<TvmInt257Sort>,
     quietBlock: (TvmState.() -> Unit)? = null
 ): Unit? {
-    // TODO correct implementation that uses the smallest `valueSizeBits` possible
-
+    // var_uint$_ {n:#} len:(#< 16) value:(uint (len * 8))
     val lenSizeBits = 4
-    val lengthValue = (1 shl lenSizeBits) - 1
-    val valueSizeBits = 8 * lengthValue
+    val maxValue = 8 * ((1 shl lenSizeBits) - 1)
 
-    val notOutOfRangeExpr = unsignedIntegerFitsBits(value, valueSizeBits.toUInt())
-    checkOutOfRange(notOutOfRangeExpr, this) ?: return null
+    val notOutOfRangeValue = unsignedIntegerFitsBits(value, maxValue.toUInt())
+    checkOutOfRange(notOutOfRangeValue, this) ?: return null
+
+    // len:(#< 16)
+    val lengthValue = calcOnState { makeSymbolicPrimitive(int257sort) }
+    val lengthRangeConstraint = unsignedIntegerFitsBits(lengthValue, lenSizeBits.toUInt())
+
+    // (len * 8)
+    val valueBits = mkBvShiftLeftExpr(lengthValue, threeValue)
+    // ((len - 1) * 8)
+    val prevValueBits = mkBvShiftLeftExpr(mkBvSubExpr(lengthValue, oneValue), threeValue)
+    // (len = 0 /\ value = 0) \/
+    // (len > 0 /\ `value ufits in (len * 8) bits` /\ `value doesn't ufit in ((len - 1) * 8) bits`)
+    val lengthValueConstraint = mkOr(
+        (lengthValue eq zeroValue) and (value eq zeroValue),
+        mkAnd(
+            mkBvSignedGreaterExpr(lengthValue, zeroValue),
+            mkBvSignedLessOrEqualExpr(value, bvMaxValueUnsignedExtended(valueBits)),
+            mkBvSignedGreaterExpr(value, bvMaxValueUnsignedExtended(prevValueBits)),
+        )
+    )
+
+    assert(
+        lengthRangeConstraint and lengthValueConstraint,
+        unsatBlock = {
+            error("Cannot assert grams length constraints")
+        },
+    ) ?: return null
 
     builderStoreInt(
         builder,
-        lengthValue.toBv257(),
+        lengthValue,
         lenSizeBits.toBv257(),
         isSigned = false,
         quietBlock
@@ -660,7 +710,7 @@ fun TvmStepScope.builderStoreGrams(
     return builderStoreInt(
         builder,
         value,
-        valueSizeBits.toBv257(),
+        valueBits,
         isSigned = false,
         quietBlock
     )

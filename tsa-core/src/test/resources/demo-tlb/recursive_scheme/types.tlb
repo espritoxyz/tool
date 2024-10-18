@@ -1,0 +1,2 @@
+empty$0 = InternalMsgBody;
+some$1 x:int8 next:InternalMsgBody = InternalMsgBody;

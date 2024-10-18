@@ -54,13 +54,14 @@ private fun TvmSymbolicTestSuite.toSarifResult(methodsMapping: Map<MethodId, Str
                 return@mapNotNull null
             }
         }
+
         val methodId = it.methodId
         val methodName = methodsMapping[methodId]
 
         Result(
             ruleID = ruleId,
             level = TsaSarifSchema.TsaSarifResult.LEVEL,
-            message = Message(text =message),
+            message = Message(text = message),
             locations = listOf(
                 Location(
                     logicalLocations = listOf(

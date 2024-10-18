@@ -4,21 +4,15 @@ import kotlinx.collections.immutable.PersistentList
 import kotlinx.collections.immutable.PersistentMap
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.persistentMapOf
-import org.ton.Endian
 import org.usvm.UBoolExpr
 import org.usvm.UConcreteHeapRef
 import org.usvm.UExpr
 import org.usvm.UHeapRef
-import org.usvm.api.readField
 import org.usvm.machine.TvmContext
 import org.usvm.machine.TvmSizeSort
-import org.usvm.machine.TvmStepScope
-import org.usvm.machine.state.TvmMethodResult
-import org.usvm.machine.state.calcOnStateCtx
 import org.usvm.memory.GuardedExpr
 import org.usvm.memory.foldHeapRef
-import org.usvm.mkSizeAddExpr
-import org.usvm.sizeSort
+import org.usvm.utils.extractAddresses
 
 class TvmDataCellLoadedTypeInfo(
     var addressToActions: PersistentMap<UConcreteHeapRef, PersistentList<Action>>
@@ -26,25 +20,26 @@ class TvmDataCellLoadedTypeInfo(
 
     sealed interface Action {
         val guard: UBoolExpr
-        val address: UConcreteHeapRef
+        val cellAddress: UConcreteHeapRef
     }
 
     class LoadData(
         override val guard: UBoolExpr,
-        override val address: UConcreteHeapRef,
+        override val cellAddress: UConcreteHeapRef,
         val type: TvmSymbolicCellDataType,
         val offset: UExpr<TvmSizeSort>,
+        val sliceAddress: UConcreteHeapRef,
     ) : Action
 
     class LoadRef(
         override val guard: UBoolExpr,
-        override val address: UConcreteHeapRef,
+        override val cellAddress: UConcreteHeapRef,
         val refNumber: UExpr<TvmSizeSort>,
     ) : Action
 
     class EndOfCell(
         override val guard: UBoolExpr,
-        override val address: UConcreteHeapRef,
+        override val cellAddress: UConcreteHeapRef,
         val offset: UExpr<TvmSizeSort>,
         val refNumber: UExpr<TvmSizeSort>,
     ) : Action
@@ -77,12 +72,19 @@ class TvmDataCellLoadedTypeInfo(
         return actionList
     }
 
+    context(TvmContext)
     fun loadData(
         cellAddress: UHeapRef,
         offset: UExpr<TvmSizeSort>,
         type: TvmSymbolicCellDataType,
-    ): List<LoadData> = registerAction(cellAddress) { ref ->
-        LoadData(ref.guard, ref.expr, type, offset)
+        slice: UHeapRef,
+    ): List<LoadData> {
+        val staticSliceAddresses = extractAddresses(slice, extractAllocated = true)
+        return staticSliceAddresses.fold(emptyList()) { acc, (sliceGuard, sliceRef) ->
+            acc + registerAction(cellAddress) { ref ->
+                LoadData(ref.guard and sliceGuard, ref.expr, type, offset, sliceRef)
+            }
+        }
     }
 
     fun loadRef(
@@ -105,88 +107,5 @@ class TvmDataCellLoadedTypeInfo(
 
     companion object {
         fun empty() = TvmDataCellLoadedTypeInfo(persistentMapOf())
-    }
-}
-
-
-sealed class TvmSymbolicCellDataType(val sizeBits: UExpr<TvmSizeSort>)
-
-class TvmSymbolicCellDataInteger(
-    sizeBits: UExpr<TvmSizeSort>,
-    val isSigned: Boolean,
-    val endian: Endian
-) : TvmSymbolicCellDataType(sizeBits)
-
-class TvmSymbolicCellMaybeConstructorBit(ctx: TvmContext) : TvmSymbolicCellDataType(ctx.mkBv(1))
-
-const val stdMsgAddrSize = 2 + 1 + 8 + 256
-
-// TODO: support other types of MsgAddr (now only stdMsgAddr is supported)
-class TvmSymbolicCellDataMsgAddr(ctx: TvmContext) : TvmSymbolicCellDataType(ctx.mkBv(stdMsgAddrSize))
-
-class TvmSymbolicCellDataBitArray(sizeBits: UExpr<TvmSizeSort>) : TvmSymbolicCellDataType(sizeBits)
-
-class TvmSymbolicCellDataCoins(
-    ctx: TvmContext,
-    val coinsPrefix: UExpr<TvmSizeSort>  // 4-bit unsigned integer in front of coins amount
-) : TvmSymbolicCellDataType(ctx.calculateExtendedCoinsLength(coinsPrefix))
-
-private fun TvmContext.calculateExtendedCoinsLength(coinsPrefix: UExpr<TvmSizeSort>): UExpr<TvmSizeSort> {
-    val extendedLength = mkBvShiftLeftExpr(coinsPrefix, shift = threeSizeExpr)
-    return mkSizeAddExpr(extendedLength, fourSizeExpr)
-}
-
-fun TvmStepScope.makeSliceTypeLoad(slice: UHeapRef, type: TvmSymbolicCellDataType): Unit? {
-    return calcOnStateCtx {
-        val cellAddress = memory.readField(slice, TvmContext.sliceCellField, addressSort)
-        val offset = memory.readField(slice, TvmContext.sliceDataPosField, sizeSort)
-        val loadList = dataCellLoadedTypeInfo.loadData(cellAddress, offset, type)
-        loadList.forEach { load ->
-            val conflictCond = dataCellInfoStorage.getConflictConditionsForLoadData(load)
-            conflictCond.entries.forEach { (error, cond) ->
-                fork(
-                    cond.not(),
-                    blockOnFalseState = {
-                        methodResult = error
-                    }
-                ) ?: return@calcOnStateCtx null
-            }
-        }
-    }
-}
-
-fun TvmStepScope.assertEndOfCell(slice: UHeapRef): Unit? {
-    return calcOnStateCtx {
-        val cellAddress = memory.readField(slice, TvmContext.sliceCellField, addressSort)
-        val offset = memory.readField(slice, TvmContext.sliceDataPosField, sizeSort)
-        val refNumber = memory.readField(slice, TvmContext.sliceRefPosField, sizeSort)
-        val actions = dataCellLoadedTypeInfo.makeEndOfCell(cellAddress, offset, refNumber)
-        actions.forEach {
-            val noConflictCond = dataCellInfoStorage.getNoUnexpectedEndOfReadingCondition(it)
-            fork(
-                noConflictCond,
-                blockOnFalseState = {
-                    methodResult = TvmMethodResult.TvmStructuralError(TvmUnexpectedEndOfReading())
-                }
-            ) ?: return@calcOnStateCtx null
-        }
-    }
-}
-
-
-fun TvmStepScope.makeSliceRefLoad(slice: UHeapRef): Unit? {
-    return calcOnStateCtx {
-        val cellAddress = memory.readField(slice, TvmContext.sliceCellField, addressSort)
-        val refNumber = mkSizeAddExpr(memory.readField(slice, TvmContext.sliceRefPosField, sizeSort), oneSizeExpr)
-        val loadList = dataCellLoadedTypeInfo.loadRef(cellAddress, refNumber)
-        loadList.forEach { load ->
-            val noConflictCond = dataCellInfoStorage.getNoUnexpectedLoadRefCondition(load)
-            fork(
-                noConflictCond,
-                blockOnFalseState = {
-                    methodResult = TvmMethodResult.TvmStructuralError(TvmUnexpectedRefReading())
-                }
-            ) ?: return@calcOnStateCtx null
-        }
     }
 }

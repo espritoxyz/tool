@@ -1,0 +1,18 @@
+#include "../stdlib.fc";
+
+
+() recv_internal(int msg_value, cell in_msg_cell, slice in_msg) impure {
+    int has_value = in_msg~load_int(1);
+    int result = 0;
+    while (has_value) {
+        int cur_value = in_msg~load_int(8);
+        result += cur_value;
+        has_value = in_msg~load_int(1);
+    }
+
+    var msg = begin_cell()
+        .store_int(result, 256)
+        .end_cell();
+
+    msg~impure_touch();
+}

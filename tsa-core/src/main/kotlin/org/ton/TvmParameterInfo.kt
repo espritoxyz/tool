@@ -7,8 +7,7 @@ sealed interface TvmParameterInfo {
     data class SliceInfo(val cellInfo: DataCellInfo) : TvmParameterInfo
 
     sealed interface CellInfo : TvmParameterInfo
-
-    data class DataCellInfo(val dataCellStructure: TvmDataCellStructure) : CellInfo
-
+    data object UnknownCellInfo : CellInfo
+    data class DataCellInfo(val dataCellStructure: TvmDataCellLabel) : CellInfo
     data class DictCellInfo(val keySize: Int) : CellInfo
 }

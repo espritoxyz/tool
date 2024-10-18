@@ -4,7 +4,7 @@ import kotlinx.serialization.Serializable
 import org.ton.TvmBuiltinDataCellLabel
 
 @Serializable
-sealed interface TvmStructuralExit<DataCellType> {
+sealed interface TvmStructuralExit<out DataCellType> {
     val ruleId: String
 }
 
@@ -28,7 +28,7 @@ data class TvmReadingOutOfSwitchBounds<DataCellType>(
         "Reading of $readingType is out of switch bounds"
 }
 
-class TvmUnexpectedRefReading<DataCellType> : TvmStructuralExit<DataCellType> {
+object TvmUnexpectedRefReading : TvmStructuralExit<Nothing> {
     override val ruleId: String
         get() = "unexpected-ref-reading"
 
@@ -36,7 +36,7 @@ class TvmUnexpectedRefReading<DataCellType> : TvmStructuralExit<DataCellType> {
         "Unexpected reading of a reference: slice should have no references left."
 }
 
-class TvmUnexpectedEndOfReading<DataCellType> : TvmStructuralExit<DataCellType> {
+object TvmUnexpectedEndOfReading : TvmStructuralExit<Nothing> {
     override val ruleId: String
         get() = "unexpected-end-of-cell"
 

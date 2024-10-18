@@ -1,16 +1,18 @@
 package org.ton.examples
 
-import io.ksmt.utils.toBigInteger
 import org.ton.TvmInputInfo
+import org.ton.TvmParameterInfo
 import org.ton.bytecode.TvmContractCode
+import org.ton.examples.types.InputParameterInfoTests
+import org.ton.tlb.readFromJson
 import org.usvm.machine.BocAnalyzer
 import org.usvm.machine.FiftAnalyzer
 import org.usvm.machine.FiftInterpreterResult
 import org.usvm.machine.FuncAnalyzer
 import org.usvm.machine.MethodId
 import org.usvm.machine.TactAnalyzer
-import org.usvm.machine.TvmOptions
 import org.usvm.machine.mainMethodId
+import org.usvm.machine.TvmOptions
 import org.usvm.machine.intValue
 import org.usvm.machine.state.TvmStack
 import org.usvm.machine.types.TvmIntegerType
@@ -37,13 +39,11 @@ private const val FIFT_STDLIB_PATH = "/fiftstdlib"
 private val FIFT_STDLIB_RESOURCE: Path = object {}.javaClass.getResource(FIFT_STDLIB_PATH)?.path?.let { Path(it) }
     ?: error("Cannot find fift stdlib in $FIFT_STDLIB_PATH")
 
-val intMaxValueAsBigInteger = Int.MAX_VALUE.toBigInteger()
-
 fun tactCompileAndAnalyzeAllMethods(
     tactSourcesPath: Path,
     contractDataHex: String? = null,
     methodsBlackList: Set<MethodId> = hashSetOf(mainMethodId),
-    inputInfo: Map<BigInteger, TvmInputInfo> = emptyMap(),
+    inputInfo: Map<MethodId, TvmInputInfo> = emptyMap(),
     tvmOptions: TvmOptions = TvmOptions(),
 ): TvmContractSymbolicTestResult = TactAnalyzer.analyzeAllMethods(
     tactSourcesPath,
@@ -57,7 +57,7 @@ fun funcCompileAndAnalyzeAllMethods(
     funcSourcesPath: Path,
     contractDataHex: String? = null,
     methodsBlackList: Set<MethodId> = hashSetOf(mainMethodId),
-    inputInfo: Map<BigInteger, TvmInputInfo> = emptyMap(),
+    inputInfo: Map<MethodId, TvmInputInfo> = emptyMap(),
     tvmOptions: TvmOptions = TvmOptions(),
 ): TvmContractSymbolicTestResult = FuncAnalyzer(funcStdlibPath = FUNC_STDLIB_RESOURCE, fiftStdlibPath = FIFT_STDLIB_RESOURCE).analyzeAllMethods(
     funcSourcesPath,
@@ -71,7 +71,7 @@ fun compileAndAnalyzeFift(
     fiftPath: Path,
     contractDataHex: String? = null,
     methodsBlackList: Set<MethodId> = hashSetOf(mainMethodId),
-    inputInfo: Map<BigInteger, TvmInputInfo> = emptyMap(),
+    inputInfo: Map<MethodId, TvmInputInfo> = emptyMap(),
     tvmOptions: TvmOptions = TvmOptions(),
 ): TvmContractSymbolicTestResult = FiftAnalyzer(fiftStdlibPath = FIFT_STDLIB_RESOURCE).analyzeAllMethods(
     fiftPath,
@@ -97,7 +97,7 @@ fun analyzeAllMethods(
     bytecodePath: String,
     contractDataHex: String? = null,
     methodsBlackList: Set<MethodId> = hashSetOf(mainMethodId),
-    inputInfo: Map<BigInteger, TvmInputInfo> = emptyMap(),
+    inputInfo: Map<MethodId, TvmInputInfo> = emptyMap(),
 ): TvmContractSymbolicTestResult =
     BocAnalyzer.analyzeAllMethods(Path(bytecodePath), contractDataHex, methodsBlackList, inputInfo)
 
@@ -239,4 +239,17 @@ internal fun checkInvariants(
         }
     }
     assertTrue(failedInvariants.isEmpty(), "Invariants $failedInvariants were violated")
+}
+
+internal fun extractTlbInfo(typesPath: String): Map<MethodId, TvmInputInfo> {
+    val path = InputParameterInfoTests::class.java.getResource(typesPath)?.path
+        ?: error("Cannot find resource bytecode $typesPath")
+    val struct = readFromJson(Path(path), "InternalMsgBody")
+        ?: error("Couldn't parse TL-B structure")
+    val info = TvmParameterInfo.SliceInfo(
+        TvmParameterInfo.DataCellInfo(
+            struct
+        )
+    )
+    return mapOf(BigInteger.ZERO to TvmInputInfo(mapOf(0 to info)))
 }

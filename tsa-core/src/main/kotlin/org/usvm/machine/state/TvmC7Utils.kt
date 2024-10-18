@@ -16,6 +16,7 @@ import org.usvm.machine.TvmContext.Companion.ADDRESS_BITS
 import org.usvm.machine.TvmContext.Companion.CONFIG_KEY_LENGTH
 import org.usvm.machine.TvmContext.Companion.INT_BITS
 import org.usvm.machine.TvmContext.TvmInt257Sort
+import org.usvm.machine.TvmStepScope
 import org.usvm.machine.state.TvmStack.TvmStackCellValue
 import org.usvm.machine.state.TvmStack.TvmStackEntry
 import org.usvm.machine.state.TvmStack.TvmStackIntValue
@@ -47,15 +48,17 @@ fun TvmState.setContractInfoParam(idx: Int, value: TvmStackEntry) {
     registers.c7 = C7Register(updatedC7)
 }
 
-fun TvmState.getConfigParam(idx: UExpr<TvmInt257Sort>): UHeapRef = with(ctx) {
-    val configDict = getConfig()
+fun TvmStepScope.getConfigParam(idx: UExpr<TvmInt257Sort>): UHeapRef? {
+    val configDict = calcOnState { getConfig() }
+    val sliceValue = calcOnStateCtx {
+        dictGetValue(
+            configDict,
+            DictId(CONFIG_KEY_LENGTH),
+            idx.extractToSort(mkBvSort(CONFIG_KEY_LENGTH.toUInt())),
+        )
+    }
 
-    dictGetValue(
-        configDict,
-        DictId(CONFIG_KEY_LENGTH),
-        idx.extractToSort(mkBvSort(CONFIG_KEY_LENGTH.toUInt())),
-        DictValueType.CELL
-    ).asExpr(addressSort)
+    return slicePreloadNextRef(sliceValue)
 }
 
 fun TvmState.configContainsParam(idx: UExpr<TvmInt257Sort>): UBoolExpr = with(ctx) {
@@ -113,13 +116,19 @@ private fun TvmState.initContractInfo(): TvmStackTupleValue = with(ctx) {
             TvmStackNullValue.toStackEntry(),
         )
     )
+    val workchain = makeSymbolicPrimitive(mkBv8Sort())
+    val extendedWorkchain = workchain.signedExtendToInteger()
     val addr = TvmStackCellValue(
         allocCellFromData(
             mkBvConcatExpr(
-                // addr_std$10 anycast:(Maybe Anycast)
-                mkBv("100", 3u),
-                // workchain_id:int8 address:bits256
-                makeSymbolicPrimitive(mkBvSort(8u + 256u))
+                mkBvConcatExpr(
+                    // addr_std$10 anycast:(Maybe Anycast)
+                    mkBv("100", 3u),
+                    // workchain_id:int8
+                    workchain
+                ),
+                // address:bits256
+                makeSymbolicPrimitive(mkBvSort(ADDRESS_BITS.toUInt()))
             )
         )
     )
@@ -138,6 +147,7 @@ private fun TvmState.initContractInfo(): TvmStackTupleValue = with(ctx) {
     pathConstraints += mkBvSignedGreaterOrEqualExpr(blockLogicTime.intValue, zeroValue)
     pathConstraints += mkBvSignedGreaterOrEqualExpr(transactionLogicTime.intValue, zeroValue)
     pathConstraints += mkBvSignedGreaterOrEqualExpr(storagePhaseFees.intValue, zeroValue)
+    pathConstraints += mkAnd((extendedWorkchain eq masterchain) or (extendedWorkchain eq baseChain))
 
     val paramList = listOf(
         tag, actions, msgsSent, unixTime, blockLogicTime, transactionLogicTime, randomSeed,
@@ -320,12 +330,14 @@ private fun TvmState.allocCellFromFields(vararg fields: KExpr<KBvSort>): UHeapRe
 private fun TvmState.setConfigParam(dict: UHeapRef, idx: Int, cellValue: UHeapRef) = with(ctx) {
     assertType(cellValue, TvmDataCellType)
 
+    val builder = allocEmptyCell().also { builderStoreNextRef(it, cellValue) }
+    val sliceValue = allocSliceFromCell(builder)
+
     dictAddKeyValue(
         dict,
         DictId(CONFIG_KEY_LENGTH),
         mkBv(idx, CONFIG_KEY_LENGTH.toUInt()),
-        cellValue,
-        DictValueType.CELL,
+        sliceValue,
     )
 }
 

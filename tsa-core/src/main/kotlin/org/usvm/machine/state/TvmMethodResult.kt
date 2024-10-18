@@ -3,7 +3,8 @@ package org.usvm.machine.state
 import kotlinx.serialization.Serializable
 import org.usvm.UBv32Sort
 import org.usvm.UExpr
-import org.usvm.machine.state.TvmMethodResult.*
+import org.usvm.machine.state.TvmMethodResult.TvmErrorExit
+import org.usvm.machine.state.TvmMethodResult.TvmSuccessfulExit
 import org.usvm.machine.types.TvmStructuralExit
 import org.usvm.machine.types.TvmSymbolicCellDataType
 
@@ -139,6 +140,14 @@ object TvmCellUnderflowError : TvmErrorExit {
     override fun toString(): String = "TVM cell underflow, exit code: $exitCode"
 }
 
+@Serializable
+object TvmDictError : TvmErrorExit {
+    override val exitCode: UInt = 10u
+    override val ruleName: String = "dict-error"
+
+    override fun toString(): String = "TVM dictionary error, exit code: $exitCode"
+}
+
 data class TvmOutOfGas(val consumedGas: UExpr<UBv32Sort>, val gasLimit: UExpr<UBv32Sort>) : TvmErrorExit {
     override val exitCode: UInt = 13u
     override val ruleName: String = "out-of-gas"
@@ -153,38 +162,3 @@ data class TvmUnknownFailure(override val exitCode: UInt): TvmErrorExit {
 
     override fun toString(): String = "TVM user defined error with exit code $exitCode"
 }
-
-// TODO add remaining
-/*
-data class TvmUnexpectedReading(
-    val readingType: TvmSymbolicCellDataType,
-) : TvmStructuralError {
-    override val message: String =
-        "Unexpected reading of $readingType: expected end of cell"
-}
-
-data class TvmReadingOutOfSwitchBounds(
-    val readingType: TvmSymbolicCellDataType,
-) : TvmStructuralError {
-    override val message: String =
-        "Reading of $readingType is out of switch bounds"
-}
-
-data object TvmUnexpectedRefReading : TvmStructuralError {
-    override val message: String =
-        "Unexpected reading of a reference: slice should have no references left."
-}
-
-data object TvmUnexpectedEndOfReading : TvmStructuralError {
-    override val message: String =
-        "Unexpected end of reading: slice is not supposed to be empty"
-}
-
-data class TvmReadingOfUnexpectedType(
-    val labelType: TvmBuiltinDataCellLabel,
-    val actualType: TvmSymbolicCellDataType,
-) : TvmStructuralError {
-    override val message: String =
-        "Reading of unexpected type: expected reading of $labelType, but read $actualType"
-}
-*/

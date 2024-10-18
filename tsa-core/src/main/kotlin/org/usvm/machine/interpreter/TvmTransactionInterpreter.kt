@@ -250,7 +250,8 @@ class TvmTransactionInterpreter(val ctx: TvmContext) {
         val length = slicePreloadDataBits(slice, bits = 4)?.zeroExtendToSort(sizeSort)
             ?: return@calcOnStateCtx null
 
-        makeSliceTypeLoad(slice, TvmSymbolicCellDataCoins(ctx, length))
+        // TODO: do we need it here?
+        // makeSliceTypeLoad(slice, TvmSymbolicCellDataCoins(ctx, length))
 
         val extendedLength = mkBvShiftLeftExpr(length, shift = threeSizeExpr)
         val bitsToSkip = mkSizeAddExpr(fourSizeExpr, extendedLength)

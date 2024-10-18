@@ -45,7 +45,14 @@ class TvmCellRefsRegionValueInfo(
         value.also { state.ensureSymbolicCellInitialized(value) }
 }
 
-fun TvmState.readCellRef(cell: UHeapRef, refIdx: UExpr<TvmSizeSort>): UHeapRef {
+fun TvmState.readCellRef(
+    cell: UHeapRef,
+    refIdx: UExpr<TvmSizeSort>,
+    initConstraintsForChildren: Boolean = true,
+): UHeapRef {
+    if (initConstraintsForChildren && stateInitialized) {
+        dataCellInfoStorage.notifyAboutChildRequest(this, cell)
+    }
     val region = memory.tvmCellRefsRegion()
     return region.readRefValue(cell, refIdx, TvmCellRefsRegionValueInfo(this))
 }

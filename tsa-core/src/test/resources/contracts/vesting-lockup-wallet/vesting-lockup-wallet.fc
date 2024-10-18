@@ -1,4 +1,4 @@
-#include "../../imports/stdlib.fc";
+#include "stdlib.fc";
 
 int equal_slices(slice a, slice b) asm "SDEQ";
 (slice, int) ~load_bool(slice s) asm( -> 1 0) "1 LDI";

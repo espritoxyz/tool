@@ -1,9 +1,11 @@
 package org.ton
 
 sealed interface TvmDataCellStructure {
-    data object Unknown : TvmDataCellStructure
+    sealed interface Leaf : TvmDataCellStructure
 
-    data object Empty : TvmDataCellStructure
+    data object Unknown : Leaf
+
+    data object Empty : Leaf
 
     data class KnownTypePrefix(
         val typeOfPrefix: TvmDataCellLabel,
