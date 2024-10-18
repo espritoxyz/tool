@@ -10,7 +10,7 @@ on:
 jobs:
   run-tests:
     name: 'Run tests'
-    runs-on: [ self-hosted, ex44 ]
+    runs-on: ubuntu-22.04
     container: explyt/tsa-env:v1.1.0
 
     steps:
