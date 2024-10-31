@@ -27,11 +27,12 @@ sealed interface TvmAtomicDataCellLabel : TvmDataCellLabel
  * */
 open class TvmCompositeDataCellLabel(
     val name: String,  // TODO: proper id
+    val definitelyHasAny: Boolean = false,
 ) : TvmDataCellLabel {
     // this is lateinit for supporting recursive structure
     lateinit var internalStructure: TvmDataCellStructure
 
-    constructor(name: String, internalStructure: TvmDataCellStructure) : this(name) {
+    constructor(name: String, internalStructure: TvmDataCellStructure, hasAny: Boolean = false) : this(name, hasAny) {
         this.internalStructure = internalStructure
     }
 }
@@ -44,14 +45,29 @@ data class TvmIntegerLabel(
 
 data object TvmEmptyLabel : TvmCompositeDataCellLabel("", Empty)
 
+sealed interface TvmMsgAddrLabel : TvmBuiltinDataCellLabel
+
 // TODO: other types of addresses (not just std)
-data object TvmMsgAddrLabel : TvmBuiltinDataCellLabel, TvmCompositeDataCellLabel(
+data object TvmFullMsgAddrLabel : TvmMsgAddrLabel, TvmCompositeDataCellLabel(
     "MsgAddr",
     SwitchPrefix(
         switchSize = 3,
         mapOf(
             "100" to KnownTypePrefix(
                 TvmInternalStdMsgAddrLabel,
+                rest = Empty
+            )
+        )
+    )
+)
+
+data object TvmBasicMsgAddrLabel : TvmMsgAddrLabel, TvmCompositeDataCellLabel(
+    "MsgAddr",
+    SwitchPrefix(
+        switchSize = 11,
+        mapOf(
+            "10000000000" to KnownTypePrefix(
+                TvmInternalShortStdMsgAddrLabel,
                 rest = Empty
             )
         )
@@ -76,6 +92,8 @@ data class TvmMaybeRefLabel(
 
 // artificial label
 data object TvmInternalStdMsgAddrLabel : TvmAtomicDataCellLabel
+// artificial label
+data object TvmInternalShortStdMsgAddrLabel : TvmAtomicDataCellLabel
 
 data object TvmCoinsLabel : TvmBuiltinDataCellLabel, TvmAtomicDataCellLabel
 

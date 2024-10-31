@@ -27,6 +27,7 @@ class TvmStack(
     private var stack: PersistentList<TvmStackEntry> = persistentListOf(), // [n n-1 n-2 ... 2 1 0]
     private var inputElements: PersistentList<TvmInputStackEntry> = persistentListOf(),
     private var inputEntryIdToStackValue: PersistentMap<Int, TvmStackValue> = persistentMapOf(),
+    private val allowInputValues: Boolean = true,
 ) {
     private inline val size: Int get() = stack.size
 
@@ -35,6 +36,18 @@ class TvmStack(
 
     val inputValues: List<TvmStackValue?>
         get() = inputElements.map { inputEntryIdToStackValue[it.id] }
+
+    fun takeValuesFromOtherStack(otherStack: TvmStack, numberOfItems: Int) {
+        val entries = List(numberOfItems) {
+            otherStack.takeLastEntry()
+        }
+        entries.reversed().forEach { entry ->
+            addStackEntry(entry)
+        }
+        otherStack.inputEntryIdToStackValue.forEach { (id, value) ->
+            putInputEntryValue(TvmInputStackEntry(id), value)
+        }
+    }
 
     fun takeLast(expectedType: TvmRealType, createEntry: (Int) -> UExpr<out USort>): TvmStackValue {
         val lastEntry = takeLastEntry()
@@ -139,6 +152,10 @@ class TvmStack(
             return
         }
 
+        if (!allowInputValues) {
+            error("New input values for stack are forbidden, but allocated values are not enough.")
+        }
+
         val newValuesSize = newSize - size
         val newValues = List(newValuesSize) {
             TvmInputStackEntry(id = ctx.nextInputStackEntryId())
@@ -159,7 +176,7 @@ class TvmStack(
         stack = stack.clear()
     }
 
-    fun clone(): TvmStack = TvmStack(ctx, stack, inputElements, inputEntryIdToStackValue)
+    fun clone(): TvmStack = TvmStack(ctx, stack, inputElements, inputEntryIdToStackValue, allowInputValues)
 
     // TODO continuations
     sealed interface TvmStackValue {

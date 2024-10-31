@@ -7,7 +7,7 @@ import org.usvm.logger
 import org.usvm.machine.TvmContext
 import org.usvm.machine.TvmContext.Companion.ADDRESS_BITS
 import org.usvm.machine.TvmContext.Companion.STD_WORKCHAIN_BITS
-import org.usvm.machine.TvmStepScope
+import org.usvm.machine.TvmStepScopeManager
 import org.usvm.machine.state.addInt
 import org.usvm.machine.state.addOnStack
 import org.usvm.machine.state.allocSliceFromData
@@ -26,8 +26,10 @@ import org.usvm.machine.types.TvmSliceType
 import org.usvm.machine.types.TvmSymbolicCellDataMsgAddr
 import org.usvm.machine.types.makeSliceTypeLoad
 
-class TvmMessageAddrInterpreter(private val ctx: TvmContext) {
-    fun visitAddrInst(scope: TvmStepScope, stmt: TvmAppAddrInst) {
+class TvmMessageAddrInterpreter(
+    private val ctx: TvmContext,
+) {
+    fun visitAddrInst(scope: TvmStepScopeManager, stmt: TvmAppAddrInst) {
         scope.consumeDefaultGas(stmt)
 
         when (stmt) {
@@ -37,7 +39,7 @@ class TvmMessageAddrInterpreter(private val ctx: TvmContext) {
         }
     }
 
-    private fun visitLoadMessageAddrInst(scope: TvmStepScope, stmt: TvmAppAddrLdmsgaddrInst) {
+    private fun visitLoadMessageAddrInst(scope: TvmStepScopeManager, stmt: TvmAppAddrLdmsgaddrInst) {
         scope.doWithStateCtx {
             val slice = scope.calcOnState { stack.takeLastSlice() }
                 ?: return@doWithStateCtx scope.doWithState(throwTypeCheckError)
@@ -67,7 +69,7 @@ class TvmMessageAddrInterpreter(private val ctx: TvmContext) {
         }
     }
 
-    private fun visitParseStdAddr(scope: TvmStepScope, inst: TvmAppAddrRewritestdaddrInst) {
+    private fun visitParseStdAddr(scope: TvmStepScopeManager, inst: TvmAppAddrRewritestdaddrInst) {
         scope.doWithStateCtx {
             // TODO support var address
 
@@ -122,6 +124,7 @@ class TvmMessageAddrInterpreter(private val ctx: TvmContext) {
             val emptySuffixConstraint = (bitsLeft eq zeroSizeExpr) and (refsLeft eq zeroSizeExpr)
             scope.fork(
                 emptySuffixConstraint,
+                falseStateIsExceptional = true,
                 // TODO set cell deserialization failure
                 blockOnFalseState = throwUnknownCellUnderflowError
             ) ?: return@doWithStateCtx

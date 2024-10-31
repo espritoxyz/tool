@@ -1,6 +1,7 @@
 package org.ton.bytecode
 
 import org.usvm.UExpr
+import org.usvm.machine.MethodId
 import org.usvm.machine.TvmContext.TvmInt257Sort
 import org.usvm.machine.state.C0Register
 import org.usvm.machine.state.C1Register
@@ -61,6 +62,20 @@ data class TvmOrdContinuation(
     ) : this(codeBlock.instList.first(), savelist)
 
     override fun updateSavelist(newSavelist: TvmRegisterSavelist): TvmOrdContinuation = copy(savelist = newSavelist)
+}
+
+/**
+ * [TvmOrdContinuation] wrapper that marks the [method] return site
+ */
+data class TvmMethodReturnContinuation(
+    val method: MethodId,
+    val returnSite: TvmOrdContinuation,
+) : TvmContinuation {
+    override val savelist: TvmRegisterSavelist
+        get() = returnSite.savelist
+
+    override fun updateSavelist(newSavelist: TvmRegisterSavelist): TvmContinuation =
+        copy(returnSite = returnSite.updateSavelist(newSavelist))
 }
 
 /**

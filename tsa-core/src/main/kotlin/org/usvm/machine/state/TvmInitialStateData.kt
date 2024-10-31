@@ -1,8 +1,9 @@
 package org.usvm.machine.state
 
 import org.usvm.UHeapRef
+import org.usvm.machine.state.TvmStack.TvmStackTupleValueConcreteNew
 
 data class TvmInitialStateData(
     val persistentData: UHeapRef,
-    val c7: C7Register,
+    val firstElementOfC7: TvmStackTupleValueConcreteNew,
 )

@@ -1,7 +1,14 @@
 package org.usvm.machine.state
 
 import io.ksmt.utils.powerOfTwo
+import org.ton.bytecode.TvmArtificialJmpToContInst
+import org.ton.bytecode.TvmCellValue
+import org.ton.bytecode.TvmCodeBlock
+import org.ton.bytecode.TvmContractCode
+import org.ton.bytecode.TvmExceptionContinuation
 import org.ton.bytecode.TvmInst
+import org.ton.bytecode.TvmMethod
+import org.ton.bytecode.TvmOrdContinuation
 import org.usvm.NULL_ADDRESS
 import org.usvm.UBoolExpr
 import org.usvm.UConcreteHeapRef
@@ -12,7 +19,8 @@ import org.usvm.api.writeField
 import org.usvm.machine.TvmContext
 import org.usvm.machine.TvmContext.TvmInt257Sort
 import org.usvm.machine.TvmSizeSort
-import org.usvm.machine.TvmStepScope
+import org.usvm.machine.TvmStepScopeManager
+import org.usvm.machine.mainMethodId
 import org.usvm.machine.types.TvmBuilderType
 import org.usvm.machine.types.TvmCellType
 import org.usvm.machine.types.TvmDataCellType
@@ -28,10 +36,6 @@ import org.usvm.mkSizeLeExpr
 import org.usvm.sizeSort
 import org.usvm.types.USingleTypeStream
 import java.math.BigInteger
-import org.ton.bytecode.TvmArtificialJmpToContInst
-import org.ton.bytecode.TvmCodeBlock
-import org.ton.bytecode.TvmExceptionContinuation
-import org.ton.bytecode.TvmMethod
 
 val TvmState.lastStmt get() = pathNode.statement
 fun TvmState.newStmt(stmt: TvmInst) {
@@ -40,6 +44,11 @@ fun TvmState.newStmt(stmt: TvmInst) {
 
 fun TvmInst.nextStmt(): TvmInst = location.codeBlock.instList.getOrNull(location.index + 1)
     ?: error("Unexpected end of the code block ${location.codeBlock}")
+
+fun TvmState.c2IsDefault(): Boolean {
+    val c2 = registersOfCurrentContract.c2.value
+    return c2 == TvmExceptionContinuation
+}
 
 fun TvmContext.setFailure(
     failure: TvmMethodResult.TvmErrorExit,
@@ -58,24 +67,24 @@ fun TvmContext.setFailure(
         state.stack.addInt(failure.exitCode.toInt().toBv257())
     }
 
-    val c2 = state.registers.c2.value
-    if (c2 == TvmExceptionContinuation) {
+    val c2 = state.registersOfCurrentContract.c2.value
+    if (state.c2IsDefault()) {
         state.methodResult = TvmMethodResult.TvmFailure(failure, level)
     } else {
         state.newStmt(TvmArtificialJmpToContInst(c2, state.lastStmt.location))
     }
 }
 
-fun <R> TvmStepScope.calcOnStateCtx(block: context(TvmContext) TvmState.() -> R): R = calcOnState {
+fun <R> TvmStepScopeManager.calcOnStateCtx(block: context(TvmContext) TvmState.() -> R): R = calcOnState {
     block(ctx, this)
 }
 
-fun <R> TvmStepScope.doWithCtx(block: context(TvmContext) TvmStepScope.() -> R): R {
+fun <R> TvmStepScopeManager.doWithCtx(block: context(TvmContext) TvmStepScopeManager.() -> R): R {
     val ctx = calcOnState { ctx }
     return block(ctx, this)
 }
 
-fun TvmStepScope.doWithStateCtx(block: context(TvmContext) TvmState.() -> Unit) = doWithState {
+fun TvmStepScopeManager.doWithStateCtx(block: context(TvmContext) TvmState.() -> Unit) = doWithState {
     block(ctx, this)
 }
 
@@ -127,7 +136,7 @@ fun TvmState.initializeSymbolicBuilder(ref: UConcreteHeapRef) = with(ctx) {
 //    memory.writeField(ref, TvmContext.cellRefsLengthField, sizeSort, mkSizeExpr(0), guard = trueExpr)
 }
 
-fun TvmStepScope.assertIfSat(
+fun TvmStepScopeManager.assertIfSat(
     constraint: UBoolExpr
 ): Boolean {
     val originalState = calcOnState { this }
@@ -242,4 +251,35 @@ fun TvmState.assertType(value: UHeapRef, type: TvmType) {
     }
 }
 
+fun TvmStepScopeManager.killCurrentState() = doWithCtx {
+    assert(falseExpr).also {
+        check(it == null) {
+            "Unexpected not null [assert(falseExpr)] result"
+        }
+    }
+}
+
 fun TvmCodeBlock.isReceiveInternal() = this is TvmMethod && id == TvmContext.RECEIVE_INTERNAL_ID
+
+fun initializeContractExecutionMemory(
+    contractsCode: List<TvmContractCode>,
+    state: TvmState,
+    contractId: ContractId,
+    allowInputStackValues: Boolean,
+): TvmContractExecutionMemory {
+    val contractCode = contractsCode[contractId]
+    val mainMethod = contractCode.methods[mainMethodId]
+        ?: error("No main method found")
+    val ctx = state.ctx
+    val firstElementOfC7 = state.contractIdToFirstElementOfC7[contractId]
+        ?: error("First element of c7 for contract $contractId not found")
+    return TvmContractExecutionMemory(
+        TvmStack(ctx, allowInputValues = allowInputStackValues),
+        C0Register(ctx.quit0Cont),
+        C1Register(ctx.quit1Cont),
+        C2Register(TvmExceptionContinuation),
+        C3Register(TvmOrdContinuation(mainMethod)),
+        C5Register(TvmCellValue(state.allocEmptyCell())),
+        C7Register(state.initC7(firstElementOfC7)),
+    )
+}

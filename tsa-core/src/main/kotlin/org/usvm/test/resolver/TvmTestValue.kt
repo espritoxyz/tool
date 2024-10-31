@@ -15,8 +15,10 @@ value class TvmTestIntegerValue(
     val value: @Contextual BigInteger
 ): TvmTestValue
 
+sealed interface TvmTestReferenceValue
+
 @Serializable
-sealed interface TvmTestCellValue: TvmTestValue
+sealed interface TvmTestCellValue: TvmTestValue, TvmTestReferenceValue
 
 @Serializable
 data class TvmTestDictCellValue(
@@ -46,14 +48,14 @@ data class TvmTestDataCellValue(
 data class TvmTestBuilderValue(
     val data: String,
     val refs: List<TvmTestCellValue>,
-): TvmTestValue
+): TvmTestValue, TvmTestReferenceValue
 
 @Serializable
 data class TvmTestSliceValue(
     val cell: TvmTestDataCellValue,
     val dataPos: Int,
     val refPos: Int,
-): TvmTestValue
+): TvmTestValue, TvmTestReferenceValue
 
 @Serializable
 data object TvmTestNullValue: TvmTestValue

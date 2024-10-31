@@ -1,16 +1,9 @@
 package org.usvm.machine.state
 
-import kotlinx.collections.immutable.PersistentList
-import kotlinx.collections.immutable.persistentListOf
 import org.ton.bytecode.TvmCellValue
 import org.ton.bytecode.TvmContinuation
 import org.ton.bytecode.TvmExceptionContinuation
-import org.usvm.UExpr
-import org.usvm.UHeapRef
 import org.usvm.machine.TvmContext
-import org.usvm.machine.TvmContext.TvmInt257Sort
-import org.usvm.machine.state.TvmStack.TvmStackEntry
-import org.usvm.machine.state.TvmStack.TvmStackNullValue
 import org.usvm.machine.state.TvmStack.TvmStackTupleValueConcreteNew
 
 interface TvmRegister

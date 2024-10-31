@@ -123,7 +123,7 @@ class InputParameterInfoTests {
         val inputInfo =
             TvmInputInfo(mapOf(0 to SliceInfo(DataCellInfo(TvmEmptyLabel))))
         val options = TvmOptions(
-            checkDataCellContentTypes = false,
+            turnOnTLBParsingChecks = false,
             excludeInputsThatDoNotMatchGivenScheme = false,
         )
         val results = funcCompileAndAnalyzeAllMethods(

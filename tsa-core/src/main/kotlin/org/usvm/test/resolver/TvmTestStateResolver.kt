@@ -10,6 +10,7 @@ import org.ton.bytecode.TvmCodeBlock
 import org.ton.bytecode.TvmInst
 import org.usvm.NULL_ADDRESS
 import org.usvm.UAddressSort
+import org.usvm.UBvSort
 import org.usvm.UConcreteHeapAddress
 import org.usvm.UConcreteHeapRef
 import org.usvm.UExpr
@@ -18,8 +19,10 @@ import org.usvm.USort
 import org.usvm.api.readField
 import org.usvm.isTrue
 import org.usvm.machine.TvmContext
+import org.usvm.machine.TvmContext.Companion.dictKeyLengthField
 import org.usvm.machine.TvmSizeSort
 import org.usvm.machine.intValue
+import org.usvm.machine.state.DictId
 import org.usvm.machine.state.TvmCellRefsRegionValueInfo
 import org.usvm.machine.state.TvmMethodResult
 import org.usvm.machine.state.TvmRefsMemoryRegion
@@ -28,16 +31,22 @@ import org.usvm.machine.state.TvmStack.TvmStackTupleValue
 import org.usvm.machine.state.TvmStack.TvmStackTupleValueConcreteNew
 import org.usvm.machine.state.TvmState
 import org.usvm.machine.state.calcConsumedGas
+import org.usvm.machine.state.dictContainsKey
+import org.usvm.machine.state.dictGetValue
+import org.usvm.machine.state.dictKeyEntries
 import org.usvm.machine.state.ensureSymbolicBuilderInitialized
 import org.usvm.machine.state.ensureSymbolicCellInitialized
 import org.usvm.machine.state.ensureSymbolicSliceInitialized
 import org.usvm.machine.state.lastStmt
 import org.usvm.machine.state.tvmCellRefsRegion
+import org.usvm.machine.types.TvmBuilderType
 import org.usvm.machine.types.TvmDataCellLoadedTypeInfo
 import org.usvm.machine.types.TvmDataCellType
 import org.usvm.machine.types.TvmDictCellType
+import org.usvm.machine.types.TvmFinalReferenceType
 import org.usvm.machine.types.TvmReadingOfUnexpectedType
 import org.usvm.machine.types.TvmReadingOutOfSwitchBounds
+import org.usvm.machine.types.TvmSliceType
 import org.usvm.machine.types.TvmSymbolicCellDataBitArray
 import org.usvm.machine.types.TvmSymbolicCellDataCoins
 import org.usvm.machine.types.TvmSymbolicCellDataInteger
@@ -45,30 +54,24 @@ import org.usvm.machine.types.TvmSymbolicCellDataMsgAddr
 import org.usvm.machine.types.TvmSymbolicCellDataType
 import org.usvm.machine.types.TvmSymbolicCellMaybeConstructorBit
 import org.usvm.machine.types.TvmType
-import org.usvm.machine.types.TvmUnexpectedEndOfReading
 import org.usvm.machine.types.TvmUnexpectedDataReading
+import org.usvm.machine.types.TvmUnexpectedEndOfReading
 import org.usvm.machine.types.TvmUnexpectedRefReading
 import org.usvm.machine.types.defaultCellValueOfMinimalLength
+import org.usvm.machine.types.dp.getDefaultDict
 import org.usvm.machine.types.getPossibleTypes
 import org.usvm.memory.UMemory
 import org.usvm.model.UModelBase
 import org.usvm.sizeSort
 import java.math.BigInteger
-import org.usvm.UBvSort
-import org.usvm.collection.set.primitive.setEntries
-import org.usvm.machine.TvmContext.Companion.dictKeyLengthField
-import org.usvm.machine.state.DictId
-import org.usvm.machine.state.DictKeyInfo
-import org.usvm.machine.state.dictContainsKey
-import org.usvm.machine.state.dictGetValue
 
 class TvmTestStateResolver(
     private val ctx: TvmContext,
-    private val model: UModelBase<TvmType>,
+    val model: UModelBase<TvmType>,
     private val state: TvmState,
 ) {
     private val stack: TvmStack
-        get() = state.stack
+        get() = state.rootStack
 
     private val memory: UMemory<TvmType, TvmCodeBlock>
         get() = state.memory
@@ -77,11 +80,10 @@ class TvmTestStateResolver(
 
     fun resolveParameters(): List<TvmTestValue> = stack.inputValues.filterNotNull().map { resolveStackValue(it) }.reversed()
 
-    fun resolveInitialData(): TvmTestCellValue = resolveCell(state.initialData.persistentData)
+    fun resolveInitialData(): TvmTestCellValue = resolveCell(state.rootInitialData.persistentData)
 
     fun resolveContractAddress(): TvmTestDataCellValue {
-        val contractInfo = (state.initialData.c7.value[0, stack].cell(stack) as? TvmStackTupleValue)
-            ?: error("Unexpected initial contract info")
+        val contractInfo = state.rootInitialData.firstElementOfC7
         val addressCell = contractInfo[8, stack].cell(stack)
             ?: error("Unexpected contract address")
         val contractAddress = (resolveStackValue(addressCell) as? TvmTestDataCellValue)
@@ -91,7 +93,7 @@ class TvmTestStateResolver(
     }
 
     fun resolveResultStack(): TvmMethodSymbolicResult {
-        val results = state.stack.results
+        val results = stack.results
 
         // Do not include exit code for exceptional results to the result
         val resultsWithoutExitCode = if (state.methodResult is TvmMethodResult.TvmFailure) results.dropLast(1) else results
@@ -139,7 +141,19 @@ class TvmTestStateResolver(
         }
     }
 
-    private fun <T : USort> evaluateInModel(expr: UExpr<T>): UExpr<T> = model.eval(expr)
+    fun resolveRef(ref: UHeapRef): TvmTestReferenceValue {
+        val concreteRef = evaluateInModel(ref) as UConcreteHeapRef
+        val possibleTypes = state.getPossibleTypes(concreteRef)
+        val type = possibleTypes.first()
+        require(type is TvmFinalReferenceType)
+        return when (type) {
+            TvmSliceType -> resolveSlice(ref)
+            TvmDataCellType, TvmDictCellType -> resolveCell(ref)
+            TvmBuilderType -> resolveBuilder(ref)
+        }
+    }
+
+    fun <T : USort> evaluateInModel(expr: UExpr<T>): UExpr<T> = model.eval(expr)
 
     private fun resolveTuple(tuple: TvmStackTupleValue): TvmTestTupleValue = when (tuple) {
         is TvmStackTupleValueConcreteNew -> {
@@ -218,11 +232,8 @@ class TvmTestStateResolver(
 
         val keyLength = extractInt(memory.readField(dict, dictKeyLengthField, int257sort))
         val dictId = DictId(keyLength)
-        // entries stored during execution
-        val memoryKeySetEntries = memory.setEntries(dict, dictId, mkBvSort(keyLength.toUInt()), DictKeyInfo)
-        // input entries
-        val modelKeySetEntries = model.setEntries(modelRef, dictId, mkBvSort(keyLength.toUInt()), DictKeyInfo)
-        val keySetEntries = memoryKeySetEntries.entries + modelKeySetEntries.entries
+        val keySort = mkBvSort(keyLength.toUInt())
+        val keySetEntries = dictKeyEntries(model, memory, modelRef, dictId, keySort)
 
         val keySet = mutableSetOf<UExpr<UBvSort>>()
         val resultEntries = mutableMapOf<TvmTestIntegerValue, TvmTestSliceValue>()
@@ -253,7 +264,7 @@ class TvmTestStateResolver(
                 TvmTestDataCellValue()
             }
             is TvmParameterInfo.DictCellInfo -> {
-                TvmTestDictCellValue(cellInfo.keySize, emptyMap())
+                getDefaultDict(cellInfo.keySize)
             }
             is TvmParameterInfo.DataCellInfo -> {
                 when (val label = cellInfo.dataCellStructure) {
@@ -350,14 +361,17 @@ class TvmTestStateResolver(
         }
     }
 
-    private fun resolveTypeLoad(loads: List<TvmDataCellLoadedTypeInfo.Action>): List<TvmCellDataTypeLoad> =
-        loads.mapNotNull {
+    private fun resolveTypeLoad(loads: List<TvmDataCellLoadedTypeInfo.Action>): List<TvmCellDataTypeLoad> {
+        val resolved = loads.mapNotNull {
             if (it is TvmDataCellLoadedTypeInfo.LoadData && model.eval(it.guard).isTrue) {
                 TvmCellDataTypeLoad(resolveCellDataType(it.type), resolveInt(it.offset))
             } else {
                 null
             }
         }
+        // remove duplicates (they might appear if we traverse the cell twice or more)
+        return resolved.toSet().sortedBy { it.offset }
+    }
 
     private fun resolveCellDataType(type: TvmSymbolicCellDataType): TvmCellDataType =
         when (type) {

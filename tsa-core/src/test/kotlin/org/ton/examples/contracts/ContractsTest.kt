@@ -3,8 +3,8 @@ package org.ton.examples.contracts
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable
 import org.ton.examples.checkAtLeastOneStateForAllMethods
 import org.ton.examples.funcCompileAndAnalyzeAllMethods
-import org.ton.examples.runHardTestsRegex
-import org.ton.examples.runHardTestsVar
+import org.ton.runHardTestsRegex
+import org.ton.runHardTestsVar
 import org.usvm.machine.MethodId
 import org.usvm.machine.mainMethodId
 import kotlin.io.path.Path
@@ -41,6 +41,7 @@ class ContractsTest {
         analyzeContract(walletV4Path, methodsNumber = 7)
     }
 
+    @EnabledIfEnvironmentVariable(named = runHardTestsVar, matches = runHardTestsRegex)
     @Test
     fun testWalletV5() {
         analyzeContract(walletV5Path, methodsNumber = 7)
@@ -98,34 +99,35 @@ class ContractsTest {
         analyzeContract(nominatorPoolPath, methodsNumber = 10)
     }
 
-    @Ignore
-    @Test
-    fun universalLockupWallet() {
-        analyzeContract(universalLockupWalletPath, methodsNumber = 13)
-    }
-
-    @Ignore
-    @Test
-    fun bridgeMultisig() {
-        analyzeContract(bridgeMultisigPath, methodsNumber = 18)
-    }
-
-    @Ignore
+    @EnabledIfEnvironmentVariable(named = runHardTestsVar, matches = runHardTestsRegex)
     @Test
     fun multisig() {
         analyzeContract(multisigPath, methodsNumber = 16)
     }
 
-    @Ignore
+    //@EnabledIfEnvironmentVariable(named = runHardTestsVar, matches = runHardTestsRegex)
+    @Ignore  // Pasha told me to do so for now
+    @Test
+    fun bridgeMultisig() {
+        analyzeContract(bridgeMultisigPath, methodsNumber = 18)
+    }
+
     @Test
     fun storageProvider() {
         analyzeContract(storageProviderPath, methodsNumber = 10)
     }
 
-    @Ignore
+    @EnabledIfEnvironmentVariable(named = runHardTestsVar, matches = runHardTestsRegex)
     @Test
     fun vesting() {
         analyzeContract(vestingPath, methodsNumber = 9)
+    }
+
+    @Ignore
+    @Test
+    fun universalLockupWallet() {
+        // TODO support PFXDICTGETQ instruction
+        analyzeContract(universalLockupWalletPath, methodsNumber = 13)
     }
 
     private fun analyzeContract(

@@ -7,7 +7,7 @@ import org.usvm.machine.types.TvmBuilderType
 import org.usvm.machine.types.TvmIntegerType
 import org.usvm.machine.types.TvmSliceType
 import org.usvm.machine.TvmContext
-import org.usvm.machine.TvmStepScope
+import org.usvm.machine.TvmStepScopeManager
 import org.usvm.machine.state.addOnStack
 import org.usvm.machine.state.builderCopy
 import org.usvm.machine.state.builderStoreGrams
@@ -21,8 +21,10 @@ import org.usvm.machine.state.takeLastBuilder
 import org.usvm.machine.state.takeLastIntOrThrowTypeError
 import org.usvm.machine.state.takeLastSlice
 
-class TvmCurrencyInterpreter(private val ctx: TvmContext) {
-    fun visitCurrencyInst(scope: TvmStepScope, stmt: TvmAppCurrencyInst) {
+class TvmCurrencyInterpreter(
+    private val ctx: TvmContext,
+) {
+    fun visitCurrencyInst(scope: TvmStepScopeManager, stmt: TvmAppCurrencyInst) {
         scope.consumeDefaultGas(stmt)
 
         when (stmt) {
@@ -32,7 +34,7 @@ class TvmCurrencyInterpreter(private val ctx: TvmContext) {
         }
     }
 
-    private fun visitLoadGramsInst(scope: TvmStepScope, stmt: TvmAppCurrencyLdgramsInst) {
+    private fun visitLoadGramsInst(scope: TvmStepScopeManager, stmt: TvmAppCurrencyLdgramsInst) {
         scope.doWithStateCtx {
             val slice = stack.takeLastSlice()
             if (slice == null) {
@@ -51,7 +53,7 @@ class TvmCurrencyInterpreter(private val ctx: TvmContext) {
         }
     }
 
-    private fun visitStoreGrams(scope: TvmStepScope, stmt: TvmAppCurrencyStgramsInst) = with(ctx) {
+    private fun visitStoreGrams(scope: TvmStepScopeManager, stmt: TvmAppCurrencyStgramsInst) = with(ctx) {
         val grams = scope.takeLastIntOrThrowTypeError()
             ?: return
         val builder = scope.calcOnState { stack.takeLastBuilder() }

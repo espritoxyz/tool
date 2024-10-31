@@ -19,6 +19,7 @@ import org.usvm.machine.BocAnalyzer
 import org.usvm.machine.DEFAULT_CONTRACT_DATA_HEX
 import org.usvm.machine.TvmComponents
 import org.usvm.machine.TvmContext
+import org.usvm.machine.TvmMachine
 import org.usvm.machine.TvmOptions
 import org.usvm.machine.TvmSizeSort
 import org.usvm.machine.intValue
@@ -40,19 +41,17 @@ class CalculatedTlbLabelInfoTest {
 
     private val someCode = BocAnalyzer.loadContractFromBoc(Path(bytecodeResourcePath))
 
-    private val dummyComponents = TvmComponents()
+    private val dummyComponents = TvmComponents(TvmMachine.defaultOptions)
     private val ctx = TvmContext(TvmOptions(), dummyComponents)
 
     private val dummyInterpreter = TvmInterpreter(
         ctx,
-        someCode,
+        listOf(someCode),
         dummyComponents.typeSystem,
         TvmInputInfo(),
-        checkDataCellContentTypes = false,
-        excludeInputsThatDoNotMatchGivenScheme = false,
     )
     private val dummyContractData = Cell.Companion.of(DEFAULT_CONTRACT_DATA_HEX)
-    private val dummyState = dummyInterpreter.getInitialState(someCode, dummyContractData, BigInteger.ZERO)
+    private val dummyState = dummyInterpreter.getInitialState(startContractId = 0, dummyContractData, BigInteger.ZERO)
 
     val info = CalculatedTlbLabelInfo(
         ctx,

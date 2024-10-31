@@ -8,7 +8,9 @@ import org.usvm.machine.TvmContext
 import org.usvm.machine.types.defaultCellValueOfMinimalLength
 import org.usvm.test.resolver.TvmTestDataCellValue
 import org.usvm.test.resolver.TvmTestDictCellValue
-
+import org.usvm.test.resolver.TvmTestIntegerValue
+import org.usvm.test.resolver.TvmTestSliceValue
+import java.math.BigInteger
 
 private data class DPParamsForDefaultCellCalculation(
     val maxRefs: Int,
@@ -16,6 +18,15 @@ private data class DPParamsForDefaultCellCalculation(
     val maxCellDepth: Int,
     val label: TvmCompositeDataCellLabel,
 )
+
+fun getDefaultDict(keyLength: Int): TvmTestDictCellValue {  // dict mustn't be empty
+    return TvmTestDictCellValue(
+        keyLength,
+        mapOf(
+            TvmTestIntegerValue(BigInteger.ZERO) to TvmTestSliceValue(TvmTestDataCellValue(), dataPos = 0, refPos = 0),
+        )
+    )
+}
 
 fun calculateDefaultCells(
     labels: Collection<TvmCompositeDataCellLabel>,
@@ -87,7 +98,7 @@ private fun getDefaultCell(
                     TvmTestDataCellValue()
                 }
                 is TvmParameterInfo.DictCellInfo -> {
-                    TvmTestDictCellValue(struct.ref.keySize, emptyMap())
+                    getDefaultDict(struct.ref.keySize)
                 }
                 is TvmParameterInfo.DataCellInfo -> {
                     when (struct.ref.dataCellStructure) {

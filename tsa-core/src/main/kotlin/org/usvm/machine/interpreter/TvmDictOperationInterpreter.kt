@@ -137,7 +137,7 @@ import org.usvm.collection.set.primitive.USetEntryLValue
 import org.usvm.collection.set.primitive.setEntries
 import org.usvm.machine.TvmContext
 import org.usvm.machine.TvmContext.Companion.dictKeyLengthField
-import org.usvm.machine.TvmStepScope
+import org.usvm.machine.TvmStepScopeManager
 import org.usvm.machine.intValue
 import org.usvm.machine.state.DictId
 import org.usvm.machine.state.DictKeyInfo
@@ -173,6 +173,7 @@ import org.usvm.machine.state.takeLastIntOrThrowTypeError
 import org.usvm.machine.state.takeLastSlice
 import org.usvm.machine.types.TvmBuilderType
 import org.usvm.machine.types.TvmCellType
+import org.usvm.machine.types.TvmDataCellType
 import org.usvm.machine.types.TvmDictCellType
 import org.usvm.machine.types.TvmIntegerType
 import org.usvm.machine.types.TvmNullType
@@ -181,8 +182,10 @@ import org.usvm.machine.types.TvmSymbolicCellMaybeConstructorBit
 import org.usvm.machine.types.makeSliceTypeLoad
 import org.usvm.utils.intValueOrNull
 
-class TvmDictOperationInterpreter(private val ctx: TvmContext) {
-    fun visitTvmDictInst(scope: TvmStepScope, inst: TvmDictInst) {
+class TvmDictOperationInterpreter(
+    private val ctx: TvmContext,
+) {
+    fun visitTvmDictInst(scope: TvmStepScopeManager, inst: TvmDictInst) {
         scope.consumeDefaultGas(inst)
 
         when (inst) {
@@ -200,7 +203,7 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
         }
     }
 
-    private fun visitDictSet(scope: TvmStepScope, inst: TvmDictSetInst) {
+    private fun visitDictSet(scope: TvmStepScopeManager, inst: TvmDictSetInst) {
         when (inst) {
             is TvmDictSetDictaddInst -> doDictSet(inst, scope, DictKeyType.SLICE, DictValueType.SLICE, getOldValue = false, DictSetMode.ADD)
             is TvmDictSetDictaddgetInst -> doDictSet(inst, scope, DictKeyType.SLICE, DictValueType.SLICE, getOldValue = true, DictSetMode.ADD)
@@ -241,7 +244,7 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
         }
     }
 
-    private fun visitDictSetBuilder(scope: TvmStepScope, inst: TvmDictSetBuilderInst) {
+    private fun visitDictSetBuilder(scope: TvmStepScopeManager, inst: TvmDictSetBuilderInst) {
         when (inst) {
             is TvmDictSetBuilderDictaddbInst -> doDictSet(inst, scope, DictKeyType.SLICE, DictValueType.BUILDER, getOldValue = false, DictSetMode.ADD)
             is TvmDictSetBuilderDictaddgetbInst -> doDictSet(inst, scope, DictKeyType.SLICE, DictValueType.BUILDER, getOldValue = true, DictSetMode.ADD)
@@ -264,7 +267,7 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
         }
     }
 
-    private fun visitDictGet(scope: TvmStepScope, inst: TvmDictGetInst) {
+    private fun visitDictGet(scope: TvmStepScopeManager, inst: TvmDictGetInst) {
         when (inst) {
             is TvmDictGetDictgetInst -> doDictGet(inst, scope, DictKeyType.SLICE, DictValueType.SLICE)
             is TvmDictGetDictgetrefInst -> doDictGet(inst, scope, DictKeyType.SLICE, DictValueType.CELL)
@@ -275,7 +278,7 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
         }
     }
 
-    private fun visitDictDelete(scope: TvmStepScope, inst: TvmDictDeleteInst) {
+    private fun visitDictDelete(scope: TvmStepScopeManager, inst: TvmDictDeleteInst) {
         when (inst) {
             is TvmDictDeleteDictdelInst -> doDictDelete(inst, scope, DictKeyType.SLICE, DictValueType.SLICE, getOldValue = false)
             is TvmDictDeleteDictdelgetInst -> doDictDelete(inst, scope, DictKeyType.SLICE, DictValueType.SLICE, getOldValue = true)
@@ -289,7 +292,7 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
         }
     }
 
-    private fun visitDictSerial(scope: TvmStepScope, inst: TvmDictSerialInst) {
+    private fun visitDictSerial(scope: TvmStepScopeManager, inst: TvmDictSerialInst) {
         when (inst) {
             is TvmDictSerialLddictInst -> doLoadDict(inst, scope, returnUpdatedSlice = true)
             is TvmDictSerialLddictqInst -> TODO()
@@ -302,7 +305,7 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
         }
     }
 
-    private fun visitDictMin(scope: TvmStepScope, inst: TvmDictMinInst) {
+    private fun visitDictMin(scope: TvmStepScopeManager, inst: TvmDictMinInst) {
         when (inst) {
             is TvmDictMinDictimaxInst -> doDictMinMax(inst, scope, DictKeyType.SIGNED_INT, DictValueType.SLICE, DictMinMaxMode.MAX, removeKey = false)
             is TvmDictMinDictimaxrefInst -> doDictMinMax(inst, scope, DictKeyType.SIGNED_INT, DictValueType.CELL, DictMinMaxMode.MAX, removeKey = false)
@@ -331,7 +334,7 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
         }
     }
 
-    private fun visitDictNext(scope: TvmStepScope, inst: TvmDictNextInst) {
+    private fun visitDictNext(scope: TvmStepScopeManager, inst: TvmDictNextInst) {
         when (inst) {
             is TvmDictNextDictgetnextInst -> doDictNextPrev(inst, scope, DictKeyType.SLICE, DictValueType.SLICE, DictNextPrevMode.NEXT, allowEq = false)
             is TvmDictNextDictgetnexteqInst -> doDictNextPrev(inst, scope, DictKeyType.SLICE, DictValueType.SLICE, DictNextPrevMode.NEXT, allowEq = true)
@@ -349,7 +352,7 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
     }
 
     // this is actually load_maybe_ref, not necessarily load_dict
-    private fun doLoadDict(inst: TvmDictSerialInst, scope: TvmStepScope, returnUpdatedSlice: Boolean) {
+    private fun doLoadDict(inst: TvmDictSerialInst, scope: TvmStepScopeManager, returnUpdatedSlice: Boolean) {
         val slice = scope.calcOnStateCtx { stack.takeLastSlice() }
         if (slice == null) {
             scope.doWithState(ctx.throwTypeCheckError)
@@ -370,6 +373,7 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
 
             fork(
                 isNotEmpty,
+                falseStateIsExceptional = false,
                 blockOnFalseState = {
                     addOnStack(ctx.nullValue, TvmNullType)
 
@@ -399,7 +403,7 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
         }
     }
 
-    private fun doStoreDictToBuilder(inst: TvmDictSerialInst, scope: TvmStepScope) {
+    private fun doStoreDictToBuilder(inst: TvmDictSerialInst, scope: TvmStepScopeManager) {
         val builder = scope.calcOnStateCtx { stack.takeLastBuilder() }
         if (builder == null) {
             scope.doWithState(ctx.throwTypeCheckError)
@@ -429,7 +433,7 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
 
     private fun doDictSet(
         inst: TvmDictInst,
-        scope: TvmStepScope,
+        scope: TvmStepScopeManager,
         keyType: DictKeyType,
         valueType: DictValueType,
         getOldValue: Boolean,
@@ -470,6 +474,7 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
 
         scope.fork(
             dictContainsKey,
+            falseStateIsExceptional = false,
             blockOnFalseState = {
                 dictSetResultStack(dictCellRef, resultDict, oldValue = null, valueType, mode, getOldValue, keyContains = false)
                 newStmt(inst.nextStmt())
@@ -531,7 +536,7 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
 
     private fun doDictGet(
         inst: TvmDictGetInst,
-        scope: TvmStepScope,
+        scope: TvmStepScopeManager,
         keyType: DictKeyType,
         valueType: DictValueType
     ) {
@@ -560,6 +565,7 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
 
         scope.fork(
             dictContainsKey,
+            falseStateIsExceptional = false,
             blockOnFalseState = {
                 addOnStack(ctx.falseValue, TvmIntegerType)
                 newStmt(inst.nextStmt())
@@ -578,7 +584,7 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
 
     private fun doDictDelete(
         inst: TvmDictDeleteInst,
-        scope: TvmStepScope,
+        scope: TvmStepScopeManager,
         keyType: DictKeyType,
         valueType: DictValueType,
         getOldValue: Boolean
@@ -605,6 +611,7 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
 
         scope.fork(
             condition = dictContainsKey,
+            falseStateIsExceptional = false,
             blockOnFalseState = {
                 addOnStack(dictCellRef, TvmCellType)
                 addOnStack(ctx.falseValue, TvmIntegerType)
@@ -642,7 +649,7 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
 
     private fun doDictMinMax(
         inst: TvmDictMinInst,
-        scope: TvmStepScope,
+        scope: TvmStepScopeManager,
         keyType: DictKeyType,
         valueType: DictValueType,
         mode: DictMinMaxMode,
@@ -738,7 +745,7 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
 
     private fun doDictNextPrev(
         inst: TvmDictNextInst,
-        scope: TvmStepScope,
+        scope: TvmStepScopeManager,
         keyType: DictKeyType,
         valueType: DictValueType,
         mode: DictNextPrevMode,
@@ -858,7 +865,7 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
         }
     }
 
-    private fun assertDictKeyLength(scope: TvmStepScope, dict: UHeapRef, keyLength: Int): Unit? = scope.calcOnStateCtx {
+    private fun assertDictKeyLength(scope: TvmStepScopeManager, dict: UHeapRef, keyLength: Int): Unit? = scope.calcOnStateCtx {
         val dictKeyLength = scope.calcOnState { memory.readField(dict, dictKeyLengthField, int257sort) }
         val dictKeyConst = dictKeyLength.intValueOrNull
 
@@ -882,7 +889,7 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
         Unit
     }
 
-    private fun loadKeyLength(scope: TvmStepScope): Int {
+    private fun loadKeyLength(scope: TvmStepScopeManager): Int {
         val keyLengthExpr = scope.takeLastIntOrThrowTypeError()
 
         if (keyLengthExpr !is KBitVecValue<*>) {
@@ -899,7 +906,7 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
 
     // todo: dict is slice?
     // todo: verify key length
-    private fun loadDict(scope: TvmStepScope, assertType: Boolean = true): UHeapRef? =
+    private fun loadDict(scope: TvmStepScopeManager, assertType: Boolean = true): UHeapRef? =
         scope.calcOnState {
             if (stack.lastIsNull()) {
                 stack.pop(0)
@@ -914,7 +921,7 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
         }
 
     private fun loadKey(
-        scope: TvmStepScope,
+        scope: TvmStepScopeManager,
         keyType: DictKeyType,
         keyLength: Int
     ): UExpr<UBvSort>? = with(ctx) {
@@ -955,7 +962,7 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
         }
     }
 
-    private fun loadValue(scope: TvmStepScope, valueType: DictValueType) = scope.calcOnState {
+    private fun loadValue(scope: TvmStepScopeManager, valueType: DictValueType) = scope.calcOnState {
         when (valueType) {
             DictValueType.SLICE -> stack.takeLastSlice()
             DictValueType.CELL -> {
@@ -967,12 +974,14 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
             }
             DictValueType.BUILDER -> {
                 val builder = stack.takeLastBuilder() ?: return@calcOnState null
-                scope.calcOnState { allocSliceFromCell(builder) }
+                val cell = memory.allocConcrete(TvmDataCellType).also { builderCopy(builder, it) }
+
+                scope.calcOnState { allocSliceFromCell(cell) }
             }
         }
     }
 
-    private fun unwrapDictValue(scope: TvmStepScope, sliceValue: UHeapRef, valueType: DictValueType): UHeapRef? =
+    private fun unwrapDictValue(scope: TvmStepScopeManager, sliceValue: UHeapRef, valueType: DictValueType): UHeapRef? =
         when (valueType) {
             DictValueType.SLICE -> sliceValue
             DictValueType.CELL -> scope.slicePreloadNextRef(sliceValue)
@@ -988,7 +997,7 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
     }
 
     private fun handleDictRemoveKey(
-        scope: TvmStepScope,
+        scope: TvmStepScopeManager,
         dictCellRef: UHeapRef,
         dictId: DictId,
         key: UExpr<UBvSort>,
@@ -1021,6 +1030,7 @@ class TvmDictOperationInterpreter(private val ctx: TvmContext) {
 
         scope.fork(
             resultDictIsEmpty,
+            falseStateIsExceptional = false,
             blockOnTrueState = { originalDictContainsKeyEmptyResult() },
             blockOnFalseState = { originalDictContainsKeyNonEmptyResult(resultDict) },
         )

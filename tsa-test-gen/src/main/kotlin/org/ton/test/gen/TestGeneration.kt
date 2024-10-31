@@ -7,6 +7,7 @@ import java.util.Locale
 import org.usvm.machine.TvmContext
 import org.usvm.machine.TvmContext.Companion.ADDRESS_TAG_LENGTH
 import org.usvm.machine.TvmContext.Companion.STD_ADDRESS_TAG
+import org.usvm.machine.truncateSliceCell
 import org.usvm.test.resolver.TvmContractSymbolicTestResult
 import org.usvm.test.resolver.TvmMethodFailure
 import org.usvm.test.resolver.TvmSymbolicTest

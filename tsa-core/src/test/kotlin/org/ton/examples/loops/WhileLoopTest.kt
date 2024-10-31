@@ -5,12 +5,13 @@ import org.ton.examples.compileAndAnalyzeFift
 import org.ton.examples.runFiftMethod
 import org.usvm.machine.TvmComponents
 import org.usvm.machine.TvmContext
+import org.usvm.machine.TvmMachine
 import org.usvm.machine.TvmOptions
 import kotlin.io.path.Path
 import kotlin.test.Test
 
 class WhileLoopTest {
-    private val ctx = TvmContext(TvmOptions(), TvmComponents())
+    private val ctx = TvmContext(TvmOptions(), TvmComponents(TvmMachine.defaultOptions))
 
     private val whileLoopsFiftPath: String = "/loops/WhileLoops.fif"
 

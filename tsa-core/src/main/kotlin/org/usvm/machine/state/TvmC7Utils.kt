@@ -16,7 +16,7 @@ import org.usvm.machine.TvmContext.Companion.ADDRESS_BITS
 import org.usvm.machine.TvmContext.Companion.CONFIG_KEY_LENGTH
 import org.usvm.machine.TvmContext.Companion.INT_BITS
 import org.usvm.machine.TvmContext.TvmInt257Sort
-import org.usvm.machine.TvmStepScope
+import org.usvm.machine.TvmStepScopeManager
 import org.usvm.machine.state.TvmStack.TvmStackCellValue
 import org.usvm.machine.state.TvmStack.TvmStackEntry
 import org.usvm.machine.state.TvmStack.TvmStackIntValue
@@ -43,12 +43,13 @@ fun TvmState.setContractInfoParam(idx: Int, value: TvmStackEntry) {
     }
 
     val updatedContractInfo = getContractInfo().set(idx, value)
+    val registers = registersOfCurrentContract
     val updatedC7 = registers.c7.value.set(0, updatedContractInfo.toStackEntry())
 
     registers.c7 = C7Register(updatedC7)
 }
 
-fun TvmStepScope.getConfigParam(idx: UExpr<TvmInt257Sort>): UHeapRef? {
+fun TvmStepScopeManager.getConfigParam(idx: UExpr<TvmInt257Sort>): UHeapRef? {
     val configDict = calcOnState { getConfig() }
     val sliceValue = calcOnStateCtx {
         dictGetValue(
@@ -75,6 +76,7 @@ fun TvmState.getGlobalVariable(idx: Int, stack: TvmStack): TvmStackValue {
     require(idx in 0..< 255) {
         "Unexpected global variable with index $idx"
     }
+    val registers = registersOfCurrentContract
     val globalEntries = registers.c7.value.entries.extendToSize(idx + 1)
 
     return globalEntries.getOrNull(idx)?.cell(stack)
@@ -86,6 +88,7 @@ fun TvmState.setGlobalVariable(idx: Int, value: TvmStackEntry) {
         "Unexpected setting global variable with index $idx"
     }
 
+    val registers = registersOfCurrentContract
     val updatedC7 = TvmStackTupleValueConcreteNew(
         ctx,
         registers.c7.value.entries.extendToSize(idx + 1)
@@ -94,13 +97,13 @@ fun TvmState.setGlobalVariable(idx: Int, value: TvmStackEntry) {
     registers.c7 = C7Register(updatedC7)
 }
 
-fun TvmState.initC7(): TvmStackTupleValueConcreteNew =
+fun TvmState.initC7(contractInfo: TvmStackTupleValue): TvmStackTupleValueConcreteNew =
     TvmStackTupleValueConcreteNew(
         ctx,
-        persistentListOf(initContractInfo().toStackEntry())
+        persistentListOf(contractInfo.toStackEntry())
     )
 
-private fun TvmState.initContractInfo(): TvmStackTupleValue = with(ctx) {
+fun TvmState.initContractInfo(): TvmStackTupleValueConcreteNew = with(ctx) {
     val tag = TvmStackIntValue(mkBvHex("076ef1ea", sizeBits = INT_BITS).uncheckedCast())
     val actions = TvmStackIntValue(zeroValue)
     val msgsSent = TvmStackIntValue(zeroValue)
@@ -142,6 +145,9 @@ private fun TvmState.initContractInfo(): TvmStackTupleValue = with(ctx) {
     val prevBlocksInfo = TvmStackNullValue
 
     // We can add constraints manually to path constraints because model list is empty
+    check(models.isEmpty()) {
+        "Model list must be empty at this point but is not."
+    }
     pathConstraints += mkBvSignedLessOrEqualExpr(unitTimeMinValue, unixTime.intValue)
     pathConstraints += mkBvSignedGreaterOrEqualExpr(grams, zeroValue)
     pathConstraints += mkBvSignedGreaterOrEqualExpr(blockLogicTime.intValue, zeroValue)
@@ -341,7 +347,7 @@ private fun TvmState.setConfigParam(dict: UHeapRef, idx: Int, cellValue: UHeapRe
     )
 }
 
-private fun TvmState.getContractInfo() = registers.c7.value[0, stack].cell(stack)?.tupleValue
+private fun TvmState.getContractInfo() = registersOfCurrentContract.c7.value[0, stack].cell(stack)?.tupleValue
     ?: error("Unexpected contract info value")
 
 private fun TvmState.getConfig() = getContractInfo()[9, stack].cell(stack)?.cellValue

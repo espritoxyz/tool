@@ -15,8 +15,11 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.builtins.serializer
 import org.usvm.machine.MethodId
 
-interface TvmContractCode {
-    val methods: Map<MethodId, TvmMethod>
+@Serializable
+data class TvmContractCode(
+    val methods: Map<@Serializable(BigIntSerializer::class) MethodId, TvmMethod>
+) {
+    var isContractWithTSACheckerFunctions: Boolean = false
 
     companion object {
         private val defaultSerializationModule: SerializersModule
@@ -43,15 +46,10 @@ interface TvmContractCode {
         }
 
         fun fromJson(bytecode: String): TvmContractCode {
-            return json.decodeFromString<TvmContractCodeImpl>(bytecode)
+            return json.decodeFromString<TvmContractCode>(bytecode)
         }
     }
 }
-
-@Serializable
-data class TvmContractCodeImpl(
-    override val methods: Map<@Serializable(BigIntSerializer::class) MethodId, TvmMethod>
-) : TvmContractCode
 
 @Serializable(with = TvmInstListSerializer::class)
 data class TvmInstList(val list: List<TvmInst>): List<TvmInst> by list

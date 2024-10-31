@@ -73,7 +73,7 @@ class TvmAddressToLabelMapper(
                 return@forEach
             }
 
-            for (childIdx in 0..<TvmContext.MAX_REFS_NUMBER) {
+            for (childIdx in childLabels.indices) {
                 val childInfo = calculatedTlbLabelInfo.getLabelChildStructure(
                     state,
                     ref,

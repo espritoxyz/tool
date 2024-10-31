@@ -3,14 +3,14 @@ package org.ton.examples.types
 import org.ton.Endian
 import org.ton.TvmCoinsLabel
 import org.ton.TvmCompositeDataCellLabel
-import org.ton.TvmDataCellStructure.SwitchPrefix
-import org.ton.TvmDataCellStructure.LoadRef
 import org.ton.TvmDataCellStructure.Empty
 import org.ton.TvmDataCellStructure.KnownTypePrefix
+import org.ton.TvmDataCellStructure.LoadRef
+import org.ton.TvmDataCellStructure.SwitchPrefix
 import org.ton.TvmDataCellStructure.Unknown
+import org.ton.TvmFullMsgAddrLabel
 import org.ton.TvmIntegerLabel
 import org.ton.TvmMaybeRefLabel
-import org.ton.TvmMsgAddrLabel
 import org.ton.TvmParameterInfo
 import org.ton.TvmParameterInfo.DictCellInfo
 
@@ -82,7 +82,7 @@ val coinsStructure = TvmCompositeDataCellLabel(
 val wrappedMsgStructure = TvmCompositeDataCellLabel(
     "WrappedMsg",
     KnownTypePrefix(
-        TvmMsgAddrLabel,
+        TvmFullMsgAddrLabel,
         rest = Empty
     )
 )

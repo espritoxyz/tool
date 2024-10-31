@@ -206,9 +206,6 @@ internal fun checkAtLeastOneStateForAllMethods(methodsNumber: Int, symbolicResul
     assertTrue(symbolicResult.all { it.tests.isNotEmpty() })
 }
 
-internal const val runHardTestsVar = "TSA_RUN_HARD_TESTS"
-internal const val runHardTestsRegex = ".+"
-
 internal fun propertiesFound(
     testSuite: TvmSymbolicTestSuite,
     properties: List<(TvmSymbolicTest) -> Boolean>

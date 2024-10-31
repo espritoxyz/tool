@@ -20,12 +20,12 @@ data object TvmContinuationType : TvmRealType(TvmAnyType)
 
 /** Reference types */
 
-data object TvmReferenceType : TvmType(TvmAnyType)
+sealed interface TvmFinalReferenceType
 
-data object TvmSliceType : TvmRealReferenceType(TvmReferenceType)
+data object TvmSliceType : TvmRealReferenceType(TvmAnyType), TvmFinalReferenceType
 
-data object TvmBuilderType : TvmRealReferenceType(TvmReferenceType)
+data object TvmBuilderType : TvmRealReferenceType(TvmAnyType), TvmFinalReferenceType
 
-data object TvmCellType : TvmRealReferenceType(TvmReferenceType)
-data object TvmDataCellType : TvmType(TvmCellType)
-data object TvmDictCellType : TvmType(TvmCellType)
+data object TvmCellType : TvmRealReferenceType(TvmAnyType)
+data object TvmDataCellType : TvmType(TvmCellType), TvmFinalReferenceType
+data object TvmDictCellType : TvmType(TvmCellType), TvmFinalReferenceType

@@ -1,21 +1,23 @@
 package org.usvm.machine
 
 import org.ton.bytecode.TvmArtificialInst
-import org.ton.bytecode.TvmContOperand1Inst
-import org.ton.bytecode.TvmContOperand2Inst
 import org.ton.bytecode.TvmContractCode
 import org.ton.bytecode.TvmInst
-import org.ton.bytecode.TvmInstList
 import org.ton.bytecode.TvmInstMethodLocation
 import org.ton.bytecode.TvmMethod
+import org.usvm.machine.state.ContractId
 import org.usvm.machine.state.TvmState
 import org.usvm.statistics.UMachineObserver
 import java.util.Collections.newSetFromMap
 import java.util.IdentityHashMap
+import org.ton.bytecode.flattenStatements
 
 // Tracks coverage of all visited statements for all visited methods from all states.
 // Note that one instance should be used only one per method.
-class TvmCoverageStatistics(private val contractCode: TvmContractCode) : UMachineObserver<TvmState> {
+class TvmCoverageStatistics(
+    private val observedContractId: ContractId,
+    private val contractCode: TvmContractCode
+) : UMachineObserver<TvmState> {
     private val coveredStatements: MutableSet<TvmInst> = newSetFromMap(IdentityHashMap())
     private val visitedMethods: MutableSet<MethodId> = hashSetOf()
     private val traversedMethodStatements: MutableMap<MethodId, List<TvmInst>> = hashMapOf()
@@ -53,36 +55,15 @@ class TvmCoverageStatistics(private val contractCode: TvmContractCode) : UMachin
             return alreadyTraversedStatements
         }
 
-        val methodStatements = mutableListOf<TvmInst>()
-        val queue = mutableListOf(TvmInstList(method.instList))
-
-        while (queue.isNotEmpty()) {
-            val instList = queue.removeLast()
-
-            instList.list.forEach { stmt ->
-                if (stmt is TvmArtificialInst) {
-                    return@forEach
-                }
-
-                methodStatements.add(stmt)
-                extractInstLists(stmt).forEach(queue::add)
-            }
-        }
+        val methodStatements = method.instList.flattenStatements()
 
         traversedMethodStatements[methodId] = methodStatements
         return methodStatements
     }
 
-    private fun extractInstLists(stmt: TvmInst): Sequence<TvmInstList> =
-        when (stmt) {
-            is TvmContOperand1Inst -> sequenceOf(stmt.c)
-            is TvmContOperand2Inst -> sequenceOf(stmt.c1, stmt.c2)
-            else -> emptySequence()
-        }
-
     override fun onStatePeeked(state: TvmState) {
         val stmt = state.currentStatement
-        if (stmt is TvmArtificialInst) {
+        if (stmt is TvmArtificialInst || state.currentContract != observedContractId) {
             return
         }
 
