@@ -39,7 +39,7 @@ const int FWD_GAS_AMOUNT = 240000000;
     tsa_assert(ihr_fee + fwd_fee == 0);
 
     ;; get wallet data
-    (_, slice owner_address, slice master_address, _) = tsa_call_4_0(1, 97026);
+    (int total_supply, slice owner_address, slice master_address, _) = tsa_call_4_0(1, 97026);
 
     ;; assert that master address is normal
     tsa_assert(slice_bits(master_address) == 267);
@@ -55,7 +55,11 @@ const int FWD_GAS_AMOUNT = 240000000;
     tsa_assert(op == 0xf8a7ea5);
 
     body_copy~load_uint(64);  ;; skip query_id
-    body_copy~load_grams(); ;; skip amount
+
+    int amout = body_copy~load_grams();
+    tsa_assert(amout <= total_supply);
+    tsa_assert(amout > 0);
+
     body_copy~load_msg_addr(); ;; skip dest
     body_copy~load_msg_addr(); ;; skip resp_dest
     body_copy~load_int(1); ;; skip custom_payload
