@@ -6,7 +6,7 @@ import org.ton.bytecode.TvmAppActionsSendrawmsgInst
 import org.ton.bytecode.TvmAppActionsSetcodeInst
 import org.ton.bytecode.TvmCellValue
 import org.usvm.machine.TvmContext
-import org.usvm.machine.TvmStepScope
+import org.usvm.machine.TvmStepScopeManager
 import org.usvm.machine.state.C5Register
 import org.usvm.machine.state.allocEmptyCell
 import org.usvm.machine.state.builderStoreDataBits
@@ -24,7 +24,7 @@ import org.usvm.machine.state.takeLastIntOrThrowTypeError
 import org.usvm.machine.state.unsignedIntegerFitsBits
 
 class TvmActionsInterpreter(private val ctx: TvmContext) {
-    fun visitActionsStmt(scope: TvmStepScope, stmt: TvmAppActionsInst) {
+    fun visitActionsStmt(scope: TvmStepScopeManager, stmt: TvmAppActionsInst) {
         scope.consumeDefaultGas(stmt)
 
         when (stmt) {
@@ -35,7 +35,7 @@ class TvmActionsInterpreter(private val ctx: TvmContext) {
         }
     }
 
-    private fun visitSendRawMsgInst(scope: TvmStepScope, stmt: TvmAppActionsSendrawmsgInst) = with(ctx) {
+    private fun visitSendRawMsgInst(scope: TvmStepScopeManager, stmt: TvmAppActionsSendrawmsgInst) = with(ctx) {
         val mode = scope.takeLastIntOrThrowTypeError()
             ?: return@with
         val msg = scope.calcOnState { takeLastCell() }
@@ -45,6 +45,7 @@ class TvmActionsInterpreter(private val ctx: TvmContext) {
         checkOutOfRange(notOutOfRangeExpr, scope) ?: return
 
         scope.doWithStateCtx {
+            val registers = registersOfCurrentContract
             val actions = registers.c5.value.value
             val updatedActions = allocEmptyCell()
 
@@ -61,7 +62,7 @@ class TvmActionsInterpreter(private val ctx: TvmContext) {
         }
     }
 
-    private fun visitRawReserveInst(scope: TvmStepScope, stmt: TvmAppActionsRawreserveInst) = with(ctx) {
+    private fun visitRawReserveInst(scope: TvmStepScopeManager, stmt: TvmAppActionsRawreserveInst) = with(ctx) {
         val mode = scope.takeLastIntOrThrowTypeError()
             ?: return@with
         val grams = scope.takeLastIntOrThrowTypeError()
@@ -76,6 +77,7 @@ class TvmActionsInterpreter(private val ctx: TvmContext) {
         checkCellOverflow(notOutOfRangeGrams, scope) ?: return
 
         scope.doWithState {
+            val registers = registersOfCurrentContract
             val actions = registers.c5.value.value
             val updatedActions = allocEmptyCell()
 
@@ -94,7 +96,7 @@ class TvmActionsInterpreter(private val ctx: TvmContext) {
         }
     }
 
-    private fun visitSetCodeInst(scope: TvmStepScope, stmt: TvmAppActionsSetcodeInst) {
+    private fun visitSetCodeInst(scope: TvmStepScopeManager, stmt: TvmAppActionsSetcodeInst) {
         scope.doWithState {
             val cell = takeLastCell()
                 ?: ctx.throwTypeCheckError(this)

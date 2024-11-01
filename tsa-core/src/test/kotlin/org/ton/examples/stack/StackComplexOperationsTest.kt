@@ -6,6 +6,7 @@ import org.ton.examples.loadIntegers
 import org.ton.examples.runFiftMethod
 import org.usvm.machine.TvmComponents
 import org.usvm.machine.TvmContext
+import org.usvm.machine.TvmMachine
 import org.usvm.machine.TvmOptions
 import org.usvm.machine.state.TvmStack
 import org.usvm.machine.state.addInt
@@ -14,7 +15,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class StackComplexOperationsTest {
-    private val ctx = TvmContext(TvmOptions(), TvmComponents())
+    private val ctx = TvmContext(TvmOptions(), TvmComponents(TvmMachine.defaultOptions))
 
     private val stackComplexFiftPath: String = "/stack/StackComplex.fif"
     private val stackNullChecksFiftPath: String = "/stack/NullChecks.fif"

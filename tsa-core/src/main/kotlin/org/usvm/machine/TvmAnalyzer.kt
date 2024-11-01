@@ -7,8 +7,10 @@ import kotlinx.serialization.json.encodeToStream
 import mu.KLogging
 import org.ton.TvmInputInfo
 import org.ton.bytecode.TvmContractCode
+import org.ton.bytecode.TvmMethod
 import org.ton.cell.Cell
 import org.usvm.machine.FuncAnalyzer.Companion.FIFT_EXECUTABLE
+import org.usvm.machine.state.ContractId
 import org.usvm.test.resolver.TvmContractSymbolicTestResult
 import org.usvm.test.resolver.TvmTestResolver
 import org.usvm.utils.FileUtils
@@ -17,6 +19,8 @@ import java.nio.file.Path
 import java.nio.file.Paths
 import java.util.concurrent.TimeUnit
 import org.usvm.machine.state.TvmState
+import org.usvm.statistics.UMachineObserver
+import org.usvm.stopstrategies.StopStrategy
 import org.usvm.test.resolver.TvmMethodCoverage
 import kotlin.io.path.ExperimentalPathApi
 import kotlin.io.path.absolutePathString
@@ -31,6 +35,7 @@ import kotlin.io.path.readBytes
 import kotlin.io.path.readText
 import kotlin.io.path.walk
 import kotlin.io.path.writeText
+import kotlin.time.Duration.Companion.minutes
 
 sealed interface TvmAnalyzer {
     fun analyzeAllMethods(
@@ -38,7 +43,7 @@ sealed interface TvmAnalyzer {
         contractDataHex: String? = null,
         methodsBlackList: Set<MethodId> = hashSetOf(mainMethodId),
         inputInfo: Map<BigInteger, TvmInputInfo> = emptyMap(),
-        tvmOptions: TvmOptions = TvmOptions(),
+        tvmOptions: TvmOptions = TvmOptions(quietMode = true, timeout = 10.minutes),
     ): TvmContractSymbolicTestResult
 }
 
@@ -168,7 +173,7 @@ class FuncAnalyzer(
         fiftFilePath.writeText(fiftCode)
     }
 
-    private fun compileFuncSourceToBoc(funcSourcesPath: Path, bocFilePath: Path) {
+    fun compileFuncSourceToBoc(funcSourcesPath: Path, bocFilePath: Path) {
         val funcCommand = "$funcExecutablePath -W ${bocFilePath.absolutePathString()} $funcStdlibPath ${funcSourcesPath.absolutePathString()}"
         val fiftCommand = "$fiftExecutablePath -I $fiftStdlibPath"
         val command = "$funcCommand | $fiftCommand"
@@ -408,6 +413,76 @@ data object BocAnalyzer : TvmAnalyzer {
     private const val DISASSEMBLER_TIMEOUT = 5.toLong() // seconds
 }
 
+private fun runAnalysisInCatchingBlock(
+    contractIdForCoverageStats: ContractId,
+    contractForCoverageStats: TvmContractCode,
+    method: TvmMethod,
+    logInfoAboutAnalysis: Boolean = true,
+    analysisRun: (TvmCoverageStatistics) -> List<TvmState>,
+) : Pair<List<TvmState>, TvmMethodCoverage> =
+    runCatching {
+        val coverageStatistics = TvmCoverageStatistics(contractIdForCoverageStats, contractForCoverageStats)
+
+        val states = analysisRun(coverageStatistics)
+
+        val coverage = TvmMethodCoverage(
+            coverageStatistics.getMethodCoveragePercents(method),
+            coverageStatistics.getTransitiveCoveragePercents()
+        )
+
+        if (logInfoAboutAnalysis) {
+            logger.info("Method {}", method)
+            logger.info("Coverage: ${coverage.coverage}, transitive coverage: ${coverage.transitiveCoverage}")
+        }
+        val exceptionalStates = states.filter { state -> state.isExceptional }
+        logger.debug("States: ${states.size}, exceptional: ${exceptionalStates.size}")
+        exceptionalStates.forEach { state -> logger.debug(state.methodResult.toString()) }
+        logger.debug("=====".repeat(20))
+
+        states to coverage
+    }.getOrElse {
+        logger.error(it) {
+            "Failed analyzing $method"
+        }
+
+        emptyList<TvmState>() to TvmMethodCoverage(coverage = 0f, transitiveCoverage = 0f)
+    }
+
+fun analyzeInterContract(
+    contracts: List<TvmContractCode>,
+    startContractId: ContractId,
+    methodId: MethodId,
+    inputInfo: TvmInputInfo = TvmInputInfo(),
+    additionalStopStrategy: StopStrategy = StopStrategy { false },
+    additionalObserver: UMachineObserver<TvmState>? = null,
+    options: TvmOptions = TvmOptions(),
+): TvmContractSymbolicTestResult {
+    val machine = TvmMachine(tvmOptions = options)
+    val startContractCode = contracts[startContractId]
+    val method = startContractCode.methods[methodId]
+        ?: error("Method $methodId not found in contract $startContractCode")
+    val analysisResult = runAnalysisInCatchingBlock(
+        contractIdForCoverageStats = startContractId,
+        contractForCoverageStats = startContractCode,
+        method = method,
+        logInfoAboutAnalysis = false,
+    ) { coverageStatistics ->
+        machine.analyze(
+            contracts,
+            startContractId,
+            Cell.Companion.of(DEFAULT_CONTRACT_DATA_HEX),
+            coverageStatistics,
+            methodId,
+            inputInfo = inputInfo,
+            additionalStopStrategy = additionalStopStrategy,
+            additionalObserver = additionalObserver,
+        )
+    }
+
+    machine.close()
+    return TvmTestResolver.resolve(mapOf(method to analysisResult))
+}
+
 fun analyzeAllMethods(
     contract: TvmContractCode,
     methodsBlackList: Set<MethodId> = hashSetOf(mainMethodId),
@@ -416,42 +491,23 @@ fun analyzeAllMethods(
     tvmOptions: TvmOptions = TvmOptions(),
 ): TvmContractSymbolicTestResult {
     val contractData = Cell.Companion.of(contractDataHex ?: DEFAULT_CONTRACT_DATA_HEX)
-    val machine = TvmMachine(tvmOptions = tvmOptions)
+    val machineOptions = TvmMachine.defaultOptions.copy(timeout = tvmOptions.timeout)
+    val machine = TvmMachine(tvmOptions = tvmOptions, options = machineOptions)
     val methodsExceptDictPushConst = contract.methods.filterKeys { it !in methodsBlackList }
     val methodStates = methodsExceptDictPushConst.values.associateWith { method ->
-        runCatching {
-            val coverageStatistics = TvmCoverageStatistics(contract)
-            val states = machine.analyze(
+        runAnalysisInCatchingBlock(
+            contractIdForCoverageStats = 0,
+            contract,
+            method
+        ) { coverageStatistics ->
+            machine.analyze(
                 contract,
                 contractData,
                 coverageStatistics,
                 method.id,
                 inputInfo[method.id] ?: TvmInputInfo()
             )
-            val coverage = TvmMethodCoverage(
-                coverageStatistics.getMethodCoveragePercents(method),
-                coverageStatistics.getTransitiveCoveragePercents()
-            )
-            
-            states to coverage
-        }.getOrElse {
-            logger.error(it) {
-                "Failed analyzing $method"
-            }
-            
-            emptyList<TvmState>() to TvmMethodCoverage(coverage = 0f, transitiveCoverage = 0f)
         }
-    }
-    methodStates.forEach { (method, analysisResult) ->
-        val states = analysisResult.first
-        val coverage = analysisResult.second
-        
-        logger.info("Method {}", method)
-        logger.info("Coverage: ${coverage.coverage}, transitive coverage: ${coverage.transitiveCoverage}")
-        val exceptionalStates = states.filter { state -> state.isExceptional }
-        logger.debug("States: ${states.size}, exceptional: ${exceptionalStates.size}")
-        exceptionalStates.forEach { state -> logger.debug(state.methodResult.toString()) }
-        logger.debug("=====".repeat(20))
     }
 
     machine.close()

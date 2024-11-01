@@ -15,7 +15,7 @@ import org.ton.bytecode.TvmExceptionsTryInst
 import org.usvm.UExpr
 import org.usvm.machine.TvmContext
 import org.usvm.machine.TvmContext.TvmInt257Sort
-import org.usvm.machine.TvmStepScope
+import org.usvm.machine.TvmStepScopeManager
 import org.usvm.machine.state.C0Register
 import org.usvm.machine.state.C2Register
 import org.usvm.machine.state.TvmFailureType
@@ -36,7 +36,7 @@ import org.usvm.machine.state.takeLastIntOrThrowTypeError
 import org.usvm.utils.intValueOrNull
 
 class TvmExceptionsInterpreter(private val ctx: TvmContext) {
-    fun visitExceptionInst(scope: TvmStepScope, stmt: TvmExceptionsInst) {
+    fun visitExceptionInst(scope: TvmStepScopeManager, stmt: TvmExceptionsInst) {
         when (stmt) {
             is TvmExceptionsThrowargInst -> scope.doWithState {
                 scope.consumeDefaultGas(stmt)
@@ -100,6 +100,7 @@ class TvmExceptionsInterpreter(private val ctx: TvmContext) {
                 scope.consumeDefaultGas(stmt)
 
                 val body = scope.calcOnState {
+                    val registers = registersOfCurrentContract
                     val oldC2 = registers.c2.value
                     val cc = extractCurrentContinuation(stmt, saveC0 = true, saveC1 = true, saveC2 = true)
                     val handler = stack.takeLastContinuation().defineC2(oldC2).defineC0(cc)
@@ -123,7 +124,7 @@ class TvmExceptionsInterpreter(private val ctx: TvmContext) {
     ) = ctx.setFailure(TvmUnknownFailure(code.toUInt()), level, param, implicitThrow = false)(this)
 
     private fun doThrowIfInst(
-        scope: TvmStepScope,
+        scope: TvmStepScopeManager,
         stmt: TvmExceptionsInst,
         exceptionCodeExtractor: ExceptionCodeExtractor,
         invertCondition: Boolean
@@ -137,6 +138,7 @@ class TvmExceptionsInterpreter(private val ctx: TvmContext) {
 
             scope.fork(
                 throwCondition,
+                falseStateIsExceptional = true,
                 blockOnFalseState = {
                     throwException(exceptionCode)
                     consumeGas(50)

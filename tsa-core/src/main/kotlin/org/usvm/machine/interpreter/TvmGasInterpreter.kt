@@ -6,7 +6,7 @@ import org.ton.bytecode.TvmAppGasGasconsumedInst
 import org.ton.bytecode.TvmAppGasInst
 import org.ton.bytecode.TvmAppGasSetgaslimitInst
 import org.usvm.machine.TvmContext
-import org.usvm.machine.TvmStepScope
+import org.usvm.machine.TvmStepScopeManager
 import org.usvm.machine.state.TvmCommitedState
 import org.usvm.machine.state.TvmOutOfGas
 import org.usvm.machine.state.addInt
@@ -19,7 +19,7 @@ import org.usvm.machine.state.setFailure
 import org.usvm.machine.state.takeLastIntOrThrowTypeError
 
 class TvmGasInterpreter(private val ctx: TvmContext) {
-    fun visitGasInst(scope: TvmStepScope, stmt: TvmAppGasInst) {
+    fun visitGasInst(scope: TvmStepScopeManager, stmt: TvmAppGasInst) {
         scope.consumeDefaultGas(stmt)
 
         when (stmt) {
@@ -29,7 +29,9 @@ class TvmGasInterpreter(private val ctx: TvmContext) {
             }
             is TvmAppGasCommitInst -> {
                 scope.doWithState {
-                    commitedState = TvmCommitedState(registers.c4, registers.c5)
+                    val registers = registersOfCurrentContract
+                    val commitedState = TvmCommitedState(registers.c4, registers.c5)
+                    lastCommitedStateOfContracts = lastCommitedStateOfContracts.put(currentContract, commitedState)
                     newStmt(stmt.nextStmt())
                 }
             }
@@ -38,7 +40,7 @@ class TvmGasInterpreter(private val ctx: TvmContext) {
         }
     }
 
-    private fun visitGasConsumedInst(scope: TvmStepScope, stmt: TvmAppGasGasconsumedInst) {
+    private fun visitGasConsumedInst(scope: TvmStepScopeManager, stmt: TvmAppGasGasconsumedInst) {
         scope.doWithStateCtx {
             val usedGas = calcConsumedGas()
 
@@ -47,13 +49,14 @@ class TvmGasInterpreter(private val ctx: TvmContext) {
         }
     }
 
-    private fun visitSetGasLimitInst(scope: TvmStepScope, stmt: TvmAppGasSetgaslimitInst) {
+    private fun visitSetGasLimitInst(scope: TvmStepScopeManager, stmt: TvmAppGasSetgaslimitInst) {
         with(ctx) {
             val gasLimit = (scope.takeLastIntOrThrowTypeError() ?: return).extractToSizeSort()
             val consumedGas = scope.calcOnState { calcConsumedGas() }
 
             scope.fork(
                 mkBvSignedGreaterOrEqualExpr(gasLimit, consumedGas),
+                falseStateIsExceptional = true,
                 blockOnFalseState = {
                     setFailure(TvmOutOfGas(consumedGas, gasLimit))(this)
                 }

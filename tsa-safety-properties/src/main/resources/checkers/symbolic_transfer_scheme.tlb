@@ -1,0 +1,6 @@
+transfer#0f8a7ea5 query_id:uint64 amount:Coins destination:MsgAddress
+                 response_destination:MsgAddress custom_payload:(Maybe ^Cell)
+                 forward_ton_amount:Coins forward_payload:(Maybe ^ForwardPayloadFmt)
+                 = InternalMsgBody;
+
+_ op:uint32 rest:Any = ForwardPayloadFmt;  // added this to avoid extra cellUnderflow

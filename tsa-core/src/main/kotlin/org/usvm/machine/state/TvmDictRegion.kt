@@ -2,6 +2,8 @@ package org.usvm.machine.state
 
 import io.ksmt.expr.KBitVecValue
 import io.ksmt.utils.asExpr
+import org.ton.bytecode.TvmCodeBlock
+import org.usvm.INITIAL_INPUT_ADDRESS
 import org.usvm.UAddressSort
 import org.usvm.UBoolExpr
 import org.usvm.UBvSort
@@ -14,16 +16,25 @@ import org.usvm.UTransformer
 import org.usvm.api.readField
 import org.usvm.api.writeField
 import org.usvm.apply
+import org.usvm.collection.set.primitive.UPrimitiveSetEntries
 import org.usvm.collection.set.primitive.USetEntryLValue
+import org.usvm.collection.set.primitive.USetModelRegion
+import org.usvm.collection.set.primitive.USetRegionId
+import org.usvm.collection.set.primitive.setEntries
 import org.usvm.machine.TvmContext.Companion.dictKeyLengthField
 import org.usvm.machine.setUnion
+import org.usvm.machine.types.TvmSliceType
+import org.usvm.machine.types.TvmType
 import org.usvm.memory.ULValue
+import org.usvm.memory.UMemory
 import org.usvm.memory.UMemoryRegion
 import org.usvm.memory.UMemoryRegionId
 import org.usvm.memory.UReadOnlyMemory
 import org.usvm.memory.USymbolicCollectionKeyInfo
+import org.usvm.model.UModelBase
 import org.usvm.regions.SetRegion
 import org.usvm.uctx
+import usvm.hack.UModelBaseAccess
 
 data class DictId(val keyLength: Int)
 
@@ -130,7 +141,9 @@ fun TvmState.dictGetValue(
     val dictValueRegion = memory.dictValueRegion(dictValueRegionId)
     val dictValueInfo = TvmDictValueRegionValueInfo(this@dictGetValue, valueSort)
 
-    return dictValueRegion.readRefValue(dictRef, key, dictValueInfo)
+    return dictValueRegion.readRefValue(dictRef, key, dictValueInfo).also {
+        assertType(it, TvmSliceType)
+    }
 }
 
 fun TvmState.dictContainsKey(
@@ -169,4 +182,52 @@ fun TvmState.copyDict(
 
     val dictKeyLength = memory.readField(originalDict, dictKeyLengthField, int257sort)
     memory.writeField(resultDict, dictKeyLengthField, int257sort, dictKeyLength, guard = trueExpr)
+}
+
+fun dictKeyEntries(
+    model: UModelBase<TvmType>,
+    memory: UMemory<TvmType, TvmCodeBlock>,
+    dict: UConcreteHeapRef,
+    dictId: DictId,
+    keySort: UBvSort,
+): Set<USetEntryLValue<DictId, UBvSort, SetRegion<UExpr<UBvSort>>>> {
+    // entries stored during execution
+    val memoryEntries = memory.setEntries(dict, dictId, keySort, DictKeyInfo).entries
+    // input entries
+    val modelEntries = dictModelKeyEntries(model, dict, dictId, keySort)
+
+    return memoryEntries + modelEntries
+}
+
+private fun dictModelKeyEntries(
+    model: UModelBase<TvmType>,
+    dict: UConcreteHeapRef,
+    dictId: DictId,
+    keySort: UBvSort,
+): Set<USetEntryLValue<DictId, UBvSort, SetRegion<UExpr<UBvSort>>>> {
+    if (dict.address <= INITIAL_INPUT_ADDRESS) {
+        return model.setEntries(dict, dictId, keySort, DictKeyInfo).entries
+    }
+
+    // collect all set regions with correct type
+    val setModelRegions = UModelBaseAccess.modelRegions(model)
+        .filterIsInstance<USetRegionId<DictId, UBvSort, SetRegion<UExpr<UBvSort>>>>()
+        .filter { it.setType == dictId }
+        .mapNotNull { regionId ->
+            val region = model.getRegion(regionId) as? USetModelRegion<DictId, UBvSort, SetRegion<UExpr<UBvSort>>>
+                ?: return@mapNotNull null
+
+            regionId to region
+        }
+
+
+    // collect entries of all sets, later they can be filtered using [dictContainsKey]
+    val result = UPrimitiveSetEntries<DictId, UBvSort, SetRegion<UExpr<UBvSort>>>()
+    setModelRegions.forEach { (regionId, region) ->
+        region.inputSet.values.keys.forEach {
+            result.add(USetEntryLValue(regionId.elementSort, it.first, it.second, dictId, DictKeyInfo))
+        }
+    }
+
+    return result.entries
 }

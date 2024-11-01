@@ -39,7 +39,7 @@ import org.usvm.machine.TvmContext.Companion.sliceRefPosField
 import org.usvm.machine.TvmContext.TvmCellDataSort
 import org.usvm.machine.TvmContext.TvmInt257Sort
 import org.usvm.machine.TvmSizeSort
-import org.usvm.machine.TvmStepScope
+import org.usvm.machine.TvmStepScopeManager
 import org.usvm.machine.intValue
 import org.usvm.machine.types.TvmSymbolicCellDataCoins
 import org.usvm.machine.types.makeSliceTypeLoad
@@ -122,7 +122,7 @@ private fun splitSizeExpr(
  */
 private fun TvmContext.processCellUnderflowCheck(
     size: UExpr<TvmSizeSort>,
-    scope: TvmStepScope,
+    scope: TvmStepScopeManager,
     minSize: UExpr<TvmSizeSort>? = null,
     maxSize: UExpr<TvmSizeSort>? = null,
     quietBlock: (TvmState.() -> Unit)? = null
@@ -134,6 +134,18 @@ private fun TvmContext.processCellUnderflowCheck(
         min and max
     }
 
+    // don't bother with concrete and symbolic cases if so
+    if (!scope.allowFailuresOnCurrentStep || quietBlock != null) {
+        return scope.fork(
+            noUnderflowExpr,
+            falseStateIsExceptional = quietBlock == null,
+            blockOnFalseState = {
+                quietBlock?.invoke(this)
+                    ?: throwUnknownCellUnderflowError(this)
+            }
+        )
+    }
+
     // cases for concrete and symbolic sizes are different:
     // this is why we need to split `size` if it represents ite.
     val (concreteSize, symbolicSize) = splitSizeExpr(size)
@@ -143,9 +155,9 @@ private fun TvmContext.processCellUnderflowCheck(
     // Case of concrete size: cellUnderflow is always a real error.
     scope.fork(
         with(ctx) { concreteGuard implies noUnderflowExpr},
+        falseStateIsExceptional = true,
         blockOnFalseState = {
-            quietBlock?.invoke(this)
-                ?: throwRealCellUnderflowError(this)
+            throwRealCellUnderflowError(this)
         }
     ) ?: return null
 
@@ -166,14 +178,13 @@ private fun TvmContext.processCellUnderflowCheck(
         blockOnUnknownTrueState = { symbolicThrow = throwUnknownCellUnderflowError },
         blockOnUnsatTrueState = { symbolicThrow = throwRealCellUnderflowError },
         blockOnFalseState = {
-            quietBlock?.invoke(this)
-                ?: symbolicThrow(this)
+            symbolicThrow(this)
         }
     )
 }
 
 fun TvmContext.checkCellDataUnderflow(
-    scope: TvmStepScope,
+    scope: TvmStepScopeManager,
     cellRef: UHeapRef,
     minSize: UExpr<TvmSizeSort>? = null,
     maxSize: UExpr<TvmSizeSort>? = null,
@@ -184,7 +195,7 @@ fun TvmContext.checkCellDataUnderflow(
 }
 
 fun TvmContext.checkCellRefsUnderflow(
-    scope: TvmStepScope,
+    scope: TvmStepScopeManager,
     cellRef: UHeapRef,
     minSize: UExpr<TvmSizeSort>? = null,
     maxSize: UExpr<TvmSizeSort>? = null,
@@ -196,17 +207,18 @@ fun TvmContext.checkCellRefsUnderflow(
 
 fun checkCellOverflow(
     noOverflowExpr: UBoolExpr,
-    scope: TvmStepScope,
+    scope: TvmStepScopeManager,
     quietBlock: (TvmState.() -> Unit)? = null
 ): Unit? = scope.fork(
     noOverflowExpr,
+    falseStateIsExceptional = (quietBlock == null),
     blockOnFalseState = {
         quietBlock?.invoke(this)
             ?: ctx.throwCellOverflowError(this)
     }
 )
 
-fun TvmStepScope.assertDataLengthConstraint(
+fun TvmStepScopeManager.assertDataLengthConstraint(
     cellDataLength: UExpr<TvmSizeSort>,
     unsatBlock: TvmState.() -> Unit,
 ): Unit? = calcOnStateCtx {
@@ -217,7 +229,7 @@ fun TvmStepScope.assertDataLengthConstraint(
     assert(correctnessConstraint, unsatBlock = unsatBlock)
 }
 
-fun TvmStepScope.assertRefsLengthConstraint(
+fun TvmStepScopeManager.assertRefsLengthConstraint(
     cellRefsLength: UExpr<TvmSizeSort>,
     unsatBlock: TvmState.() -> Unit,
 ): Unit? = calcOnStateCtx {
@@ -260,7 +272,7 @@ fun TvmState.slicePreloadDataBitsWithoutChecks(
 /**
  * @return bv 1023 with undefined high-order bits
  */
-fun TvmStepScope.slicePreloadDataBits(
+fun TvmStepScopeManager.slicePreloadDataBits(
     slice: UHeapRef,
     sizeBits: UExpr<TvmSizeSort>,
     quietBlock: (TvmState.() -> Unit)? = null
@@ -282,7 +294,7 @@ fun TvmStepScope.slicePreloadDataBits(
     preloadDataBitsFromCellWithoutChecks(cell, dataPosition, sizeBits)
 }
 
-fun TvmStepScope.slicePreloadDataBits(
+fun TvmStepScopeManager.slicePreloadDataBits(
     slice: UHeapRef,
     bits: Int,
     quietBlock: (TvmState.() -> Unit)? = null
@@ -322,7 +334,7 @@ fun TvmState.loadIntFromCellWithoutChecks(
 /**
  * 0 <= bits <= 257
  */
-fun TvmStepScope.slicePreloadInt(
+fun TvmStepScopeManager.slicePreloadInt(
     slice: UHeapRef,
     sizeBits: UExpr<TvmInt257Sort>,
     isSigned: Boolean,
@@ -336,7 +348,7 @@ fun TvmStepScope.slicePreloadInt(
     }
 }
 
-private fun TvmStepScope.slicePreloadInternalAddrLengthConstraint(
+private fun TvmStepScopeManager.slicePreloadInternalAddrLengthConstraint(
     slice: UHeapRef
 ): Pair<UBoolExpr, UExpr<TvmSizeSort>>? = calcOnStateCtx {
     // addr_var$11 anycast:(Maybe Anycast) addr_len:(## 9) workchain_id:int32
@@ -396,7 +408,7 @@ private fun TvmStepScope.slicePreloadInternalAddrLengthConstraint(
     constraint to addrLength
 }
 
-private fun TvmStepScope.slicePreloadExternalAddrLengthConstraint(
+private fun TvmStepScopeManager.slicePreloadExternalAddrLengthConstraint(
     slice: UHeapRef
 ): Pair<UBoolExpr, UExpr<TvmSizeSort>> = calcOnStateCtx {
     // addr_extern$01 len:(## 9)
@@ -425,11 +437,12 @@ private fun TvmStepScope.slicePreloadExternalAddrLengthConstraint(
     (noneConstraint or externConstraint) to addrLength
 }
 
-fun TvmStepScope.slicePreloadInternalAddrLength(slice: UHeapRef): UExpr<TvmSizeSort>? {
+fun TvmStepScopeManager.slicePreloadInternalAddrLength(slice: UHeapRef): UExpr<TvmSizeSort>? {
     val (constraint, length) = slicePreloadInternalAddrLengthConstraint(slice) ?: return null
 
     fork(
         constraint,
+        falseStateIsExceptional = true,
         blockOnFalseState = {
             // TODO tl-b parsing failure
             ctx.throwUnknownCellUnderflowError(this)
@@ -440,11 +453,12 @@ fun TvmStepScope.slicePreloadInternalAddrLength(slice: UHeapRef): UExpr<TvmSizeS
 }
 
 
-fun TvmStepScope.slicePreloadExternalAddrLength(slice: UHeapRef): UExpr<TvmSizeSort>? {
+fun TvmStepScopeManager.slicePreloadExternalAddrLength(slice: UHeapRef): UExpr<TvmSizeSort>? {
     val (constraint, length) = slicePreloadExternalAddrLengthConstraint(slice) ?: return null
 
     fork(
         constraint,
+        falseStateIsExceptional = true,
         blockOnFalseState = {
             // TODO tl-b parsing failure
             ctx.throwUnknownCellUnderflowError(this)
@@ -454,7 +468,7 @@ fun TvmStepScope.slicePreloadExternalAddrLength(slice: UHeapRef): UExpr<TvmSizeS
     return length
 }
 
-fun TvmStepScope.slicePreloadAddrLength(slice: UHeapRef): UExpr<TvmSizeSort>? = calcOnStateCtx {
+fun TvmStepScopeManager.slicePreloadAddrLength(slice: UHeapRef): UExpr<TvmSizeSort>? = calcOnStateCtx {
     val (intConstraint, intLength) = slicePreloadInternalAddrLengthConstraint(slice) ?: return@calcOnStateCtx null
     val (extConstraint, extLength) = slicePreloadExternalAddrLengthConstraint(slice) ?: return@calcOnStateCtx null
 
@@ -471,10 +485,10 @@ fun TvmStepScope.slicePreloadAddrLength(slice: UHeapRef): UExpr<TvmSizeSort>? = 
 }
 
 fun sliceLoadGrams(
-    scope: TvmStepScope,
+    scope: TvmStepScopeManager,
     oldSlice: UHeapRef,
     newSlice: UConcreteHeapRef,
-    doWithGrams: TvmStepScope.(UExpr<TvmInt257Sort>) -> Unit
+    doWithGrams: TvmStepScopeManager.(UExpr<TvmInt257Sort>) -> Unit
 ) = scope.calcOnStateCtx {
     val peekedLength = slicePreloadDataBitsWithoutChecks(newSlice, sizeBits = 4).zeroExtendToSort(sizeSort)
     scope.makeSliceTypeLoad(oldSlice, TvmSymbolicCellDataCoins(ctx, peekedLength), newSlice) {
@@ -498,7 +512,7 @@ fun sliceLoadGrams(
     }
 }
 
-fun TvmStepScope.slicePreloadRef(
+fun TvmStepScopeManager.slicePreloadRef(
     slice: UHeapRef,
     idx: UExpr<TvmSizeSort>,
     quietBlock: (TvmState.() -> Unit)? = null
@@ -521,7 +535,7 @@ fun TvmStepScope.slicePreloadRef(
     readCellRef(cell, refIdx)
 }
 
-fun TvmStepScope.slicePreloadNextRef(
+fun TvmStepScopeManager.slicePreloadNextRef(
     slice: UHeapRef,
     quietBlock: (TvmState.() -> Unit)? = null
 ): UHeapRef? = calcOnStateCtx { slicePreloadRef(slice, zeroSizeExpr, quietBlock) }
@@ -590,7 +604,7 @@ fun TvmState.builderStoreDataBits(builder: UHeapRef, bits: UExpr<UBvSort>) = wit
 
 
 context(TvmContext)
-fun <S : UBvSort> TvmStepScope.builderStoreDataBits(
+fun <S : UBvSort> TvmStepScopeManager.builderStoreDataBits(
     builder: UHeapRef,
     bits: UExpr<S>,
     sizeBits: UExpr<TvmSizeSort>,
@@ -617,7 +631,7 @@ fun <S : UBvSort> TvmStepScope.builderStoreDataBits(
 }
 
 context(TvmContext)
-fun TvmStepScope.builderStoreInt(
+fun TvmStepScopeManager.builderStoreInt(
     builder: UHeapRef,
     value: UExpr<TvmInt257Sort>,
     sizeBits: UExpr<TvmInt257Sort>,
@@ -661,7 +675,7 @@ private fun TvmContext.updateBuilderData(
 }
 
 context(TvmContext)
-fun TvmStepScope.builderStoreGrams(
+fun TvmStepScopeManager.builderStoreGrams(
     builder: UHeapRef,
     value: UExpr<TvmInt257Sort>,
     quietBlock: (TvmState.() -> Unit)? = null
@@ -724,7 +738,7 @@ fun TvmState.builderStoreNextRef(builder: UHeapRef, ref: UHeapRef) = with(ctx) {
 }
 
 context(TvmContext)
-fun TvmStepScope.builderStoreSlice(
+fun TvmStepScopeManager.builderStoreSlice(
     builder: UHeapRef,
     slice: UHeapRef,
     quietBlock: (TvmState.() -> Unit)? = null,
@@ -774,7 +788,7 @@ fun TvmState.allocCellFromData(data: UExpr<UBvSort>): UHeapRef = with(ctx) {
     cell
 }
 
-fun TvmStepScope.allocCellFromData(
+fun TvmStepScopeManager.allocCellFromData(
     data: UExpr<TvmCellDataSort>,
     sizeBits: UExpr<TvmSizeSort>,
 ): UHeapRef? = calcOnStateCtx {
@@ -790,7 +804,7 @@ fun TvmState.allocSliceFromData(data: UExpr<UBvSort>): UHeapRef = with(ctx) {
     return allocSliceFromCell(sliceCell)
 }
 
-fun TvmStepScope.allocSliceFromData(data: UExpr<TvmCellDataSort>, sizeBits: UExpr<TvmSizeSort>): UHeapRef? {
+fun TvmStepScopeManager.allocSliceFromData(data: UExpr<TvmCellDataSort>, sizeBits: UExpr<TvmSizeSort>): UHeapRef? {
     val sliceCell = allocCellFromData(data, sizeBits) ?: return null
 
     return calcOnStateCtx { allocSliceFromCell(sliceCell) }
@@ -800,6 +814,10 @@ fun TvmState.allocateCell(cellValue: TvmCell): UConcreteHeapRef = with(ctx) {
     val refsSizeCondition = cellValue.refs.size <= TvmContext.MAX_REFS_NUMBER
     val cellDataSizeCondition = cellValue.data.bits.length <= MAX_DATA_LENGTH
     check(refsSizeCondition && cellDataSizeCondition) { "Unexpected cellValue: $cellValue" }
+
+    if (cellValue.data.bits.isEmpty()) {
+        return allocEmptyCell()
+    }
 
     val data = mkBv(cellValue.data.bits, cellValue.data.bits.length.toUInt())
     val cell = allocEmptyCell()

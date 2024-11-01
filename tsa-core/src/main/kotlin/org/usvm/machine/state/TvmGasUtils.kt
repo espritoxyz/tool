@@ -6,7 +6,7 @@ import org.ton.bytecode.TvmInst
 import org.ton.bytecode.TvmSimpleGas
 import org.usvm.UBv32Sort
 import org.usvm.UExpr
-import org.usvm.machine.TvmStepScope
+import org.usvm.machine.TvmStepScopeManager
 
 const val IMPLICIT_EXCEPTION_THROW_GAS = 50
 const val SIMPLE_INSTRUCTION_BASE_GAS = 10
@@ -15,7 +15,7 @@ const val SIMPLE_INSTRUCTION_BIT_GAS = 1
 const val SIMPLE_INSTRUCTION_BIT_SIZE = 16 // todo: check for instructions with simple gas and another bit size
 const val SIMPLE_GAS_USAGE = SIMPLE_INSTRUCTION_BASE_GAS + SIMPLE_INSTRUCTION_BIT_SIZE * SIMPLE_INSTRUCTION_BIT_GAS // 26
 
-fun TvmStepScope.consumeDefaultGas(stmt: TvmInst) = doWithState {
+fun TvmStepScopeManager.consumeDefaultGas(stmt: TvmInst) = doWithState {
     consumeDefaultGas(stmt)
 }
 

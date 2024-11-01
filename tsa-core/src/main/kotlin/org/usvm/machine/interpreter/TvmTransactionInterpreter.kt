@@ -4,7 +4,8 @@ import org.ton.bytecode.TvmCellValue
 import org.usvm.UBoolExpr
 import org.usvm.UHeapRef
 import org.usvm.machine.TvmContext
-import org.usvm.machine.TvmStepScope
+import org.usvm.machine.TvmStepScopeManager
+import org.usvm.machine.state.ContractId
 import org.usvm.machine.state.allocCellFromData
 import org.usvm.machine.state.allocEmptyCell
 import org.usvm.machine.state.allocSliceFromCell
@@ -18,14 +19,13 @@ import org.usvm.machine.state.slicePreloadDataBits
 import org.usvm.machine.state.slicePreloadExternalAddrLength
 import org.usvm.machine.state.slicePreloadInternalAddrLength
 import org.usvm.machine.state.slicePreloadNextRef
-import org.usvm.machine.types.TvmSymbolicCellDataCoins
-import org.usvm.machine.types.makeSliceTypeLoad
 import org.usvm.mkSizeAddExpr
 import org.usvm.sizeSort
 
 class TvmTransactionInterpreter(val ctx: TvmContext) {
 
-    fun executeActions(scope: TvmStepScope): List<OutMessage>? = with(ctx) {
+    fun executeActions(scope: TvmStepScopeManager, contractId: ContractId): List<OutMessage>? = with(ctx) {
+        val commitedState = scope.calcOnState { lastCommitedStateOfContracts[contractId] }
         val commitedActions = scope.calcOnState { commitedState?.c5?.value?.value }
         if (commitedActions == null) {
             return@with null
@@ -58,7 +58,7 @@ class TvmTransactionInterpreter(val ctx: TvmContext) {
         return outMessages
     }
 
-    private fun extractActions(scope: TvmStepScope, actions: UHeapRef): List<UHeapRef>? = with(ctx) {
+    private fun extractActions(scope: TvmStepScopeManager, actions: UHeapRef): List<UHeapRef>? = with(ctx) {
         var cur = actions
         val actionList = mutableListOf<UHeapRef>()
 
@@ -85,7 +85,7 @@ class TvmTransactionInterpreter(val ctx: TvmContext) {
         return actionList.reversed()
     }
 
-    private fun visitSendMessageAction(scope: TvmStepScope, slice: UHeapRef): OutMessage? = with(ctx) {
+    private fun visitSendMessageAction(scope: TvmStepScopeManager, slice: UHeapRef): OutMessage? = with(ctx) {
         val msg = scope.slicePreloadNextRef(slice) ?: return null
         val msgSlice = scope.calcOnState { allocSliceFromCell(msg) }
 
@@ -96,7 +96,7 @@ class TvmTransactionInterpreter(val ctx: TvmContext) {
         OutMessage(dest, body, hasStateInit)
     }
 
-    private fun parseCommonMsgInfoRelaxed(scope: TvmStepScope, msgSlice: UHeapRef): TvmCellValue? = with(ctx) {
+    private fun parseCommonMsgInfoRelaxed(scope: TvmStepScopeManager, msgSlice: UHeapRef): TvmCellValue? = with(ctx) {
         val tag = scope.slicePreloadDataBits(msgSlice, 1) ?: return null
 
         val isInternalCond = tag eq zeroBit
@@ -137,6 +137,7 @@ class TvmTransactionInterpreter(val ctx: TvmContext) {
 
             scope.fork(
                 externalTag eq mkBv(value = 3, sizeBits = 2u),
+                falseStateIsExceptional = true,
                 // TODO set cell deserialization failure
                 blockOnFalseState = throwStructuralCellUnderflowError
             ) ?: return null
@@ -162,7 +163,7 @@ class TvmTransactionInterpreter(val ctx: TvmContext) {
         TvmCellValue(dest)
     }
 
-    private fun parseStateInit(scope: TvmStepScope, msgSlice: UHeapRef): Boolean? = with(ctx) {
+    private fun parseStateInit(scope: TvmStepScopeManager, msgSlice: UHeapRef): Boolean? = with(ctx) {
         // init:(Maybe (Either StateInit ^StateInit))
         val initMaybeBit = scope.slicePreloadDataBits(msgSlice, 1) ?: return null
         val noStateInitConstraint = initMaybeBit eq zeroBit
@@ -223,7 +224,7 @@ class TvmTransactionInterpreter(val ctx: TvmContext) {
         return true
     }
 
-    private fun parseBody(scope: TvmStepScope, msgSlice: UHeapRef): TvmCellValue? = with(ctx) {
+    private fun parseBody(scope: TvmStepScopeManager, msgSlice: UHeapRef): TvmCellValue? = with(ctx) {
         //  body:(Either X ^X)
         val bodyEitherBit = scope.slicePreloadDataBits(msgSlice, 1) ?: return null
         val isBodyLeft = scope.checkCondition(bodyEitherBit eq zeroBit) ?: return null
@@ -240,13 +241,13 @@ class TvmTransactionInterpreter(val ctx: TvmContext) {
         TvmCellValue(body)
     }
 
-    private fun visitReserveAction(scope: TvmStepScope, slice: UHeapRef): Unit? {
+    private fun visitReserveAction(scope: TvmStepScopeManager, slice: UHeapRef): Unit? {
         // TODO no implementation, since we don't compute actions fees and balance
 
         return Unit
     }
 
-    private fun TvmStepScope.skipGrams(slice: UHeapRef) = calcOnStateCtx {
+    private fun TvmStepScopeManager.skipGrams(slice: UHeapRef) = calcOnStateCtx {
         val length = slicePreloadDataBits(slice, bits = 4)?.zeroExtendToSort(sizeSort)
             ?: return@calcOnStateCtx null
 
@@ -259,7 +260,7 @@ class TvmTransactionInterpreter(val ctx: TvmContext) {
         sliceMoveDataPtr(slice, bitsToSkip)
     }
 
-    private fun TvmStepScope.checkCondition(cond: UBoolExpr): Boolean? = with(ctx) {
+    private fun TvmStepScopeManager.checkCondition(cond: UBoolExpr): Boolean? = with(ctx) {
         val checkRes = checkSat(cond)
         val invertedRes = checkSat(cond.not())
 

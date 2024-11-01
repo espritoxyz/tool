@@ -1,35 +1,33 @@
 package org.ton.tlb
 
 import org.ton.Endian.BigEndian
+import org.ton.TvmBasicMsgAddrLabel
+import org.ton.TvmCoinsLabel
 import org.ton.TvmCompositeDataCellLabel
 import org.ton.TvmDataCellLabel
 import org.ton.TvmDataCellStructure
-import org.ton.TvmDataCellStructure.KnownTypePrefix
-import org.ton.TvmDataCellStructure.Unknown
 import org.ton.TvmDataCellStructure.Empty
-import org.ton.TvmDataCellStructure.SwitchPrefix
+import org.ton.TvmDataCellStructure.KnownTypePrefix
 import org.ton.TvmDataCellStructure.LoadRef
+import org.ton.TvmDataCellStructure.SwitchPrefix
+import org.ton.TvmDataCellStructure.Unknown
+import org.ton.TvmFullMsgAddrLabel
 import org.ton.TvmIntegerLabel
 import org.ton.TvmMaybeRefLabel
-import org.ton.TvmMsgAddrLabel
 import org.ton.TvmParameterInfo
 import org.ton.TvmParameterInfo.DataCellInfo
 
 class TvmTlbTransformer(
-    definitions: List<TvmTlbTypeDefinition>
+    definitions: List<TvmTlbTypeDefinition>,
+    private val onlyBasicAddresses: Boolean = false,
 ) {
     private val typeDefinitions = definitions.associateBy { it.id }
     private val transformed = hashMapOf<Pair<TvmTlbTypeDefinition, List<TvmTlbTypeExpr>>, TvmDataCellLabel>()
+    private val cellTypeId = definitions.first { it.name == "Cell" }.id
+    private val anyTypeId = definitions.first { it.name == "Any" }.id
 
-    fun transform(
-        def: TvmTlbTypeDefinition,
-        args: List<TvmTlbTypeExpr> = emptyList(),
-    ): TvmDataCellStructure {
-        val label = transformTypeDefinition(def, args) ?: return Unknown
-        return KnownTypePrefix(label, Empty)
-    }
-
-    private fun getTypeDef(id: Int): TvmTlbTypeDefinition = typeDefinitions[id] ?: error("Unknown type id: $id")
+    private fun getTypeDef(id: Int): TvmTlbTypeDefinition = typeDefinitions[id]
+        ?: error("Unknown type id: $id")
 
     fun transformTypeDefinition(
         def: TvmTlbTypeDefinition,
@@ -42,6 +40,12 @@ class TvmTlbTransformer(
                 transformComplexType(def, args)
             }
         }
+    }
+
+    private fun sequenceOfExprsHasAny(
+        sequence: Iterable<TvmTlbTypeExpr>
+    ): Boolean = sequence.any {
+        it is TvmTlbType && it.id in listOf(cellTypeId, anyTypeId)
     }
 
     private fun transformBuiltins(
@@ -74,23 +78,53 @@ class TvmTlbTransformer(
     private fun transformComplexType(
         def: TvmTlbTypeDefinition,
         args: List<TvmTlbTypeExpr>,
-    ): TvmCompositeDataCellLabel {
+    ): TvmDataCellLabel {
         // special cases
         when (def.name) {
             "Maybe" -> {
                 require(args.size == 1)
-                val internal = transformSequenceOfExprs(args)
-                val label = TvmCompositeDataCellLabel(
-                    "<anonymous-label>",
-                    internal
-                )
-                return TvmMaybeRefLabel(DataCellInfo(label))
+                when (val arg = args.single()) {
+                    is TvmTlbReference -> {
+                        val (internal, hasAny) = transformSequenceOfExprs(listOf(arg.ref))
+                        val label = TvmCompositeDataCellLabel(
+                            "<anonymous-label>",
+                            internal,
+                            hasAny,
+                        )
+                        return TvmMaybeRefLabel(DataCellInfo(label))
+                    }
+                    else -> {
+                        val (internal, hasAny) = transformSequenceOfExprs(listOf(arg))
+                        val structure = SwitchPrefix(
+                            switchSize = 1,
+                            mapOf(
+                                "0" to Empty,
+                                "1" to internal
+                            )
+                        )
+                        return TvmCompositeDataCellLabel("Maybe", structure, hasAny)
+                    }
+                }
+
             }
             "Either" -> {
-                TODO()
+                require(args.size == 2)
+                val (left, leftHasAny) = transformSequenceOfExprs(listOf(args[0]))
+                val (right, rightHasAny) = transformSequenceOfExprs(listOf(args[1]))
+                val structure = SwitchPrefix(
+                    switchSize = 1,
+                    mapOf(
+                        "0" to left,
+                        "1" to right
+                    )
+                )
+                return TvmCompositeDataCellLabel("Either", structure, hasAny = leftHasAny || rightHasAny)
             }
             "MsgAddress" -> {
-                return TvmMsgAddrLabel
+                return if (onlyBasicAddresses) TvmBasicMsgAddrLabel else TvmFullMsgAddrLabel
+            }
+            "Grams", "Coins" -> {  // TODO: add variant for `VarUInteger`
+                return TvmCoinsLabel
             }
         }
 
@@ -98,7 +132,18 @@ class TvmTlbTransformer(
             TODO()
         }
 
-        // TODO use this
+        val someConstructorHasAny = def.constructors.any { c ->
+            val typeExprs = c.fields.map { it.typeExpr }
+            sequenceOfExprsHasAny(typeExprs)
+        }
+        if (someConstructorHasAny) {
+            // this one must not be recursive (if it is, it will lead to infinite recursion)
+            val structure = transformConstructors(
+                def.constructors.map { ConstructorTagSuffix(it, it.tag) }
+            )
+            return TvmCompositeDataCellLabel(def.name, structure, hasAny = true)
+        }
+
         return TvmCompositeDataCellLabel(
             name = def.name
         ).also { label ->
@@ -137,8 +182,9 @@ class TvmTlbTransformer(
 
     private fun transformSequenceOfExprs(
         sequence: List<TvmTlbTypeExpr>,
-    ): TvmDataCellStructure {
+    ): Pair<TvmDataCellStructure, Boolean> {
         var last: TvmDataCellStructure = Empty
+        var foundAny = false
         sequence.asReversed().forEach { expr ->
             last = when (expr) {
                 is TvmTlbReference -> {
@@ -157,23 +203,32 @@ class TvmTlbTransformer(
                 is TvmTlbType -> {
                     val typeDef = getTypeDef(expr.id)
 
-                    transformTypeDefinition(typeDef, expr.args)?.let {
-                        KnownTypePrefix(it, last)
-                    } ?: Unknown
+                    transformTypeDefinition(typeDef, expr.args)?.let { label ->
+                        // unfold last label, if it has `Any`
+                        if (last is Empty && label is TvmCompositeDataCellLabel && label.definitelyHasAny) {
+                            foundAny = true
+                            label.internalStructure
+                        } else {
+                            KnownTypePrefix(label, last)
+                        }
+                    } ?: let {
+                        foundAny = true
+                        Unknown
+                    }
                 }
 
                 else -> TODO()
             }
         }
 
-        return last
+        return last to foundAny
     }
 
     private fun transformConstructor(
         constructor: TvmTlbTypeConstructor
     ): TvmDataCellStructure {
         val exprs = constructor.fields.map { it.typeExpr }
-        return transformSequenceOfExprs(exprs)
+        return transformSequenceOfExprs(exprs).first
     }
 
     private data class ConstructorTagSuffix(

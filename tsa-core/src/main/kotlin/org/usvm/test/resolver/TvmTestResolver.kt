@@ -3,6 +3,8 @@ package org.usvm.test.resolver
 import org.ton.bytecode.TvmInst
 import org.ton.bytecode.TvmMethod
 import org.usvm.machine.MethodId
+import org.usvm.machine.interpreter.TvmInterpreter.Companion.logger
+import org.usvm.machine.tryCatchIf
 import org.usvm.machine.state.TvmMethodResult.TvmFailure
 import org.usvm.machine.state.TvmState
 import org.usvm.machine.types.TvmStructuralExit
@@ -33,13 +35,26 @@ data object TvmTestResolver {
     fun resolve(
         methodStates: Map<TvmMethod, Pair<List<TvmState>, TvmMethodCoverage>>
     ): TvmContractSymbolicTestResult = TvmContractSymbolicTestResult(
-        methodStates.map {
+        methodStates.mapNotNull {
             val method = it.key
+            val coverage = it.value.second
+            val states = it.value.first
+            val tests = states.mapNotNull { state ->
+                tryCatchIf(
+                    condition = state.ctx.tvmOptions.quietMode,
+                    body = { resolve(method, state) },
+                    exceptionHandler = { exception ->
+                        logger.debug(exception) { "Exception is thrown during the resolve of state $state" }
+                        null
+                    }
+                )
+            }
+
             TvmSymbolicTestSuite(
                 method.id,
-                it.value.second,
-                it.value.first.map { state -> resolve(method, state) },
-            )
+                coverage,
+                tests,
+            ).takeIf { tests.isNotEmpty() }
         }
     )
 }

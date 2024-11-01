@@ -19,7 +19,7 @@ import org.usvm.machine.TvmContext.Companion.ADDRESS_TAG_BITS
 import org.usvm.machine.TvmContext.Companion.STD_ADDRESS_TAG
 import org.usvm.machine.TvmContext.Companion.cellDataField
 import org.usvm.machine.TvmContext.TvmInt257Sort
-import org.usvm.machine.TvmStepScope
+import org.usvm.machine.TvmStepScopeManager
 import org.usvm.machine.state.TvmStack.TvmConcreteStackEntry
 import org.usvm.machine.state.TvmStack.TvmInputStackEntry
 import org.usvm.machine.state.TvmStack.TvmStackTupleValue
@@ -47,7 +47,7 @@ fun TvmState.addOnStack(value: UExpr<out USort>, type: TvmRealType) {
     }
 }
 
-fun TvmStepScope.addOnStack(value: UExpr<out USort>, type: TvmRealType) =
+fun TvmStepScopeManager.addOnStack(value: UExpr<out USort>, type: TvmRealType) =
     calcOnState { addOnStack(value, type) }
 
 fun TvmStack.addInt(value: UExpr<TvmInt257Sort>) {
@@ -82,7 +82,7 @@ fun TvmState.takeLastIntOrThrowTypeError(): UExpr<TvmInt257Sort>? =
         null
     }
 
-fun TvmStepScope.takeLastIntOrThrowTypeError(): UExpr<TvmInt257Sort>? =
+fun TvmStepScopeManager.takeLastIntOrThrowTypeError(): UExpr<TvmInt257Sort>? =
     calcOnState { takeLastIntOrThrowTypeError() }
 
 fun TvmState.takeLastCell(): UHeapRef? =
@@ -90,7 +90,7 @@ fun TvmState.takeLastCell(): UHeapRef? =
         initializeMsgBody(generateSymbolicCell())
     }?.also { ensureSymbolicCellInitialized(it) }
 
-fun TvmStepScope.takeLastCell(): UHeapRef? =
+fun TvmStepScopeManager.takeLastCell(): UHeapRef? =
     calcOnState { takeLastCell() }
 
 context(TvmState)
@@ -105,7 +105,7 @@ fun TvmStack.takeLastBuilder(): UHeapRef? =
         generateSymbolicBuilder()
     }?.also { ensureSymbolicBuilderInitialized(it) }
 
-fun TvmStepScope.takeLastTuple(): TvmStackTupleValue? = calcOnStateCtx {
+fun TvmStepScopeManager.takeLastTuple(): TvmStackTupleValue? = calcOnStateCtx {
     val lastEntry = stack.takeLastEntry()
 
     when (lastEntry) {
@@ -203,21 +203,21 @@ private fun TvmState.initializeMsgBody(
     symbolicCell
 }
 
-fun doXchg(scope: TvmStepScope, first: Int, second: Int) {
+fun doXchg(scope: TvmStepScopeManager, first: Int, second: Int) {
     scope.doWithState {
         stack.swap(first, second)
     }
 }
 
-fun doSwap(scope: TvmStepScope) = doXchg(scope, first = 0, second = 1)
+fun doSwap(scope: TvmStepScopeManager) = doXchg(scope, first = 0, second = 1)
 
-fun doPop(scope: TvmStepScope, i: Int) {
+fun doPop(scope: TvmStepScopeManager, i: Int) {
     scope.doWithState {
         stack.pop(i)
     }
 }
 
-fun doPush(scope: TvmStepScope, i: Int) {
+fun doPush(scope: TvmStepScopeManager, i: Int) {
     scope.doWithState {
         stack.push(i)
     }

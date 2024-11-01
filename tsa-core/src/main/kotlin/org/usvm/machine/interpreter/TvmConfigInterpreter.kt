@@ -1,11 +1,12 @@
 package org.usvm.machine.interpreter
 
+import org.ton.bytecode.TIME_PARAMETER_IDX
 import org.ton.bytecode.TvmAppConfigConfigoptparamInst
 import org.ton.bytecode.TvmAppConfigGetparamInst
 import org.ton.bytecode.TvmAppConfigInst
 import org.usvm.api.makeSymbolicPrimitive
 import org.usvm.machine.TvmContext
-import org.usvm.machine.TvmStepScope
+import org.usvm.machine.TvmStepScopeManager
 import org.usvm.machine.state.TvmStack.TvmStackIntValue
 import org.usvm.machine.state.addInt
 import org.usvm.machine.state.addOnStack
@@ -25,7 +26,7 @@ import org.usvm.machine.types.TvmCellType
 import org.usvm.machine.types.TvmSliceType
 
 class TvmConfigInterpreter(private val ctx: TvmContext) {
-    fun visitConfigInst(scope: TvmStepScope, stmt: TvmAppConfigInst) {
+    fun visitConfigInst(scope: TvmStepScopeManager, stmt: TvmAppConfigInst) {
         scope.consumeDefaultGas(stmt)
 
         when (stmt) {
@@ -35,7 +36,7 @@ class TvmConfigInterpreter(private val ctx: TvmContext) {
         }
     }
 
-    private fun visitGetParamInst(scope: TvmStepScope, stmt: TvmAppConfigGetparamInst) {
+    private fun visitGetParamInst(scope: TvmStepScopeManager, stmt: TvmAppConfigGetparamInst) {
         scope.doWithStateCtx {
             val i = stmt.i
 
@@ -52,7 +53,7 @@ class TvmConfigInterpreter(private val ctx: TvmContext) {
                     val messagesSent = getContractInfoParam(i).intValue
                     stack.addInt(messagesSent)
                 }
-                3 -> { // NOW
+                TIME_PARAMETER_IDX -> { // NOW
                     val now = makeSymbolicPrimitive(int257sort)
                     val previousValue = getContractInfoParam(i).intValue
 
@@ -118,7 +119,7 @@ class TvmConfigInterpreter(private val ctx: TvmContext) {
         }
     }
 
-    private fun visitConfigParamInst(scope: TvmStepScope, stmt: TvmAppConfigConfigoptparamInst) = with(ctx) {
+    private fun visitConfigParamInst(scope: TvmStepScopeManager, stmt: TvmAppConfigConfigoptparamInst) = with(ctx) {
         val idx = scope.takeLastIntOrThrowTypeError() ?: return@with
 
         val absIdx = mkIte(mkBvSignedGreaterOrEqualExpr(idx, zeroValue), idx, mkBvNegationExpr(idx))

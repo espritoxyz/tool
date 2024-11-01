@@ -10,10 +10,12 @@ import org.usvm.UHeapRef
 import org.usvm.api.readField
 import org.usvm.machine.TvmContext
 import org.usvm.machine.TvmSizeSort
-import org.usvm.machine.TvmStepScope
+import org.usvm.machine.TvmStepScopeManager
+import org.usvm.machine.TvmStepScopeManager.ActionOnCondition
 import org.usvm.machine.state.TvmMethodResult
 import org.usvm.machine.state.TvmState
 import org.usvm.machine.state.calcOnStateCtx
+import org.usvm.machine.state.doWithCtx
 import org.usvm.mkSizeAddExpr
 import org.usvm.sizeSort
 import org.usvm.utils.extractAddresses
@@ -52,12 +54,13 @@ private data class Error(val error: TvmMethodResult.TvmStructuralError) : MakeSl
 
 private data object NoTlbStack : MakeSliceTypeLoadOutcome
 
-fun TvmStepScope.makeSliceTypeLoad(
+fun TvmStepScopeManager.makeSliceTypeLoad(
     oldSlice: UHeapRef,
     type: TvmSymbolicCellDataType,
     newSlice: UConcreteHeapRef,
-    restActions: TvmStepScope.() -> Unit,
+    restActions: TvmStepScopeManager.() -> Unit,
 ) {
+    val turnOnTLBParsingChecks = doWithCtx { tvmOptions.turnOnTLBParsingChecks }
 
     val outcomes = hashMapOf<MakeSliceTypeLoadOutcome, UBoolExpr>()
 
@@ -70,7 +73,12 @@ fun TvmStepScope.makeSliceTypeLoad(
             tlbStack?.step(this, load)?.forEach { (guard, stepResult) ->
                 when (stepResult) {
                     is TlbStack.Error -> {
-                        val outcome = Error(stepResult.error)
+                        val outcome =
+                            if (turnOnTLBParsingChecks) {
+                                Error(stepResult.error)
+                            } else {
+                                NoTlbStack
+                            }
                         val oldValue = outcomes[outcome] ?: falseExpr
                         outcomes[outcome] = oldValue or (guard and load.guard)
                     }
@@ -88,9 +96,13 @@ fun TvmStepScope.makeSliceTypeLoad(
     }
 
     doWithConditions(
-        conditionsWithActions = outcomes.entries.map { (outcome, guard) ->
+        givenConditionsWithActions = outcomes.entries.map { (outcome, guard) ->
             val action = processMakeSliceTypeLoadOutcome(newSlice, outcome)
-            guard to action
+            ActionOnCondition(
+                action = action,
+                condition = guard,
+                caseIsExceptional = outcome is Error,
+            )
         },
         doForAllBlock = {
             // we execute [restActions] only on states that haven't terminated yet
@@ -118,7 +130,13 @@ private fun processMakeSliceTypeLoadOutcome(
         }
     }
 
-fun TvmStepScope.assertEndOfCell(slice: UHeapRef): Unit? {
+fun TvmStepScopeManager.assertEndOfCell(
+    slice: UHeapRef
+): Unit? {
+    val turnOnTLBParsingChecks = doWithCtx { tvmOptions.turnOnTLBParsingChecks }
+    if (!turnOnTLBParsingChecks) {
+        return Unit
+    }
     return calcOnStateCtx {
         val cellAddress = memory.readField(slice, TvmContext.sliceCellField, addressSort)
         val offset = memory.readField(slice, TvmContext.sliceDataPosField, sizeSort)
@@ -128,6 +146,7 @@ fun TvmStepScope.assertEndOfCell(slice: UHeapRef): Unit? {
             val noConflictCond = dataCellInfoStorage.getNoUnexpectedEndOfReadingCondition(this, it)
             fork(
                 noConflictCond,
+                falseStateIsExceptional = true,
                 blockOnFalseState = {
                     methodResult = TvmMethodResult.TvmStructuralError(TvmUnexpectedEndOfReading)
                 }
@@ -136,25 +155,30 @@ fun TvmStepScope.assertEndOfCell(slice: UHeapRef): Unit? {
     }
 }
 
-fun TvmStepScope.makeSliceRefLoad(
+fun TvmStepScopeManager.makeSliceRefLoad(
     oldSlice: UHeapRef,
     newSlice: UConcreteHeapRef,
-    restActions: TvmStepScope.() -> Unit,
+    restActions: TvmStepScopeManager.() -> Unit,
 ) {
-    calcOnStateCtx {
-        val cellAddress = memory.readField(oldSlice, TvmContext.sliceCellField, addressSort)
-        val refNumber = mkSizeAddExpr(memory.readField(oldSlice, TvmContext.sliceRefPosField, sizeSort), oneSizeExpr)
-        val loadList = dataCellLoadedTypeInfo.loadRef(cellAddress, refNumber)
-        loadList.forEach { load ->
-            val noConflictCond = dataCellInfoStorage.getNoUnexpectedLoadRefCondition(this, load)
-            fork(
-                noConflictCond,
-                blockOnFalseState = {
-                    methodResult = TvmMethodResult.TvmStructuralError(TvmUnexpectedRefReading)
-                }
-            ) ?: return@calcOnStateCtx null
-        }
-    } ?: return
+    val turnOnTLBParsingChecks = doWithCtx { tvmOptions.turnOnTLBParsingChecks }
+    if (turnOnTLBParsingChecks) {
+        calcOnStateCtx {
+            val cellAddress = memory.readField(oldSlice, TvmContext.sliceCellField, addressSort)
+            val refNumber =
+                mkSizeAddExpr(memory.readField(oldSlice, TvmContext.sliceRefPosField, sizeSort), oneSizeExpr)
+            val loadList = dataCellLoadedTypeInfo.loadRef(cellAddress, refNumber)
+            loadList.forEach { load ->
+                val noConflictCond = dataCellInfoStorage.getNoUnexpectedLoadRefCondition(this, load)
+                fork(
+                    noConflictCond,
+                    falseStateIsExceptional = true,
+                    blockOnFalseState = {
+                        methodResult = TvmMethodResult.TvmStructuralError(TvmUnexpectedRefReading)
+                    }
+                ) ?: return@calcOnStateCtx null
+            }
+        } ?: return
+    }
 
     // One cell on a concrete address might both have and not have TL-B scheme for different constraints.
     // This is why absence of TL-B stack is a separate situation on which we have to fork.
@@ -172,16 +196,20 @@ fun TvmStepScope.makeSliceRefLoad(
 
     doWithConditions(
         possibleTlbStacks.map { (stack, guard) ->
-            guard to { stack?.let { dataCellInfoStorage.sliceMapper.mapSliceToTlbStack(newSlice, it) } }
+            ActionOnCondition(
+                action = { stack?.let { dataCellInfoStorage.sliceMapper.mapSliceToTlbStack(newSlice, it) } },
+                condition = guard,
+                caseIsExceptional = false,
+            )
         },
         doForAllBlock = restActions
     )
 }
 
-fun TvmStepScope.makeCellToSlice(
+fun TvmStepScopeManager.makeCellToSlice(
     cellAddress: UHeapRef,
     sliceAddress: UConcreteHeapRef,
-    restActions: TvmStepScope.() -> Unit
+    restActions: TvmStepScopeManager.() -> Unit
 ) {
     // One cell on a concrete address might both have and not have TL-B scheme for different constraints.
     // This is why absence of TL-B stack is a separate situation on which we have to fork.
@@ -199,7 +227,11 @@ fun TvmStepScope.makeCellToSlice(
 
     doWithConditions(
         possibleLabels.map { (label, guard) ->
-            guard to { label?.let { dataCellInfoStorage.sliceMapper.allocateInitialSlice(ctx, sliceAddress, label) } }
+            ActionOnCondition(
+                action = { label?.let { dataCellInfoStorage.sliceMapper.allocateInitialSlice(ctx, sliceAddress, label) } },
+                condition = guard,
+                caseIsExceptional = false,
+            )
         },
         doForAllBlock = restActions
     )

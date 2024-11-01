@@ -25,7 +25,7 @@ import org.ton.bytecode.TvmRepeatContinuation
 import org.ton.bytecode.TvmUntilContinuation
 import org.ton.bytecode.TvmWhileContinuation
 import org.usvm.machine.TvmContext
-import org.usvm.machine.TvmStepScope
+import org.usvm.machine.TvmStepScopeManager
 import org.usvm.machine.state.C0Register
 import org.usvm.machine.state.C1Register
 import org.usvm.machine.state.TvmState
@@ -43,7 +43,7 @@ import org.usvm.machine.state.takeLastIntOrThrowTypeError
 class TvmLoopsInterpreter(private val ctx: TvmContext) {
     private var loopIdx = 0u
 
-    fun visitTvmContLoopsInst(scope: TvmStepScope, stmt: TvmContLoopsInst) {
+    fun visitTvmContLoopsInst(scope: TvmStepScopeManager, stmt: TvmContLoopsInst) {
         scope.consumeDefaultGas(stmt)
 
         when (stmt) {
@@ -78,6 +78,7 @@ class TvmLoopsInterpreter(private val ctx: TvmContext) {
             return cont
         }
 
+        val registers = registersOfCurrentContract
         val newCont = cont.defineC0(registers.c0.value).defineC1(registers.c1.value)
 
         registers.c1 = C1Register(newCont)
@@ -86,7 +87,7 @@ class TvmLoopsInterpreter(private val ctx: TvmContext) {
     }
 
     private fun visitRepeatInst(
-        scope: TvmStepScope,
+        scope: TvmStepScopeManager,
         stmt: TvmContLoopsInst,
         hasBreak: Boolean
     ) = doRepeat(
@@ -97,18 +98,18 @@ class TvmLoopsInterpreter(private val ctx: TvmContext) {
     )
 
     private fun visitRepeatEndInst(
-        scope: TvmStepScope,
+        scope: TvmStepScopeManager,
         stmt: TvmContLoopsInst,
         hasBreak: Boolean
     ) = doRepeat(
         scope = scope,
         extractBody = { extractCurrentContinuation(stmt) },
-        extractAfter = { registers.c0.value },
+        extractAfter = { registersOfCurrentContract.c0.value },
         hasBreak = hasBreak
     )
 
     private inline fun doRepeat(
-        scope: TvmStepScope,
+        scope: TvmStepScopeManager,
         crossinline extractBody: TvmState.() -> TvmContinuation,
         crossinline extractAfter: TvmState.() -> TvmContinuation,
         hasBreak: Boolean
@@ -120,6 +121,7 @@ class TvmLoopsInterpreter(private val ctx: TvmContext) {
 
         scope.fork(
             inRangeConstraint,
+            falseStateIsExceptional = true,
             blockOnFalseState = throwIntegerOutOfRangeError
         ) ?: return
 
@@ -130,7 +132,7 @@ class TvmLoopsInterpreter(private val ctx: TvmContext) {
     }
 
     private fun visitUntilInst(
-        scope: TvmStepScope,
+        scope: TvmStepScopeManager,
         stmt: TvmContLoopsInst,
         hasBreak: Boolean,
     ) = doUntil(
@@ -141,18 +143,18 @@ class TvmLoopsInterpreter(private val ctx: TvmContext) {
     )
 
     private fun visitUntilEndInst(
-        scope: TvmStepScope,
+        scope: TvmStepScopeManager,
         stmt: TvmContLoopsInst,
         hasBreak: Boolean,
     ) = doUntil(
         scope = scope,
         extractBody = { extractCurrentContinuation(stmt) },
-        extractAfter = { registers.c0.value },
+        extractAfter = { registersOfCurrentContract.c0.value },
         hasBreak = hasBreak
     )
 
     private inline fun doUntil(
-        scope: TvmStepScope,
+        scope: TvmStepScopeManager,
         crossinline extractBody: TvmState.() -> TvmContinuation,
         crossinline extractAfter: TvmState.() -> TvmContinuation,
         hasBreak: Boolean
@@ -163,6 +165,7 @@ class TvmLoopsInterpreter(private val ctx: TvmContext) {
         scope.doWithState {
             val after = scope.calcOnState { registerBreakpoint(extractAfter(), hasBreak) }
             val untilCont = TvmUntilContinuation(wrappedBody, after)
+            val registers = registersOfCurrentContract
             registers.c0 = C0Register(untilCont)
         }
 
@@ -170,7 +173,7 @@ class TvmLoopsInterpreter(private val ctx: TvmContext) {
     }
 
     private fun visitWhileInst(
-        scope: TvmStepScope,
+        scope: TvmStepScopeManager,
         stmt: TvmContLoopsInst,
         hasBreak: Boolean,
     ) = doWhile(
@@ -181,18 +184,18 @@ class TvmLoopsInterpreter(private val ctx: TvmContext) {
     )
 
     private fun visitWhileEndInst(
-        scope: TvmStepScope,
+        scope: TvmStepScopeManager,
         stmt: TvmContLoopsInst,
         hasBreak: Boolean,
     ) = doWhile(
         scope = scope,
         extractBody = { extractCurrentContinuation(stmt) },
-        extractAfter = { registers.c0.value },
+        extractAfter = { registersOfCurrentContract.c0.value },
         hasBreak = hasBreak
     )
 
     private inline fun doWhile(
-        scope: TvmStepScope,
+        scope: TvmStepScopeManager,
         crossinline extractBody: TvmState.() -> TvmContinuation,
         crossinline extractAfter: TvmState.() -> TvmContinuation,
         hasBreak: Boolean
@@ -204,6 +207,7 @@ class TvmLoopsInterpreter(private val ctx: TvmContext) {
         scope.doWithState {
             val after = scope.calcOnState { registerBreakpoint(extractAfter(), hasBreak) }
             val whileCond = TvmWhileContinuation(wrappedCond, body, after, isCondition = true)
+            val registers = registersOfCurrentContract
             registers.c0 = C0Register(whileCond)
         }
 
@@ -211,7 +215,7 @@ class TvmLoopsInterpreter(private val ctx: TvmContext) {
     }
 
     private fun visitAgainInst(
-        scope: TvmStepScope,
+        scope: TvmStepScopeManager,
         stmt: TvmContLoopsInst,
         hasBreak: Boolean,
     ) {
@@ -220,6 +224,7 @@ class TvmLoopsInterpreter(private val ctx: TvmContext) {
 
         if (hasBreak) {
             scope.doWithState {
+                val registers = registersOfCurrentContract
                 registers.c1 = C1Register(extractCurrentContinuation(stmt, saveC0 = true, saveC1 = true))
             }
         }
@@ -230,7 +235,7 @@ class TvmLoopsInterpreter(private val ctx: TvmContext) {
     }
 
     private fun visitAgainEndInst(
-        scope: TvmStepScope,
+        scope: TvmStepScopeManager,
         stmt: TvmContLoopsInst,
         hasBreak: Boolean,
     ) {
@@ -239,6 +244,7 @@ class TvmLoopsInterpreter(private val ctx: TvmContext) {
 
         if (hasBreak) {
             scope.doWithState {
+                val registers = registersOfCurrentContract
                 val newC0 = registers.c0.value.defineC1(registers.c1.value)
                 registers.c0 = C0Register(newC0)
                 registers.c1 = C1Register(registers.c0.value)

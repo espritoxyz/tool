@@ -5,6 +5,7 @@ import org.ton.TvmBuiltinDataCellLabel
 import org.ton.TvmCoinsLabel
 import org.ton.TvmInputInfo
 import org.ton.TvmIntegerLabel
+import org.ton.TvmInternalShortStdMsgAddrLabel
 import org.ton.TvmInternalStdMsgAddrLabel
 import org.ton.TvmMaybeRefLabel
 import org.ton.TvmMsgAddrLabel
@@ -81,6 +82,9 @@ fun TvmAtomicDataCellLabel.offset(
         is TvmInternalStdMsgAddrLabel -> {
             mkSizeExpr(internalStdMsgAddrSize)
         }
+        is TvmInternalShortStdMsgAddrLabel -> {
+            mkSizeExpr(internalShortStdMsgAddrSize)
+        }
         is TvmCoinsLabel -> {
             val prefix = state.loadIntFromCellWithoutChecks(
                 address,
@@ -95,13 +99,16 @@ fun TvmAtomicDataCellLabel.offset(
     }
 
 private const val internalStdMsgAddrSize = 8 + 256
+private const val internalShortStdMsgAddrSize = 256
 
 private val defaultInternalMsgAddr = "0".repeat(internalStdMsgAddrSize)
+private val defaultInternalShortMsgAddr = "0".repeat(internalShortStdMsgAddrSize)
 
 fun TvmAtomicDataCellLabel.defaultCellValueOfMinimalLength(): String =
     when (this) {
         is TvmIntegerLabel -> "0".repeat(bitSize)
         is TvmInternalStdMsgAddrLabel -> defaultInternalMsgAddr
+        is TvmInternalShortStdMsgAddrLabel -> defaultInternalShortMsgAddr
         is TvmCoinsLabel -> "0000"
     }
 
@@ -110,6 +117,7 @@ fun TvmAtomicDataCellLabel.maximumLength(): Int =
         is TvmIntegerLabel -> bitSize
         is TvmInternalStdMsgAddrLabel -> internalStdMsgAddrSize
         is TvmCoinsLabel -> 4 + TvmContext.MAX_GRAMS_BITS.toInt()
+        is TvmInternalShortStdMsgAddrLabel -> internalShortStdMsgAddrSize
     }
 
 data class InputParametersStructure(
