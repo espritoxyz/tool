@@ -332,7 +332,7 @@ class TvmInterpreter(
     private val gasInterpreter = TvmGasInterpreter(ctx)
     private val globalsInterpreter = TvmGlobalsInterpreter(ctx)
     private val transactionInterpreter = TvmTransactionInterpreter(ctx)
-    private val tsaCheckerFunctionsInterpreter = TsaCheckerFunctionsInterpreter(contractsCode)
+    private val tsaCheckerFunctionsInterpreter = TsaCheckerFunctionsInterpreter(contractsCode, transactionInterpreter)
 
     fun getInitialState(
         startContractId: ContractId,

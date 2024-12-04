@@ -1,0 +1,16 @@
+#include "../imports/stdlib.fc";
+
+
+() recv_internal(int msg_value, cell in_msg_cell, slice in_msg) impure {
+    int len1 = in_msg~load_uint(16);
+
+    throw_unless(1000, len1 == 0);
+    ;; skip x1 read
+
+    int len2 = in_msg~load_uint(16);
+    int x2 = in_msg~load_int(len2 * 10);
+
+    throw_unless(1001, x2 == 10);
+
+    in_msg.end_parse();
+}

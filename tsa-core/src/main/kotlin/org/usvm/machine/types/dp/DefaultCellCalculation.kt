@@ -1,11 +1,11 @@
 package org.usvm.machine.types.dp
 
-import org.ton.TvmAtomicDataCellLabel
-import org.ton.TvmCompositeDataCellLabel
-import org.ton.TvmDataCellStructure
+import org.ton.TlbAtomicLabel
+import org.ton.TlbCompositeLabel
+import org.ton.TlbStructure
 import org.ton.TvmParameterInfo
 import org.usvm.machine.TvmContext
-import org.usvm.machine.types.defaultCellValueOfMinimalLength
+import org.usvm.machine.types.defaultCellValue
 import org.usvm.test.resolver.TvmTestDataCellValue
 import org.usvm.test.resolver.TvmTestDictCellValue
 import org.usvm.test.resolver.TvmTestIntegerValue
@@ -16,7 +16,7 @@ private data class DPParamsForDefaultCellCalculation(
     val maxRefs: Int,
     val maxTlbDepth: Int,
     val maxCellDepth: Int,
-    val label: TvmCompositeDataCellLabel,
+    val label: TlbCompositeLabel,
 )
 
 fun getDefaultDict(keyLength: Int): TvmTestDictCellValue {  // dict mustn't be empty
@@ -29,12 +29,15 @@ fun getDefaultDict(keyLength: Int): TvmTestDictCellValue {  // dict mustn't be e
 }
 
 fun calculateDefaultCells(
-    labels: Collection<TvmCompositeDataCellLabel>,
-    individualMaxCellTlbDepth: Map<TvmCompositeDataCellLabel, Int>,
-): Map<TvmCompositeDataCellLabel, TvmTestDataCellValue> {
+    ctx: TvmContext,
+    labels: Collection<TlbCompositeLabel>,
+    individualMaxCellTlbDepth: Map<TlbCompositeLabel, Int>,
+): Map<TlbCompositeLabel, TvmTestDataCellValue> {
+    val generalMaxTlbDepth = ctx.tvmOptions.tlbOptions.maxTlbDepth
+    val maxCellDepthForDefault = ctx.tvmOptions.tlbOptions.maxCellDepthForDefaultCellsConsistentWithTlb
     val calculatedValues = hashMapOf<DPParamsForDefaultCellCalculation, TvmTestDataCellValue?>()
-    for (maxCellDepth in 0..MAX_CELL_DEPTH_FOR_DEFAULT) {
-        for (maxTlbDepth in 0..MAX_TLB_DEPTH) {
+    for (maxCellDepth in 0..maxCellDepthForDefault) {
+        for (maxTlbDepth in 0..generalMaxTlbDepth) {
             for (maxRefs in 0..TvmContext.MAX_REFS_NUMBER) {
                 for (label in labels) {
                     val tlbDepthBound = individualMaxCellTlbDepth[label]
@@ -43,10 +46,12 @@ fun calculateDefaultCells(
                     val result =
                         if (maxTlbDepth <= tlbDepthBound) {
                             getDefaultCell(
+                                ctx,
                                 label.internalStructure,
                                 maxRefs,
                                 maxTlbDepth,
                                 maxCellDepth,
+                                generalMaxTlbDepth,
                                 calculatedValues
                             )
                         } else {
@@ -62,12 +67,12 @@ fun calculateDefaultCells(
         }
     }
 
-    val result = hashMapOf<TvmCompositeDataCellLabel, TvmTestDataCellValue>()
+    val result = hashMapOf<TlbCompositeLabel, TvmTestDataCellValue>()
     labels.forEach { label ->
         val params = DPParamsForDefaultCellCalculation(
             maxRefs = TvmContext.MAX_REFS_NUMBER,
-            maxTlbDepth = MAX_TLB_DEPTH,
-            maxCellDepth = MAX_CELL_DEPTH_FOR_DEFAULT,
+            maxTlbDepth = generalMaxTlbDepth,
+            maxCellDepth = maxCellDepthForDefault,
             label = label
         )
         calculatedValues[params]?.let { result[label] = it }
@@ -77,18 +82,20 @@ fun calculateDefaultCells(
 }
 
 private fun getDefaultCell(
-    struct: TvmDataCellStructure,
+    ctx: TvmContext,
+    struct: TlbStructure,
     maxRefs: Int,
     maxTlbDepth: Int,
     maxCellDepth: Int,
+    generalMaxTlbDepth: Int,
     calculatedValues: Map<DPParamsForDefaultCellCalculation, TvmTestDataCellValue?>,
 ): TvmTestDataCellValue? {
     return when (struct) {
-        is TvmDataCellStructure.Unknown, is TvmDataCellStructure.Empty -> {
+        is TlbStructure.Unknown, is TlbStructure.Empty -> {
             TvmTestDataCellValue()
         }
 
-        is TvmDataCellStructure.LoadRef -> {
+        is TlbStructure.LoadRef -> {
             if (maxRefs == 0 || maxCellDepth == 0) {
                 return null
             }
@@ -102,14 +109,14 @@ private fun getDefaultCell(
                 }
                 is TvmParameterInfo.DataCellInfo -> {
                     when (struct.ref.dataCellStructure) {
-                        is TvmAtomicDataCellLabel -> {
-                            val content = struct.ref.dataCellStructure.defaultCellValueOfMinimalLength()
+                        is TlbAtomicLabel -> {
+                            val content = struct.ref.dataCellStructure.defaultCellValue(ctx)
                             TvmTestDataCellValue(data = content)
                         }
-                        is TvmCompositeDataCellLabel -> {
+                        is TlbCompositeLabel -> {
                             val params = DPParamsForDefaultCellCalculation(
                                 maxRefs = TvmContext.MAX_REFS_NUMBER,
-                                maxTlbDepth = MAX_TLB_DEPTH,
+                                maxTlbDepth = generalMaxTlbDepth,
                                 maxCellDepth = maxCellDepth - 1,
                                 label = struct.ref.dataCellStructure
                             )
@@ -124,7 +131,7 @@ private fun getDefaultCell(
                 }
             }
 
-            val furtherStruct = getDefaultCell(struct.selfRest, maxRefs - 1, maxTlbDepth, maxCellDepth, calculatedValues)
+            val furtherStruct = getDefaultCell(ctx, struct.rest, maxRefs - 1, maxTlbDepth, maxCellDepth, generalMaxTlbDepth, calculatedValues)
                 ?: return null
 
             TvmTestDataCellValue(
@@ -133,11 +140,11 @@ private fun getDefaultCell(
             )
         }
 
-        is TvmDataCellStructure.KnownTypePrefix -> {
-            when (struct.typeOfPrefix) {
-                is TvmAtomicDataCellLabel -> {
-                    val content = struct.typeOfPrefix.defaultCellValueOfMinimalLength()
-                    val further = getDefaultCell(struct.rest, maxRefs, maxTlbDepth, maxCellDepth, calculatedValues)
+        is TlbStructure.KnownTypePrefix -> {
+            when (struct.typeLabel) {
+                is TlbAtomicLabel -> {
+                    val content = struct.typeLabel.defaultCellValue(ctx)
+                    val further = getDefaultCell(ctx, struct.rest, maxRefs, maxTlbDepth, maxCellDepth, generalMaxTlbDepth, calculatedValues)
                         ?: return null
                     if (content.length + further.data.length > TvmContext.MAX_DATA_LENGTH) {
                         return null
@@ -148,7 +155,7 @@ private fun getDefaultCell(
                     )
                 }
 
-                is TvmCompositeDataCellLabel -> {
+                is TlbCompositeLabel -> {
 
                     if (maxTlbDepth == 0) {
                         return null
@@ -161,7 +168,7 @@ private fun getDefaultCell(
                             maxRefs = innerRefs,
                             maxTlbDepth = maxTlbDepth - 1,
                             maxCellDepth = maxCellDepth,
-                            label = struct.typeOfPrefix,
+                            label = struct.typeLabel,
                         )
 
                         if (params !in calculatedValues.keys) {
@@ -172,10 +179,12 @@ private fun getDefaultCell(
                             ?: continue
 
                         val further = getDefaultCell(
+                            ctx,
                             struct.rest,
                             maxRefs - innerRefs,
                             maxTlbDepth,
                             maxCellDepth,
+                            generalMaxTlbDepth,
                             calculatedValues,
                         )
                         if (further != null && (result == null || result.data.length > variant.data.length + further.data.length)) {
@@ -194,11 +203,11 @@ private fun getDefaultCell(
             }
         }
 
-        is TvmDataCellStructure.SwitchPrefix -> {
+        is TlbStructure.SwitchPrefix -> {
             var result: TvmTestDataCellValue? = null
 
             for ((key, variant) in struct.variants) {
-                val further = getDefaultCell(variant, maxRefs, maxTlbDepth, maxCellDepth, calculatedValues)
+                val further = getDefaultCell(ctx, variant, maxRefs, maxTlbDepth, maxCellDepth, generalMaxTlbDepth, calculatedValues)
 
                 if (further != null && (result == null || result.data.length > further.data.length + key.length)) {
                     result = TvmTestDataCellValue(

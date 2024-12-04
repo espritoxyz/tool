@@ -2,6 +2,7 @@ package org.usvm.machine.interpreter
 
 import org.ton.bytecode.TvmCellValue
 import org.usvm.UBoolExpr
+import org.usvm.UConcreteHeapRef
 import org.usvm.UHeapRef
 import org.usvm.machine.TvmContext
 import org.usvm.machine.TvmStepScopeManager
@@ -18,6 +19,7 @@ import org.usvm.machine.state.slicePreloadAddrLength
 import org.usvm.machine.state.slicePreloadDataBits
 import org.usvm.machine.state.slicePreloadExternalAddrLength
 import org.usvm.machine.state.slicePreloadInternalAddrLength
+import org.usvm.machine.state.slicePreloadInternalOrNoneAddrLength
 import org.usvm.machine.state.slicePreloadNextRef
 import org.usvm.mkSizeAddExpr
 import org.usvm.sizeSort
@@ -31,11 +33,13 @@ class TvmTransactionInterpreter(val ctx: TvmContext) {
             return@with null
         }
 
-        val actions = extractActions(scope, commitedActions) ?: return null
+        val actions = extractActions(scope, commitedActions)
+            ?: return null
         val outMessages = mutableListOf<OutMessage>()
 
         for (action in actions) {
-            val tag = scope.slicePreloadDataBits(action, 32) ?: return null
+            val tag = scope.slicePreloadDataBits(action, 32)
+                ?: return null
             scope.doWithState { sliceMoveDataPtr(action, 32) }
 
             val isSendMsgAction = scope.checkSat(tag eq sendMsgActionTag)
@@ -46,9 +50,11 @@ class TvmTransactionInterpreter(val ctx: TvmContext) {
             }
 
             when {
-                isReserveAction != null -> visitReserveAction(scope, action) ?: return null
+                isReserveAction != null -> visitReserveAction(scope, action)
+                    ?: return null
                 isSendMsgAction != null -> {
-                    val msg = visitSendMessageAction(scope, action) ?: return null
+                    val msg = visitSendMessageAction(scope, action)
+                        ?: return null
                     outMessages.add(msg)
                 }
                 else -> TODO()
@@ -66,13 +72,15 @@ class TvmTransactionInterpreter(val ctx: TvmContext) {
             val slice = scope.calcOnState { allocSliceFromCell(cur) }
             val remainingRefs = scope.calcOnState { getSliceRemainingRefsCount(slice) }
 
-            val isEnd = scope.checkCondition(remainingRefs eq zeroSizeExpr) ?: return null
+            val isEnd = scope.checkCondition(remainingRefs eq zeroSizeExpr)
+                ?: return null
             if (isEnd) {
                 // TODO check that `remainingBits` is also zero
                 break
             }
 
-            cur = scope.slicePreloadNextRef(slice) ?: return null
+            cur = scope.slicePreloadNextRef(slice)
+                ?: return null
             scope.doWithState { sliceMoveRefPtr(slice) }
             actionList.add(slice)
 
@@ -86,54 +94,119 @@ class TvmTransactionInterpreter(val ctx: TvmContext) {
     }
 
     private fun visitSendMessageAction(scope: TvmStepScopeManager, slice: UHeapRef): OutMessage? = with(ctx) {
-        val msg = scope.slicePreloadNextRef(slice) ?: return null
+        val msg = scope.slicePreloadNextRef(slice)
+            ?: return null
         val msgSlice = scope.calcOnState { allocSliceFromCell(msg) }
 
-        val dest = parseCommonMsgInfoRelaxed(scope, msgSlice) ?: return null
-        val hasStateInit = parseStateInit(scope, msgSlice) ?: return null
-        val body = parseBody(scope, msgSlice) ?: return null
+//        val dest = parseDest(scope, msgSlice)
+//            ?: return null
+        val (dest, mustRewriteSrcAddr) = parseCommonMsgInfoRelaxed(scope, msgSlice)
+            ?: return null
+        val hasStateInit = parseStateInit(scope, msgSlice)
+            ?: return null
+        val bodyCell = parseBody(scope, msgSlice)
+            ?: return null
+        val body = scope.calcOnState { allocSliceFromCell(bodyCell.value) }
 
-        OutMessage(dest, body, hasStateInit)
+        if (!mustRewriteSrcAddr) {
+            return OutMessage(msg, body)
+        }
+
+        // TODO rewrite addr_none to the real contract addr
+//        rewriteSrcAddr(scope, msgSlice)
+        OutMessage(msg, body)
     }
 
-    private fun parseCommonMsgInfoRelaxed(scope: TvmStepScopeManager, msgSlice: UHeapRef): TvmCellValue? = with(ctx) {
-        val tag = scope.slicePreloadDataBits(msgSlice, 1) ?: return null
+    private fun rewriteSrcAddr(scope: TvmStepScopeManager, msgSlice: UConcreteHeapRef) = with(ctx) {
+        // int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool
+//        val tagAndFlagBits = scope.slicePreloadDataBits(msgSlice, bits = 4)
+//        scope.doWithState { sliceMoveDataPtr(msgSlice, 4) }
+
+        // TODO support rewriting addr_none to the current contract address
+        msgSlice
+    }
+
+    private fun skipFlags(scope: TvmStepScopeManager, msgSlice: UHeapRef): UHeapRef {
+        // Skip msg_info tag and three following flags ihr_disabled:Bool bounce:Bool bounced:Bool
+        TODO()
+    }
+
+    private fun parseDest(scope: TvmStepScopeManager, msgSlice: UHeapRef): TvmCellValue? = with(ctx) {
+        // Skip msg flag
+        scope.doWithState { sliceMoveDataPtr(msgSlice, 6) }
+
+        // dest:MsgAddressInt
+        val destAddrLength = scope.slicePreloadInternalAddrLength(msgSlice)
+            ?: return null
+        val destAddr = scope.slicePreloadDataBits(msgSlice, destAddrLength)
+            ?: return null
+        scope.doWithState { sliceMoveDataPtr(msgSlice, destAddrLength) }
+
+        // value:CurrencyCollection
+        scope.skipGrams(msgSlice)
+            ?: return null
+
+        val cell = scope.allocCellFromData(destAddr, destAddrLength)
+        TvmCellValue(cell)
+    }
+
+    private fun parseCommonMsgInfoRelaxed(scope: TvmStepScopeManager, msgSlice: UHeapRef): AddressInfo? = with(ctx) {
+        val tag = scope.slicePreloadDataBits(msgSlice, 1)
+            ?: return null
 
         val isInternalCond = tag eq zeroBit
-        val isInternal = scope.checkCondition(isInternalCond) ?: return null
+        val isInternal = scope.checkCondition(isInternalCond)
+            ?: return null
 
-        val dest = if (isInternal) {
+        val (dest, mustRewriteScrAddr) = if (isInternal) {
             // int_msg_info$0 ihr_disabled:Bool bounce:Bool bounced:Bool
             scope.doWithState { sliceMoveDataPtr(msgSlice, 4) }
 
             // src:MsgAddress
-            val srcAddrLength = scope.slicePreloadAddrLength(msgSlice) ?: return null
+            // TODO comment why addr_none
+            val srcAddrLength = scope.slicePreloadInternalOrNoneAddrLength(msgSlice)
+                ?: return null
+            val isSrcAddrNone = scope.checkCondition(srcAddrLength eq twoSizeExpr)
+                ?: return null
+
+            // TODO Do we really need the src addr?
+//            val srcAddr = scope.slicePreloadDataBits(msgSlice, srcAddrLength)
+//                ?: return null
             scope.doWithState { sliceMoveDataPtr(msgSlice, srcAddrLength) }
 
             // dest:MsgAddressInt
-            val destAddrLength = scope.slicePreloadInternalAddrLength(msgSlice) ?: return null
-            val destAddr = scope.slicePreloadDataBits(msgSlice, destAddrLength) ?: return null
+            val destAddrLength = scope.slicePreloadInternalAddrLength(msgSlice)
+                ?: return null
+            val destAddr = scope.slicePreloadDataBits(msgSlice, destAddrLength)
+                ?: return null
             scope.doWithState { sliceMoveDataPtr(msgSlice, destAddrLength) }
 
             // value:CurrencyCollection
-            scope.skipGrams(msgSlice) ?: return null
-            val extraCurrenciesBit = scope.slicePreloadDataBits(msgSlice, 1) ?: return null
+            scope.skipGrams(msgSlice)
+                ?: return null
+            val extraCurrenciesBit = scope.slicePreloadDataBits(msgSlice, 1)
+                ?: return null
             scope.doWithState { sliceMoveDataPtr(msgSlice, 1) }
             val extraCurrenciesEmptyConstraint = extraCurrenciesBit eq zeroBit
-            val isExtraCurrenciesEmpty = scope.checkCondition(extraCurrenciesEmptyConstraint) ?: return null
+            val isExtraCurrenciesEmpty = scope.checkCondition(extraCurrenciesEmptyConstraint)
+                ?: return null
             if (!isExtraCurrenciesEmpty) {
-                scope.slicePreloadNextRef(msgSlice) ?: return null
+                scope.slicePreloadNextRef(msgSlice)
+                    ?: return null
                 scope.doWithState { sliceMoveRefPtr(msgSlice) }
             }
 
             // ihr_fee:Grams fwd_fee:Grams created_lt:uint64 created_at:uint32
-            scope.skipGrams(msgSlice) ?: return null
-            scope.skipGrams(msgSlice) ?: return null
+            scope.skipGrams(msgSlice)
+                ?: return null
+            scope.skipGrams(msgSlice)
+                ?: return null
             scope.doWithState { sliceMoveDataPtr(msgSlice, 64 + 32) }
 
-            scope.allocCellFromData(destAddr, destAddrLength) ?: return null
+            scope.allocCellFromData(destAddr, destAddrLength) to isSrcAddrNone
         } else {
-            val externalTag = scope.slicePreloadDataBits(msgSlice, 2) ?: return null
+            val externalTag = scope.slicePreloadDataBits(msgSlice, 2)
+                ?: return null
 
             scope.fork(
                 externalTag eq mkBv(value = 3, sizeBits = 2u),
@@ -146,47 +219,64 @@ class TvmTransactionInterpreter(val ctx: TvmContext) {
             scope.doWithState { sliceMoveDataPtr(msgSlice, 2) }
 
             // src:MsgAddress
-            val srcAddrLength = scope.slicePreloadAddrLength(msgSlice) ?: return null
+            val srcAddrLength = scope.slicePreloadAddrLength(msgSlice)
+                ?: return null
             scope.doWithState { sliceMoveDataPtr(msgSlice, srcAddrLength) }
 
             // dest:MsgAddressExt
-            val destAddrLength = scope.slicePreloadExternalAddrLength(msgSlice) ?: return null
-            val destAddr = scope.slicePreloadDataBits(msgSlice, destAddrLength) ?: return null
+            val destAddrLength = scope.slicePreloadExternalAddrLength(msgSlice)
+                ?: return null
+            val destAddr = scope.slicePreloadDataBits(msgSlice, destAddrLength)
+                ?: return null
             scope.doWithState { sliceMoveDataPtr(msgSlice, destAddrLength) }
 
             // created_lt:uint64 created_at:uint32
             scope.doWithState { sliceMoveDataPtr(msgSlice, 64 + 32) }
 
-            scope.allocCellFromData(destAddr, destAddrLength) ?: return null
+            scope.allocCellFromData(destAddr, destAddrLength) to false
         }
 
-        TvmCellValue(dest)
+        AddressInfo(
+            TvmCellValue(dest),
+            mustRewriteScrAddr,
+        )
     }
+
+    data class AddressInfo(
+        val destAddress: TvmCellValue,
+        val mustRewriteSrcAddr: Boolean
+    )
 
     private fun parseStateInit(scope: TvmStepScopeManager, msgSlice: UHeapRef): Boolean? = with(ctx) {
         // init:(Maybe (Either StateInit ^StateInit))
-        val initMaybeBit = scope.slicePreloadDataBits(msgSlice, 1) ?: return null
+        val initMaybeBit = scope.slicePreloadDataBits(msgSlice, 1)
+            ?: return null
         val noStateInitConstraint = initMaybeBit eq zeroBit
-        val noStateInit = scope.checkCondition(noStateInitConstraint) ?: return null
+        val noStateInit = scope.checkCondition(noStateInitConstraint)
+            ?: return null
         scope.doWithState { sliceMoveDataPtr(msgSlice, 1) }
 
         if (noStateInit) {
             return false
         }
 
-        val eitherBit = scope.slicePreloadDataBits(msgSlice, 1) ?: return null
+        val eitherBit = scope.slicePreloadDataBits(msgSlice, 1)
+            ?: return null
         val isEitherRightCond = eitherBit eq oneBit
-        val isEitherRight = scope.checkCondition(isEitherRightCond) ?: return null
+        val isEitherRight = scope.checkCondition(isEitherRightCond)
+            ?: return null
         scope.doWithState { sliceMoveDataPtr(msgSlice, 1) }
 
         if (isEitherRight) {
-            scope.slicePreloadNextRef(msgSlice) ?: return null
+            scope.slicePreloadNextRef(msgSlice)
+                ?: return null
             scope.doWithState { sliceMoveRefPtr(msgSlice) }
             return true
         }
 
         // split_depth:(Maybe (## 5))
-        val splitDepthMaybeBit = scope.slicePreloadDataBits(msgSlice, 1) ?: return null
+        val splitDepthMaybeBit = scope.slicePreloadDataBits(msgSlice, 1)
+            ?: return null
         val splitDepthLen = mkIte(
             splitDepthMaybeBit eq oneBit,
             sixSizeExpr,
@@ -195,7 +285,8 @@ class TvmTransactionInterpreter(val ctx: TvmContext) {
         scope.doWithState { sliceMoveDataPtr(msgSlice, splitDepthLen) }
 
         // special:(Maybe TickTock)
-        val specialMaybeBit = scope.slicePreloadDataBits(msgSlice, 1) ?: return null
+        val specialMaybeBit = scope.slicePreloadDataBits(msgSlice, 1)
+            ?: return null
         val specialLen = mkIte(
             specialMaybeBit eq oneBit,
             threeSizeExpr,
@@ -204,11 +295,14 @@ class TvmTransactionInterpreter(val ctx: TvmContext) {
         scope.doWithState { sliceMoveDataPtr(msgSlice, specialLen) }
 
         // code:(Maybe ^Cell) data:(Maybe ^Cell) library:(Maybe ^Cell)
-        val codeMaybeBit = scope.slicePreloadDataBits(msgSlice, 1) ?: return null
+        val codeMaybeBit = scope.slicePreloadDataBits(msgSlice, 1)
+            ?: return null
         scope.doWithState { sliceMoveDataPtr(msgSlice, 1) }
-        val dataMaybeBit = scope.slicePreloadDataBits(msgSlice, 1) ?: return null
+        val dataMaybeBit = scope.slicePreloadDataBits(msgSlice, 1)
+            ?: return null
         scope.doWithState { sliceMoveDataPtr(msgSlice, 1) }
-        val libMaybeBit = scope.slicePreloadDataBits(msgSlice, 1) ?: return null
+        val libMaybeBit = scope.slicePreloadDataBits(msgSlice, 1)
+            ?: return null
         scope.doWithState { sliceMoveDataPtr(msgSlice, 1) }
 
         val refsToSkip = mkSizeAddExpr(
@@ -226,16 +320,20 @@ class TvmTransactionInterpreter(val ctx: TvmContext) {
 
     private fun parseBody(scope: TvmStepScopeManager, msgSlice: UHeapRef): TvmCellValue? = with(ctx) {
         //  body:(Either X ^X)
-        val bodyEitherBit = scope.slicePreloadDataBits(msgSlice, 1) ?: return null
-        val isBodyLeft = scope.checkCondition(bodyEitherBit eq zeroBit) ?: return null
+        val bodyEitherBit = scope.slicePreloadDataBits(msgSlice, 1)
+            ?: return null
+        val isBodyLeft = scope.checkCondition(bodyEitherBit eq zeroBit)
+            ?: return null
         scope.doWithState { sliceMoveDataPtr(msgSlice, 1) }
 
         val body = if (isBodyLeft) {
             val bodyBuilder = scope.calcOnState { allocEmptyCell() }
-            scope.builderStoreSlice(bodyBuilder, msgSlice) ?: return null
+            scope.builderStoreSlice(bodyBuilder, msgSlice)
+                ?: return null
             bodyBuilder
         } else {
-            scope.slicePreloadNextRef(msgSlice) ?: return null
+            scope.slicePreloadNextRef(msgSlice)
+                ?: return null
         }
 
         TvmCellValue(body)
@@ -277,7 +375,6 @@ class TvmTransactionInterpreter(val ctx: TvmContext) {
 }
 
 data class OutMessage(
-    val addr: TvmCellValue,
-    val body: TvmCellValue,
-    val hasStateInit: Boolean,
+    val inMsgFull: UHeapRef,
+    val inMsgBody: UHeapRef,
 )

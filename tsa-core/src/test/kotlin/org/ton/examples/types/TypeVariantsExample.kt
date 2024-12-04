@@ -3,9 +3,9 @@ package org.ton.examples.types
 import org.ton.Endian
 import org.ton.examples.funcCompileAndAnalyzeAllMethods
 import org.ton.examples.propertiesFound
-import org.usvm.test.resolver.TvmCellDataBitArray
-import org.usvm.test.resolver.TvmCellDataMaybeConstructorBit
-import org.usvm.test.resolver.TvmCellDataInteger
+import org.usvm.test.resolver.TvmTestCellDataBitArrayRead
+import org.usvm.test.resolver.TvmTestCellDataMaybeConstructorBitRead
+import org.usvm.test.resolver.TvmTestCellDataIntegerRead
 import org.usvm.test.resolver.TvmCellDataTypeLoad
 import org.usvm.test.resolver.TvmSymbolicTest
 import org.usvm.test.resolver.TvmTestSliceValue
@@ -27,38 +27,38 @@ class TypeVariantsExample {
 
         val expectedTypeSet1 = { bitArraySize: Int ->
             listOf(
-                TvmCellDataTypeLoad(TvmCellDataInteger(8, true, Endian.BigEndian), 0),
-                TvmCellDataTypeLoad(TvmCellDataBitArray(bitArraySize), 8)
+                TvmCellDataTypeLoad(TvmTestCellDataIntegerRead(8, true, Endian.BigEndian), 0),
+                TvmCellDataTypeLoad(TvmTestCellDataBitArrayRead(bitArraySize), 8)
             )
         }
 
         val expectedTypeSet2 = { intSize: Int ->
             listOf(
-                TvmCellDataTypeLoad(TvmCellDataInteger(8, true, Endian.BigEndian), 0),
-                TvmCellDataTypeLoad(TvmCellDataInteger(intSize, true, Endian.BigEndian), 8)
+                TvmCellDataTypeLoad(TvmTestCellDataIntegerRead(8, true, Endian.BigEndian), 0),
+                TvmCellDataTypeLoad(TvmTestCellDataIntegerRead(intSize, true, Endian.BigEndian), 8)
             )
         }
 
         propertiesFound(
             testSuite,
             listOf(
-                generatePredicate1(listOf(TvmCellDataTypeLoad(TvmCellDataInteger(8, true, Endian.BigEndian), 0))),
+                generatePredicate1(listOf(TvmCellDataTypeLoad(TvmTestCellDataIntegerRead(8, true, Endian.BigEndian), 0))),
                 generatePredicate1(
                     listOf(
-                        TvmCellDataTypeLoad(TvmCellDataInteger(8, true, Endian.BigEndian), 0),
-                        TvmCellDataTypeLoad(TvmCellDataInteger(10, true, Endian.BigEndian), 8)
+                        TvmCellDataTypeLoad(TvmTestCellDataIntegerRead(8, true, Endian.BigEndian), 0),
+                        TvmCellDataTypeLoad(TvmTestCellDataIntegerRead(10, true, Endian.BigEndian), 8)
                     )
                 ),
                 generatePredicate1(
                     listOf(
-                        TvmCellDataTypeLoad(TvmCellDataInteger(8, true, Endian.BigEndian), 0),
-                        TvmCellDataTypeLoad(TvmCellDataMaybeConstructorBit, 8)
+                        TvmCellDataTypeLoad(TvmTestCellDataIntegerRead(8, true, Endian.BigEndian), 0),
+                        TvmCellDataTypeLoad(TvmTestCellDataMaybeConstructorBitRead, 8)
                     )
                 ),
                 generatePredicate1(
                     listOf(
-                        TvmCellDataTypeLoad(TvmCellDataInteger(8, true, Endian.BigEndian), 0),
-                        TvmCellDataTypeLoad(TvmCellDataBitArray(100), 8)
+                        TvmCellDataTypeLoad(TvmTestCellDataIntegerRead(8, true, Endian.BigEndian), 0),
+                        TvmCellDataTypeLoad(TvmTestCellDataBitArrayRead(100), 8)
                     )
                 ),
                 generatePredicate(

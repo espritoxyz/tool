@@ -1,19 +1,19 @@
 package org.usvm.machine.types
 
-import org.ton.TvmDataCellStructure
+import org.ton.TlbStructure
 
-fun <Acc> TvmDataCellStructure.fold(
+fun <Acc> TlbStructure.fold(
     init: Acc,
-    f: (Acc, TvmDataCellStructure) -> Acc
+    f: (Acc, TlbStructure) -> Acc
 ): Acc {
     val cur = f(init, this)
     return when (this) {
-        is TvmDataCellStructure.KnownTypePrefix -> rest.fold(cur, f)
-        is TvmDataCellStructure.LoadRef -> selfRest.fold(cur, f)
-        is TvmDataCellStructure.SwitchPrefix -> variants.values.fold(cur) { acc, struct -> struct.fold(acc, f) }
-        is TvmDataCellStructure.Unknown, is TvmDataCellStructure.Empty -> cur
+        is TlbStructure.KnownTypePrefix -> rest.fold(cur, f)
+        is TlbStructure.LoadRef -> rest.fold(cur, f)
+        is TlbStructure.SwitchPrefix -> variants.values.fold(cur) { acc, struct -> struct.fold(acc, f) }
+        is TlbStructure.Unknown, is TlbStructure.Empty -> cur
     }
 }
 
-fun TvmDataCellStructure.forEach(f: (TvmDataCellStructure) -> Unit) =
+fun TlbStructure.forEach(f: (TlbStructure) -> Unit) =
     fold(Unit) { _, struct -> f(struct) }

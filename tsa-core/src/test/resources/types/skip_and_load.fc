@@ -1,0 +1,8 @@
+#include "../imports/stdlib.fc";
+
+
+() recv_internal(slice in_msg) impure {
+    in_msg~skip_bits(10);
+    int coins = in_msg~load_coins();
+    coins~impure_touch();
+}

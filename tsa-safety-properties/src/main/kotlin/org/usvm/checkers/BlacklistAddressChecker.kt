@@ -8,9 +8,9 @@ import org.usvm.FIFT_STDLIB_PATH
 import org.usvm.FUNC_STDLIB_PATH
 import org.usvm.getFuncContract
 import org.usvm.resolveResourcePath
-import org.usvm.test.resolver.TvmCellDataMsgAddr
 import org.usvm.test.resolver.TvmMethodFailure
 import org.usvm.test.resolver.TvmSymbolicTest
+import org.usvm.test.resolver.TvmTestCellDataMsgAddrRead
 import org.usvm.test.resolver.TvmTestDataCellValue
 import org.usvm.test.resolver.TvmTestSliceValue
 import java.nio.file.Path
@@ -54,7 +54,7 @@ data class BlacklistAddressChecker(private val resourcesDir: Path?) : TvmChecker
             }
             val msgBody = extractMsgBody(test)
                 ?: return@mapNotNullTo null
-            val firstAddressTypeLoad = msgBody.knownTypes.firstOrNull { it.type is TvmCellDataMsgAddr }
+            val firstAddressTypeLoad = msgBody.knownTypes.firstOrNull { it.type is TvmTestCellDataMsgAddrRead }
                 ?: return@mapNotNullTo null
             val firstAddress = msgBody.data.substring(
                 firstAddressTypeLoad.offset,

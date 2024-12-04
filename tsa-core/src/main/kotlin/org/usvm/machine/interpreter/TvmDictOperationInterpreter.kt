@@ -178,7 +178,7 @@ import org.usvm.machine.types.TvmDictCellType
 import org.usvm.machine.types.TvmIntegerType
 import org.usvm.machine.types.TvmNullType
 import org.usvm.machine.types.TvmSliceType
-import org.usvm.machine.types.TvmSymbolicCellMaybeConstructorBit
+import org.usvm.machine.types.TvmCellMaybeConstructorBitRead
 import org.usvm.machine.types.makeSliceTypeLoad
 import org.usvm.utils.intValueOrNull
 
@@ -360,7 +360,7 @@ class TvmDictOperationInterpreter(
         }
 
         val updatedSlice = scope.calcOnState { memory.allocConcrete(TvmSliceType) }
-        scope.makeSliceTypeLoad(slice, TvmSymbolicCellMaybeConstructorBit(ctx), updatedSlice) {
+        scope.makeSliceTypeLoad(slice, TvmCellMaybeConstructorBitRead(ctx), updatedSlice) {
 
             // hide the original [scope] from this closure
             @Suppress("NAME_SHADOWING", "UNUSED_VARIABLE")

@@ -1,17 +1,24 @@
 package org.usvm.machine.types
 
+import io.ksmt.expr.KBitVecValue
+import io.ksmt.expr.KInterpretedValue
 import org.ton.Endian
-import org.ton.TvmDataCellLabel
+import org.ton.TlbCoinsLabel
+import org.ton.TlbIntegerLabelOfConcreteSize
+import org.ton.TlbIntegerLabelOfSymbolicSize
+import org.ton.TlbLabel
 import org.ton.TvmParameterInfo
 import org.usvm.UBoolExpr
 import org.usvm.UConcreteHeapRef
 import org.usvm.UExpr
 import org.usvm.UHeapRef
 import org.usvm.api.readField
+import org.usvm.isAllocated
 import org.usvm.machine.TvmContext
 import org.usvm.machine.TvmSizeSort
 import org.usvm.machine.TvmStepScopeManager
 import org.usvm.machine.TvmStepScopeManager.ActionOnCondition
+import org.usvm.machine.intValue
 import org.usvm.machine.state.TvmMethodResult
 import org.usvm.machine.state.TvmState
 import org.usvm.machine.state.calcOnStateCtx
@@ -21,25 +28,25 @@ import org.usvm.sizeSort
 import org.usvm.utils.extractAddresses
 
 
-sealed class TvmSymbolicCellDataType(open val sizeBits: UExpr<TvmSizeSort>)
+sealed class TvmCellDataTypeRead(open val sizeBits: UExpr<TvmSizeSort>)
 
-data class TvmSymbolicCellDataInteger(
+data class TvmCellDataIntegerRead(
     override val sizeBits: UExpr<TvmSizeSort>,
     val isSigned: Boolean,
     val endian: Endian
-) : TvmSymbolicCellDataType(sizeBits)
+) : TvmCellDataTypeRead(sizeBits)
 
-data class TvmSymbolicCellMaybeConstructorBit(val ctx: TvmContext) : TvmSymbolicCellDataType(ctx.oneSizeExpr)
+data class TvmCellMaybeConstructorBitRead(val ctx: TvmContext) : TvmCellDataTypeRead(ctx.oneSizeExpr)
 
 // TODO: support other types of MsgAddr (now only stdMsgAddr is supported)
-data class TvmSymbolicCellDataMsgAddr(val ctx: TvmContext) : TvmSymbolicCellDataType(ctx.stdMsgAddrSizeExpr)
+data class TvmCellDataMsgAddrRead(val ctx: TvmContext) : TvmCellDataTypeRead(ctx.stdMsgAddrSizeExpr)
 
-data class TvmSymbolicCellDataBitArray(override val sizeBits: UExpr<TvmSizeSort>) : TvmSymbolicCellDataType(sizeBits)
+data class TvmCellDataBitArrayRead(override val sizeBits: UExpr<TvmSizeSort>) : TvmCellDataTypeRead(sizeBits)
 
-data class TvmSymbolicCellDataCoins(
+data class TvmCellDataCoinsRead(
     val ctx: TvmContext,
     val coinsPrefix: UExpr<TvmSizeSort>  // 4-bit unsigned integer in front of coins amount
-) : TvmSymbolicCellDataType(ctx.calculateExtendedCoinsLength(coinsPrefix))
+) : TvmCellDataTypeRead(ctx.calculateExtendedCoinsLength(coinsPrefix))
 
 private fun TvmContext.calculateExtendedCoinsLength(coinsPrefix: UExpr<TvmSizeSort>): UExpr<TvmSizeSort> {
     val extendedLength = mkBvShiftLeftExpr(coinsPrefix, shift = threeSizeExpr)
@@ -56,11 +63,12 @@ private data object NoTlbStack : MakeSliceTypeLoadOutcome
 
 fun TvmStepScopeManager.makeSliceTypeLoad(
     oldSlice: UHeapRef,
-    type: TvmSymbolicCellDataType,
+    type: TvmCellDataTypeRead,
     newSlice: UConcreteHeapRef,
     restActions: TvmStepScopeManager.() -> Unit,
 ) {
     val turnOnTLBParsingChecks = doWithCtx { tvmOptions.turnOnTLBParsingChecks }
+    val performTlbChecksOnAllocatedCells = doWithCtx { tvmOptions.tlbOptions.performTlbChecksOnAllocatedCells }
 
     val outcomes = hashMapOf<MakeSliceTypeLoadOutcome, UBoolExpr>()
 
@@ -70,11 +78,11 @@ fun TvmStepScopeManager.makeSliceTypeLoad(
         val loadList = dataCellLoadedTypeInfo.loadData(cellAddress, offset, type, oldSlice)
         loadList.forEach { load ->
             val tlbStack = dataCellInfoStorage.sliceMapper.getTlbStack(load.sliceAddress)
-            tlbStack?.step(this, load)?.forEach { (guard, stepResult) ->
+            tlbStack?.step(this, LimitedLoadData.fromLoadData(load))?.forEach { (guard, stepResult) ->
                 when (stepResult) {
                     is TlbStack.Error -> {
                         val outcome =
-                            if (turnOnTLBParsingChecks) {
+                            if (turnOnTLBParsingChecks && (!load.cellAddress.isAllocated || performTlbChecksOnAllocatedCells)) {
                                 Error(stepResult.error)
                             } else {
                                 NoTlbStack
@@ -143,7 +151,11 @@ fun TvmStepScopeManager.assertEndOfCell(
         val refNumber = memory.readField(slice, TvmContext.sliceRefPosField, sizeSort)
         val actions = dataCellLoadedTypeInfo.makeEndOfCell(cellAddress, offset, refNumber)
         actions.forEach {
-            val noConflictCond = dataCellInfoStorage.getNoUnexpectedEndOfReadingCondition(this, it)
+            val noConflictCond = if (it.cellAddress.isAllocated) {
+                trueExpr
+            } else {
+                dataCellInfoStorage.getNoUnexpectedEndOfReadingCondition(this, it)
+            }
             fork(
                 noConflictCond,
                 falseStateIsExceptional = true,
@@ -168,7 +180,11 @@ fun TvmStepScopeManager.makeSliceRefLoad(
                 mkSizeAddExpr(memory.readField(oldSlice, TvmContext.sliceRefPosField, sizeSort), oneSizeExpr)
             val loadList = dataCellLoadedTypeInfo.loadRef(cellAddress, refNumber)
             loadList.forEach { load ->
-                val noConflictCond = dataCellInfoStorage.getNoUnexpectedLoadRefCondition(this, load)
+                val noConflictCond = if (load.cellAddress.isAllocated) {
+                    trueExpr
+                } else {
+                    dataCellInfoStorage.getNoUnexpectedLoadRefCondition(this, load)
+                }
                 fork(
                     noConflictCond,
                     falseStateIsExceptional = true,
@@ -214,7 +230,7 @@ fun TvmStepScopeManager.makeCellToSlice(
     // One cell on a concrete address might both have and not have TL-B scheme for different constraints.
     // This is why absence of TL-B stack is a separate situation on which we have to fork.
     // This is why type of the key is [TlbStack?]
-    val possibleLabels = mutableMapOf<TvmDataCellLabel?, UBoolExpr>()
+    val possibleLabels = mutableMapOf<TlbLabel?, UBoolExpr>()
 
     calcOnStateCtx {
         val infoVariants = dataCellInfoStorage.getLabelForFreshSlice(cellAddress)
@@ -235,4 +251,58 @@ fun TvmStepScopeManager.makeCellToSlice(
         },
         doForAllBlock = restActions
     )
+}
+
+private fun TvmState.addTlbLabelToBuilder(
+    oldBuilder: UConcreteHeapRef,
+    newBuilder: UConcreteHeapRef,
+    label: TlbLabel,
+) {
+    val oldTlbBuilder = dataCellInfoStorage.mapper.getTlbBuilder(oldBuilder)
+        ?: return
+    val newTlbBuilder = oldTlbBuilder.addTlbLabel(label)
+    dataCellInfoStorage.mapper.addTlbBuilder(newBuilder, newTlbBuilder)
+}
+
+private fun TvmState.addTlbConstantToBuilder(
+    oldBuilder: UConcreteHeapRef,
+    newBuilder: UConcreteHeapRef,
+    constant: String,
+) {
+    val oldTlbBuilder = dataCellInfoStorage.mapper.getTlbBuilder(oldBuilder)
+        ?: return
+    val newTlbBuilder = oldTlbBuilder.addConstant(constant)
+    dataCellInfoStorage.mapper.addTlbBuilder(newBuilder, newTlbBuilder)
+}
+
+fun TvmState.loadIntLabelToBuilder(
+    oldBuilder: UConcreteHeapRef,
+    newBuilder: UConcreteHeapRef,
+    sizeBits: UExpr<TvmSizeSort>,
+    value: UExpr<TvmContext.TvmInt257Sort>,
+    isSigned: Boolean,
+    endian: Endian,
+) {
+
+    // special case for storing constants
+    if (value is KBitVecValue && sizeBits is KInterpretedValue) {
+        val constValue = (value as KBitVecValue<*>).stringValue.takeLast(sizeBits.intValue())
+        addTlbConstantToBuilder(oldBuilder, newBuilder, constValue)
+        return
+    }
+
+    val label = if (sizeBits is KInterpretedValue) {
+        TlbIntegerLabelOfConcreteSize(sizeBits.intValue(), isSigned = isSigned, endian = endian)
+    } else {
+        TlbIntegerLabelOfSymbolicSize(isSigned, endian, arity = 0) { _, _ -> sizeBits }
+    }
+
+    addTlbLabelToBuilder(oldBuilder, newBuilder, label)
+}
+
+fun TvmState.loadCoinLabelToBuilder(
+    oldBuilder: UConcreteHeapRef,
+    newBuilder: UConcreteHeapRef,
+) {
+    addTlbLabelToBuilder(oldBuilder, newBuilder, TlbCoinsLabel)
 }

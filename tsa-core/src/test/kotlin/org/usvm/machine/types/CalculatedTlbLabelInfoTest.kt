@@ -4,6 +4,8 @@ import io.ksmt.expr.KInterpretedValue
 import org.ton.TvmInputInfo
 import org.ton.TvmParameterInfo
 import org.ton.cell.Cell
+import org.ton.examples.types.customVarInteger
+import org.ton.examples.types.doubleCustomVarInteger
 import org.ton.examples.types.intSwitchStructure
 import org.ton.examples.types.longDataStructure
 import org.ton.examples.types.maybeStructure
@@ -26,7 +28,6 @@ import org.usvm.machine.intValue
 import org.usvm.machine.interpreter.TvmInterpreter
 import org.usvm.machine.state.generateSymbolicCell
 import org.usvm.machine.types.dp.CalculatedTlbLabelInfo
-import org.usvm.machine.types.dp.MAX_TLB_DEPTH
 import java.math.BigInteger
 import kotlin.io.path.Path
 import kotlin.test.Test
@@ -66,15 +67,19 @@ class CalculatedTlbLabelInfoTest {
             refAfterRecursiveStructure,
             longDataStructure,
             wrappedMsgStructure,
+            customVarInteger,
+            doubleCustomVarInteger,
         )
     )
+    
+    private val maxTlbDepth = ctx.tvmOptions.tlbOptions.maxTlbDepth
 
     @Test
     fun testMaybeStructureValues() {
         assertTrue(info.labelHasUnknownLeaves(maybeStructure) == false)
         assertEquals(0, info.minimalLabelDepth(maybeStructure))
         assertEquals(1, info.maxRefSize(maybeStructure))
-        assertEquals(MAX_TLB_DEPTH, info.getIndividualTlbDepthBound(maybeStructure))
+        assertEquals(maxTlbDepth, info.getIndividualTlbDepthBound(maybeStructure))
 
         val address = dummyState.generateSymbolicCell()
 
@@ -98,7 +103,7 @@ class CalculatedTlbLabelInfoTest {
         assertTrue(info.labelHasUnknownLeaves(intSwitchStructure) == false)
         assertEquals(0, info.minimalLabelDepth(intSwitchStructure))
         assertEquals(0, info.maxRefSize(intSwitchStructure))
-        assertEquals(MAX_TLB_DEPTH, info.getIndividualTlbDepthBound(intSwitchStructure))
+        assertEquals(maxTlbDepth, info.getIndividualTlbDepthBound(intSwitchStructure))
 
         val address = dummyState.generateSymbolicCell()
 
@@ -110,7 +115,7 @@ class CalculatedTlbLabelInfoTest {
         val child = info.getLabelChildStructure(dummyState, address, intSwitchStructure,  childIdx = 0)!!
         assertEquals(0, child.size)
 
-        val switchConstraint = info.getSwitchConstraints(dummyState, address, intSwitchStructure)
+        val switchConstraint = info.getDataConstraints(dummyState, address, intSwitchStructure)
         assertTrue(switchConstraint !is KInterpretedValue)
 
         val cell = info.getDefaultCell(intSwitchStructure)
@@ -119,7 +124,7 @@ class CalculatedTlbLabelInfoTest {
 
     @Test
     fun testHasUnknownLeaves() {
-        assertEquals(MAX_TLB_DEPTH, info.getIndividualTlbDepthBound(prefixInt64Structure))
+        assertEquals(maxTlbDepth, info.getIndividualTlbDepthBound(prefixInt64Structure))
         assertTrue(info.labelHasUnknownLeaves(prefixInt64Structure) == true)
         assertEquals(TvmContext.MAX_REFS_NUMBER, info.maxRefSize(prefixInt64Structure))
         val address = dummyState.generateSymbolicCell()
@@ -128,7 +133,7 @@ class CalculatedTlbLabelInfoTest {
             info.getDataCellSize(dummyState, address, prefixInt64Structure)
         )
         // no switch constraints here
-        assertEquals(ctx.trueExpr, info.getSwitchConstraints(dummyState, address, prefixInt64Structure))
+        assertEquals(ctx.trueExpr, info.getDataConstraints(dummyState, address, prefixInt64Structure))
 
         val cell = info.getDefaultCell(prefixInt64Structure)
         assertTrue(cell != null && cell.data.length == 64 && cell.refs.isEmpty())
@@ -139,15 +144,12 @@ class CalculatedTlbLabelInfoTest {
         assertTrue(info.labelHasUnknownLeaves(structureX) == false)
         assertEquals(0, info.minimalLabelDepth(structureX))
         assertEquals(0, info.maxRefSize(structureX))
-        assertEquals(MAX_TLB_DEPTH, info.getIndividualTlbDepthBound(structureX))
+        assertEquals(maxTlbDepth, info.getIndividualTlbDepthBound(structureX))
 
         val cell = info.getDefaultCell(structureX)
         assertTrue(cell != null && cell.data.length == 16 && cell.refs.isEmpty())
 
         val address = dummyState.generateSymbolicCell()
-
-        // no switch constraints here
-        assertEquals(ctx.trueExpr, info.getSwitchConstraints(dummyState, address, structureX))
 
         val size = info.getDataCellSize(dummyState, address, structureX)
         assertEquals(16, size?.intValue())
@@ -161,15 +163,12 @@ class CalculatedTlbLabelInfoTest {
         assertTrue(info.labelHasUnknownLeaves(structureY) == false)
         assertEquals(1, info.minimalLabelDepth(structureY))
         assertEquals(0, info.maxRefSize(structureY))
-        assertEquals(MAX_TLB_DEPTH, info.getIndividualTlbDepthBound(structureY))
+        assertEquals(maxTlbDepth, info.getIndividualTlbDepthBound(structureY))
 
         val cell = info.getDefaultCell(structureY)
         assertTrue(cell != null && cell.data.length == 16 * 3 && cell.refs.isEmpty())
 
         val address = dummyState.generateSymbolicCell()
-
-        // no switch constraints here
-        assertEquals(ctx.trueExpr, info.getSwitchConstraints(dummyState, address, structureY))
 
         val size = info.getDataCellSize(dummyState, address, structureY)
         assertEquals(16 * 3, size?.intValue())
@@ -183,7 +182,7 @@ class CalculatedTlbLabelInfoTest {
         assertTrue(info.labelHasUnknownLeaves(recursiveStructure) == false)
         assertEquals(0, info.minimalLabelDepth(recursiveStructure))
         assertEquals(0, info.maxRefSize(recursiveStructure))
-        assertEquals(MAX_TLB_DEPTH, info.getIndividualTlbDepthBound(recursiveStructure))
+        assertEquals(maxTlbDepth, info.getIndividualTlbDepthBound(recursiveStructure))
 
         val cell = info.getDefaultCell(recursiveStructure)
         assertTrue(cell != null && cell.data == "1" && cell.refs.isEmpty())
@@ -294,7 +293,35 @@ class CalculatedTlbLabelInfoTest {
     fun testWrappedMsg() {
         val address = dummyState.generateSymbolicCell()
 
-        val switchConstraints = info.getSwitchConstraints(dummyState, address, wrappedMsgStructure)
+        val switchConstraints = info.getDataConstraints(dummyState, address, wrappedMsgStructure)
         assertTrue(switchConstraints !is KInterpretedValue)
+    }
+
+    @Test
+    fun testCustomVarInteger() {
+        assertEquals(false, info.labelHasUnknownLeaves(customVarInteger))
+        assertEquals(0, info.minimalLabelDepth(customVarInteger))
+        assertEquals(0, info.maxRefSize(customVarInteger))
+
+        val address = dummyState.generateSymbolicCell()
+        val size = info.getDataCellSize(dummyState, address, customVarInteger)
+        assertTrue(size !is KInterpretedValue)
+
+        val dataConstraint = info.getDataConstraints(dummyState, address, customVarInteger)
+        assertTrue(dataConstraint !is KInterpretedValue)
+    }
+
+    @Test
+    fun testDoubleCustomVarInteger() {
+        assertEquals(false, info.labelHasUnknownLeaves(doubleCustomVarInteger))
+        assertEquals(1, info.minimalLabelDepth(doubleCustomVarInteger))
+        assertEquals(0, info.maxRefSize(doubleCustomVarInteger))
+
+        val address = dummyState.generateSymbolicCell()
+        val size = info.getDataCellSize(dummyState, address, doubleCustomVarInteger)
+        assertTrue(size !is KInterpretedValue)
+
+        val dataConstraint = info.getDataConstraints(dummyState, address, doubleCustomVarInteger)
+        assertTrue(dataConstraint !is KInterpretedValue)
     }
 }

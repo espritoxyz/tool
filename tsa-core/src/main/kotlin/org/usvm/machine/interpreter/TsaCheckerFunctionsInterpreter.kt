@@ -2,22 +2,29 @@ package org.usvm.machine.interpreter
 
 import org.ton.bytecode.TvmContractCode
 import org.ton.bytecode.TvmInst
+import org.usvm.api.makeSymbolicPrimitive
 import org.usvm.machine.TvmStepScopeManager
 import org.usvm.machine.state.TvmContractExecutionMemory
 import org.usvm.machine.state.TvmContractPosition
 import org.usvm.machine.state.TvmRegisters
 import org.usvm.machine.state.TvmStack.TvmStackTupleValueConcreteNew
+import org.usvm.machine.state.addOnStack
 import org.usvm.machine.state.doWithCtx
+import org.usvm.machine.state.doWithStateCtx
 import org.usvm.machine.state.initializeContractExecutionMemory
 import org.usvm.machine.state.newStmt
 import org.usvm.machine.state.nextStmt
 import org.usvm.machine.state.takeLastIntOrNull
 import org.usvm.machine.state.takeLastIntOrThrowTypeError
 import org.usvm.machine.toMethodId
+import org.usvm.machine.types.TvmCellType
+import org.usvm.machine.types.TvmIntegerType
+import org.usvm.machine.types.TvmSliceType
 import org.usvm.utils.intValueOrNull
 
 class TsaCheckerFunctionsInterpreter(
     private val contractsCode: List<TvmContractCode>,
+    private val transactionInterpreter: TvmTransactionInterpreter,
 ) {
     /**
      * return null if operation was executed.
@@ -47,6 +54,9 @@ class TsaCheckerFunctionsInterpreter(
             }
             ASSERT_NOT_METHOD_ID -> {
                 performTsaAssert(scope, stmt, invert = true)
+            }
+            PROCESS_ACTIONS_ID -> {
+                processActions(scope, stmt)
             }
             else -> {
                 return Unit
@@ -120,6 +130,42 @@ class TsaCheckerFunctionsInterpreter(
             ?: return
         scope.doWithState {
             newStmt(stmt.nextStmt())
+        }
+    }
+
+
+    private fun processActions(scope: TvmStepScopeManager, stmt: TvmInst) {
+        scope.doWithState {
+            val contractIdSymbolic = takeLastIntOrNull()
+            val contractId = contractIdSymbolic?.intValueOrNull
+                ?: error("Contract id must be concrete for processing output actions, but found $contractIdSymbolic")
+            val outMessages = transactionInterpreter.executeActions(scope, contractId)
+                ?: return@doWithState
+            addMessagesOnTheStack(scope, outMessages)
+            newStmt(stmt.nextStmt())
+        }
+    }
+
+    private fun addMessagesOnTheStack(scope: TvmStepScopeManager, outMessages: List<OutMessage>) {
+        if (outMessages.size > 1) {
+            // TODO support multiple messages
+            return
+        }
+
+        val message = outMessages.singleOrNull()
+            ?: return
+        scope.doWithStateCtx {
+            // TODO write about org.usvm.machine.state.TvmStackUtilsKt.initializeIncomingMsgValue
+            val myBalanceParameter = makeSymbolicPrimitive(int257sort)
+            val msgValueParameter = makeSymbolicPrimitive(int257sort)
+
+            val inMsgFullParameter = message.inMsgFull
+            val inMsgBodyParameter = message.inMsgBody
+
+            addOnStack(myBalanceParameter, TvmIntegerType)
+            addOnStack(msgValueParameter, TvmIntegerType)
+            addOnStack(inMsgFullParameter, TvmCellType)
+            addOnStack(inMsgBodyParameter, TvmSliceType)
         }
     }
 }

@@ -1,5 +1,6 @@
 package org.usvm.test.resolver
 
+import org.ton.TlbResolvedBuiltinLabel
 import org.ton.bytecode.TvmInst
 import org.ton.bytecode.TvmMethod
 import org.usvm.machine.MethodId
@@ -105,5 +106,5 @@ data class TvmSuccessfulExecution(
 data class TvmExecutionWithStructuralError(
     val lastStmt: TvmInst,
     override val stack: List<TvmTestValue>,
-    val exit: TvmStructuralExit<TvmCellDataType>,
+    val exit: TvmStructuralExit<TvmTestCellDataTypeRead, TlbResolvedBuiltinLabel>,
 ) : TvmMethodSymbolicResult

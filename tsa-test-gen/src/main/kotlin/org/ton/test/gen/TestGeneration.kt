@@ -1,9 +1,22 @@
 package org.ton.test.gen
 
 import java.math.BigInteger
-import java.nio.file.Files.createDirectories
 import java.nio.file.Path
 import java.util.Locale
+import org.ton.test.gen.dsl.TsContext
+import org.ton.test.gen.dsl.models.TsBlockchain
+import org.ton.test.gen.dsl.models.TsCell
+import org.ton.test.gen.dsl.models.blockchainCreate
+import org.ton.test.gen.dsl.models.compileContract
+import org.ton.test.gen.dsl.models.openContract
+import org.ton.test.gen.dsl.models.parseAddress
+import org.ton.test.gen.dsl.models.toTsValue
+import org.ton.test.gen.dsl.render.TsRenderer
+import org.ton.test.gen.dsl.testFile
+import org.ton.test.gen.dsl.wrapper.basic.TsBasicWrapperDescriptor
+import org.ton.test.gen.dsl.wrapper.basic.constructor
+import org.ton.test.gen.dsl.wrapper.basic.initializeContract
+import org.ton.test.gen.dsl.wrapper.basic.internal
 import org.usvm.machine.TvmContext
 import org.usvm.machine.TvmContext.Companion.ADDRESS_TAG_LENGTH
 import org.usvm.machine.TvmContext.Companion.STD_ADDRESS_TAG
@@ -13,11 +26,8 @@ import org.usvm.test.resolver.TvmMethodFailure
 import org.usvm.test.resolver.TvmSymbolicTest
 import org.usvm.test.resolver.TvmTerminalMethodSymbolicResult
 import org.usvm.test.resolver.TvmTestDataCellValue
-import org.usvm.test.resolver.TvmTestDictCellValue
 import org.usvm.test.resolver.TvmTestIntegerValue
-import org.usvm.test.resolver.TvmTestNullValue
 import org.usvm.test.resolver.TvmTestSliceValue
-import org.usvm.test.resolver.TvmTestValue
 import kotlin.io.path.nameWithoutExtension
 
 fun generateTests(
@@ -30,75 +40,146 @@ fun generateTests(
         .filter { it.result is TvmMethodFailure }
 
     val name = extractContractName(sourceRelativePath)
-    val wrapper = renderWrapperFile(name)
-    val tests = renderTestFile(name, sourceRelativePath.toString(), entryTests)
 
-    val wrapperFolder = projectPath.resolve(wrappersDirName)
-    val testsFolder = projectPath.resolve(testsDirName)
-    val wrapperFile = wrapperFolder.resolve("$name.ts").toFile()
-    val testsFile = testsFolder.resolve("$name.spec.ts").toFile()
+    val ctx = TsContext()
+    val test = ctx.recvInternalTests(name, entryTests, sourceRelativePath.toString())
+    val renderedTests = TsRenderer(ctx).renderTests(test)
 
-    createDirectories(wrapperFolder)
-    createDirectories(testsFolder)
-
-    wrapperFile.writeText(wrapper)
-    testsFile.writeText(tests)
+    writeRenderedTest(projectPath, renderedTests)
 }
 
-private fun renderArgValue(arg: TvmTestValue): String =
-    when (arg) {
-        is TvmTestNullValue -> "null()"
-        is TvmTestIntegerValue -> arg.value.toString()
-        is TvmTestSliceValue -> "${renderArgValue(truncateSliceCell(arg))}.beginParse()"
-        is TvmTestDictCellValue -> {
-            val dictInit = "Dictionary.empty(Dictionary.Keys.BigInt(${arg.keyLength}), sliceValue)"
-            val dictStores = arg.entries.map { entry ->
-                ".set(${renderArgValue(entry.key)}n, ${renderArgValue(entry.value)})"
-            }
+private fun TsContext.recvInternalTests(
+    name: String,
+    tests: List<TvmSymbolicTest>,
+    sourcePath: String
+) = testFile(name) {
+    val wrapperDescriptor = TsBasicWrapperDescriptor(name)
+    registerWrapper(wrapperDescriptor)
 
-            "${dictInit}${dictStores.joinToString(separator = "")}"
+    describe("tsa-tests") {
+        val code = newVar("code", TsCell)
+        val blockchain = newVar("blockchain", TsBlockchain)
+
+        emptyLine()
+
+        beforeAll {
+            code assign compileContract(sourcePath)
         }
-        is TvmTestDataCellValue -> {
-            // TODO use loads
 
-            val storeBits = { bitsToStore: String ->
-                val bitsLength = bitsToStore.length
-                val formattedBits = bitsToStore.takeIf { it.any { char -> char != '0' } } ?: "0"
-                val bitsValue = "BigInt(\"0b$formattedBits\")"
+        emptyLine()
 
-                ".storeUint($bitsValue, $bitsLength)".takeIf { bitsLength > 0 } ?: ""
-            }
+        beforeEach {
+            blockchain assign blockchainCreate()
+        }
 
-            val storesBuilder = StringBuilder()
-            var bitsLeft = arg.data
+        emptyLine()
 
-            arg.refs
-                .map { it to renderArgValue(it) }
-                .forEach { (ref, refValue) ->
-                    when (ref) {
-                        is TvmTestDataCellValue -> storesBuilder.append(".storeRef($refValue)")
-                        is TvmTestDictCellValue -> {
-                            val justConstructorIdx = bitsLeft.indexOfFirst { it == '1' }
+        tests.forEachIndexed { idx, test ->
+            val input = resolveReceiveInternalInput(test)
 
-                            check(justConstructorIdx != -1) {
-                                "Cell contains more dict refs than non-zero bits"
-                            }
+            // TODO more specific names
+            it("test-$idx") {
+                val data = newVar("data", test.initialData.toTsValue())
+                val contractAddr = newVar("contractAddr", parseAddress(input.address))
+                val contractBalance = newVar("contractBalance", input.balance.toTsValue())
 
-                            val bitsToStore = bitsLeft.take(justConstructorIdx)
-                            bitsLeft = bitsLeft.drop(justConstructorIdx + 1)
+                emptyLine()
 
-                            storesBuilder.append(storeBits(bitsToStore))
-                            storesBuilder.append(".storeDict($refValue)")
-                        }
-                    }
+                val contract = newVar(
+                    "contract",
+                    blockchain.openContract(wrapperDescriptor.constructor(contractAddr, code, data))
+                )
+                +contract.initializeContract(blockchain, contractBalance)
+
+                emptyLine()
+
+                val srcAddr = newVar("srcAddr", parseAddress(input.srcAddress))
+                val msgBody = newVar("msgBody", input.msgBody.toTsValue())
+                val msgCurrency = newVar("msgCurrency", input.msgCurrency.toTsValue())
+                val bounce = newVar("bounce", input.bounce.toTsValue())
+                val bounced = newVar("bounced", input.bounced.toTsValue())
+
+                emptyLine()
+
+                val sendMessageResult = newVar(
+                    "sendMessageResult",
+                    contract.internal(blockchain, srcAddr, msgBody, msgCurrency, bounce, bounced)
+                )
+                sendMessageResult.expectToHaveTransaction {
+                    from = srcAddr
+                    to = contractAddr
+                    exitCode = input.exitCode.toTsValue()
                 }
-
-            storesBuilder.append(storeBits(bitsLeft))
-
-            "beginCell()$storesBuilder.endCell()"
+            }
         }
-        else -> TODO("Not yet implemented: $arg")
     }
+}
+
+private fun resolveReceiveInternalInput(test: TvmSymbolicTest): TvmReceiveInternalInput {
+    // assume that recv_internal args have specified order:
+    // recv_internal(int balance, int msg_value, cell full_msg, slice msg_body)
+    val args = test.usedParameters.reversed()
+    val msgBody = args.getOrNull(0)
+        ?: TvmTestSliceValue()
+    val fullMsg = args.getOrNull(1)
+        ?: TvmTestDataCellValue()
+    val defaultCurrency = TvmTestIntegerValue(BigInteger.valueOf(TvmContext.MIN_MESSAGE_CURRENCY))
+    val msgCurrency = args.getOrNull(2)
+        ?: defaultCurrency
+    val balance = args.getOrNull(3)
+        ?: defaultCurrency
+
+    require(msgBody is TvmTestSliceValue) {
+        "Unexpected recv_internal arg at index 0: $msgBody"
+    }
+    require(fullMsg is TvmTestDataCellValue) {
+        "Unexpected recv_internal arg at index 1: $fullMsg"
+    }
+    require(msgCurrency is TvmTestIntegerValue) {
+        "Unexpected recv_internal arg at index 2: $msgCurrency"
+    }
+    require(balance is TvmTestIntegerValue) {
+        "Unexpected recv_internal arg at index 3: $balance"
+    }
+
+    val msgBits = fullMsg.data
+    val contractAddress = extractAddress(test.contractAddress.data)
+        ?: error("Unexpected incorrect contract address")
+    val srcAddress = extractAddress(msgBits.drop(4))
+        ?: ("0:" + "0".repeat(64))
+
+    val bounce = msgBits.getOrNull(2) == '1'
+    val bounced = msgBits.getOrNull(3) == '1'
+
+    val result = test.result
+    require(result is TvmTerminalMethodSymbolicResult) {
+        "Unexpected test result: $result"
+    }
+
+    return TvmReceiveInternalInput(
+        truncateSliceCell(msgBody),
+        fullMsg,
+        msgCurrency,
+        balance,
+        contractAddress,
+        srcAddress,
+        bounce,
+        bounced,
+        result.exitCode.toInt()
+    )
+}
+
+private data class TvmReceiveInternalInput(
+    val msgBody: TvmTestDataCellValue,
+    val fullMsg: TvmTestDataCellValue,
+    val msgCurrency: TvmTestIntegerValue,
+    val balance: TvmTestIntegerValue,
+    val address: String,
+    val srcAddress: String,
+    val bounce: Boolean,
+    val bounced: Boolean,
+    val exitCode: Int,
+)
 
 private fun extractContractName(sourceRelativePath: Path): String {
     val fileName = sourceRelativePath.fileName.nameWithoutExtension
@@ -133,191 +214,4 @@ private fun extractAddress(bits: String): String? {
     val paddedAddr = addr.padStart(TvmContext.ADDRESS_BITS / 4, '0')
 
     return "$workchain:$paddedAddr"
-}
-
-private fun renderTestBodies(name: String, tests: List<TvmSymbolicTest>, ident: String): String {
-    val testBodies = tests.map { test ->
-        val result = test.result
-        require(result is TvmTerminalMethodSymbolicResult) {
-            "Unexpected test result: $result"
-        }
-
-        val sliceArgs = test.usedParameters.filterIsInstance<TvmTestSliceValue>()
-        val cellArgs = test.usedParameters.filterIsInstance<TvmTestDataCellValue>()
-        require(sliceArgs.size <= 1 && cellArgs.size <= 1) {
-            "Unexpected number of slice & cell arguments: ${sliceArgs.size} ${cellArgs.size}"
-        }
-
-        val messageCell = cellArgs.singleOrNull() ?: TvmTestDataCellValue()
-        val messageBody = sliceArgs.singleOrNull()?.let { truncateSliceCell(it) } ?: TvmTestDataCellValue()
-        val defaultCurrency = TvmTestIntegerValue(BigInteger.valueOf(TvmContext.MIN_MESSAGE_CURRENCY))
-        val contractCurrency = test.usedParameters.firstOrNull { it is TvmTestIntegerValue }
-            ?: defaultCurrency
-        val messageCurrency = test.usedParameters.lastOrNull { it is TvmTestIntegerValue }
-            ?: defaultCurrency
-
-        val msgBits = messageCell.data
-
-        val contractAddress = extractAddress(test.contractAddress.data)
-            ?: error("Unexpected incorrect contract address")
-        val srcAddress = extractAddress(msgBits.drop(4))
-            ?: ("0:" + "0".repeat(64))
-
-        val bounceValue = if (msgBits.getOrNull(2) == '1') "true" else "false"
-        val bouncedValue = if (msgBits.getOrNull(3) == '1') "true" else "false"
-
-        val contractAddressValue = "Address.parseRaw(\"$contractAddress\")"
-        val srcAddressValue = "Address.parseRaw(\"$srcAddress\")"
-        val persistentDataValue = renderArgValue(test.initialData)
-        val msgBodyValue = renderArgValue(messageBody)
-        val contractCurrencyValue = renderArgValue(contractCurrency)
-        val msgCurrencyValue = renderArgValue(messageCurrency)
-
-        """
-            $ident        const data = $persistentDataValue
-            $ident        const contractAddress = $contractAddressValue
-            $ident        const contractBalance = ${contractCurrencyValue}n
-            $ident
-            $ident        const contract = blockchain.openContract(new $name(contractAddress, { code, data }))
-            $ident        await contract.initializeContract(blockchain, contractBalance)
-            $ident
-            $ident        const from = $srcAddressValue
-            $ident        const msgBody = $msgBodyValue
-            $ident        const msgCurrency = ${msgCurrencyValue}n
-            $ident        const bounce = $bounceValue
-            $ident        const bounced = $bouncedValue
-            $ident  
-            $ident        const sentMessageResult = await contract.internal(
-            $ident            blockchain,
-            $ident            from,
-            $ident            msgBody,
-            $ident            msgCurrency,
-            $ident            bounce,
-            $ident            bounced
-            $ident        )
-            $ident        expect(sentMessageResult.transactions).toHaveTransaction({
-            $ident            from: from,
-            $ident            to: contractAddress,
-            $ident            exitCode: ${result.exitCode},
-            $ident        })
-        """.trimIndent()
-
-    }
-
-    val renderedTestBodies = testBodies.mapIndexed { idx, body ->
-        """
-        $ident    it('test-$idx', async () => {
-                      $body
-        $ident    })
-        """.trimIndent()
-    }.joinToString(separator = "\n$ident\n")
-
-    return renderedTestBodies
-}
-
-private fun renderWrapperFile(name: String): String = """
-    import {Address, Cell, Contract, ContractProvider, TupleItem} from '@ton/core'
-    import {Blockchain, createShardAccount, internal} from "@ton/sandbox"
-
-    export class $name implements Contract {
-        constructor(readonly address: Address, readonly init: { code: Cell; data: Cell }) {}
-
-        async internal(
-            blockchain: Blockchain,
-            sender: Address,
-            body: Cell,
-            value: bigint,
-            bounce: boolean,
-            bounced: boolean
-        ) {
-            return await blockchain.sendMessage(internal({
-                from: sender,
-                to: this.address,
-                body: body,
-                value: value ,
-                bounce: bounce,
-                bounced: bounced,
-            }))
-        }
-
-        async initializeContract(blockchain: Blockchain, balance: bigint) {
-            const contr = await blockchain.getContract(this.address);
-            contr.account = createShardAccount({
-                address: this.address,
-                code: this.init.code,
-                data: this.init.data,
-                balance: balance,
-                workchain: 0
-            })
-        }
-
-        async get(provider: ContractProvider, name: string, args: TupleItem[]) {
-            return await provider.get(name, args)
-        }
-    }
-""".trimIndent()
-
-
-private fun renderTestFile(
-    name: String,
-    sourcePath: String,
-    tests: List<TvmSymbolicTest>,
-): String {
-    val imports = """
-        import {Blockchain} from '@ton/sandbox'
-        import {Address, beginCell, Builder, Cell, Dictionary, DictionaryValue, Slice} from '@ton/core'
-        import '@ton/test-utils'
-        import {compileFunc} from "@ton-community/func-js"
-        import * as fs from "node:fs"
-        import {$name} from "../$wrappersDirName/$name"
-        
-    """.trimIndent()
-
-    val compileFunction = """
-        
-        async function compileContract(): Promise<Cell> {
-            let compileResult = await compileFunc({
-                targets: ['$sourcePath'],
-                sources: (x) => fs.readFileSync(x).toString("utf8"),
-            })
-
-            if (compileResult.status === "error") {
-                console.error("Compilation Error!")
-                console.error(`\n${'$'}{compileResult.message}`)
-                process.exit(1)
-            }
-
-            return Cell.fromBoc(Buffer.from(compileResult.codeBoc, "base64"))[0]
-        }
-        
-    """.trimIndent()
-
-    val testCode = """
-        |
-        |const sliceValue: DictionaryValue<Slice> = {
-        |    serialize: (src: Slice, builder: Builder) => {
-        |        builder.storeSlice(src)
-        |    },
-        |    parse: (src: Slice) => {
-        |        return src.clone();
-        |    }
-        |}
-        |
-        |describe('TvmTest', () => {
-        |    let code: Cell
-        |    let blockchain: Blockchain
-        |
-        |    beforeAll(async () => {
-        |        code = await compileContract()
-        |    })
-        |
-        |    beforeEach(async () => {
-        |        blockchain = await Blockchain.create()
-        |    })
-        |
-            ${renderTestBodies(name, tests, "|")}
-        |})
-    """.trimMargin()
-
-    return imports + compileFunction + testCode
 }

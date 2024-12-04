@@ -11,6 +11,7 @@ import org.usvm.machine.types.TvmCellType
 import org.usvm.machine.types.TvmRealType
 import org.usvm.machine.types.TvmContinuationType
 import org.ton.bytecode.TvmContinuation
+import org.usvm.UConcreteHeapRef
 import org.usvm.machine.types.TvmIntegerType
 import org.usvm.machine.types.TvmNullType
 import org.usvm.machine.types.TvmSliceType
@@ -185,7 +186,7 @@ class TvmStack(
         val tupleValue: TvmStackTupleValue get() = error("Cannot extract tuple from stack value $this")
         val cellValue: UHeapRef? get() = error("Cannot extract cell from stack value $this")
         val sliceValue: UHeapRef? get() = error("Cannot extract slice from stack value $this")
-        val builderValue: UHeapRef? get() = error("Cannot extract builder from stack value $this")
+        val builderValue: UConcreteHeapRef? get() = error("Cannot extract builder from stack value $this")
         val isNull: Boolean get() = false
     }
     data class TvmStackContinuationValue(override val continuationValue: TvmContinuation) : TvmStackValue
@@ -262,10 +263,10 @@ class TvmStack(
 
         override val cellValue: UHeapRef? = null
         override val sliceValue: UHeapRef? get() = null
-        override val builderValue: UHeapRef? get() = null
+        override val builderValue: UConcreteHeapRef? get() = null
     }
     data class TvmStackSliceValue(override val sliceValue: UHeapRef): TvmStackValue
-    data class TvmStackBuilderValue(override val builderValue: UHeapRef): TvmStackValue
+    data class TvmStackBuilderValue(override val builderValue: UConcreteHeapRef): TvmStackValue
 ///...
 
     sealed interface TvmStackEntry {
@@ -312,7 +313,7 @@ class TvmStack(
     @Suppress("UNCHECKED_CAST")
     fun UExpr<*>.toStackValue(expectedType: TvmRealType): TvmStackValue = when (expectedType) {
         is TvmIntegerType -> TvmStackIntValue(this as UExpr<TvmInt257Sort>)
-        TvmBuilderType -> TvmStackBuilderValue(this as UHeapRef)
+        TvmBuilderType -> TvmStackBuilderValue(this as UConcreteHeapRef)
         TvmCellType -> TvmStackCellValue(this as UHeapRef)
         TvmContinuationType -> TODO("Unexpected $this for constructing stack value of $TvmContinuationType")
         TvmNullType -> TvmStackNullValue

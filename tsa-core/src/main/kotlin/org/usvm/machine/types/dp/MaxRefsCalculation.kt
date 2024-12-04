@@ -1,15 +1,16 @@
 package org.usvm.machine.types.dp
 
-import org.ton.TvmCompositeDataCellLabel
-import org.ton.TvmDataCellStructure
+import org.ton.TlbCompositeLabel
+import org.ton.TlbStructure
 import org.usvm.machine.TvmContext
 import kotlin.math.min
 
 fun calculateMaximumRefs(
-    compositeLabels: Collection<TvmCompositeDataCellLabel>,
-    individualMaxCellTlbDepth: Map<TvmCompositeDataCellLabel, Int>,
-): List<Map<TvmCompositeDataCellLabel, Int>> =
-    calculateMapsByTlbDepth(compositeLabels) { label, curDepth, prevDepthValues ->
+    maxTlbDepth: Int,
+    compositeLabels: Collection<TlbCompositeLabel>,
+    individualMaxCellTlbDepth: Map<TlbCompositeLabel, Int>,
+): List<Map<TlbCompositeLabel, Int>> =
+    calculateMapsByTlbDepth(maxTlbDepth, compositeLabels) { label, curDepth, prevDepthValues ->
         val tlbDepthBound = individualMaxCellTlbDepth[label]
             ?: error("individualMaxCellTlbDepth must be calculated for all labels")
 
@@ -24,25 +25,25 @@ fun calculateMaximumRefs(
  * If returns null, construction of the given depth is impossible.
  * */
 private fun getMaximumRefs(
-    struct: TvmDataCellStructure,
-    maxRefsFromPreviousDepth: Map<TvmCompositeDataCellLabel, Int>,
+    struct: TlbStructure,
+    maxRefsFromPreviousDepth: Map<TlbCompositeLabel, Int>,
 ): Int? {
     val cur: Int = when (struct) {
-        is TvmDataCellStructure.Unknown -> {
+        is TlbStructure.Unknown -> {
             TvmContext.MAX_REFS_NUMBER
         }
-        is TvmDataCellStructure.Empty -> {
+        is TlbStructure.Empty -> {
             0
         }
-        is TvmDataCellStructure.SwitchPrefix -> {
+        is TlbStructure.SwitchPrefix -> {
             struct.variants.values.maxOf { getMaximumRefs(it, maxRefsFromPreviousDepth) ?: -1 }
         }
-        is TvmDataCellStructure.LoadRef -> {
-            1 + (getMaximumRefs(struct.selfRest, maxRefsFromPreviousDepth) ?: return null)
+        is TlbStructure.LoadRef -> {
+            1 + (getMaximumRefs(struct.rest, maxRefsFromPreviousDepth) ?: return null)
         }
-        is TvmDataCellStructure.KnownTypePrefix -> {
-            val add = if (struct.typeOfPrefix is TvmCompositeDataCellLabel) {
-                maxRefsFromPreviousDepth[struct.typeOfPrefix]
+        is TlbStructure.KnownTypePrefix -> {
+            val add = if (struct.typeLabel is TlbCompositeLabel) {
+                maxRefsFromPreviousDepth[struct.typeLabel]
                     ?: return null
             } else {
                 0

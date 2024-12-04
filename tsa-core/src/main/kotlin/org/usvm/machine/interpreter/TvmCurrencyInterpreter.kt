@@ -20,6 +20,7 @@ import org.usvm.machine.state.sliceLoadGrams
 import org.usvm.machine.state.takeLastBuilder
 import org.usvm.machine.state.takeLastIntOrThrowTypeError
 import org.usvm.machine.state.takeLastSlice
+import org.usvm.machine.types.loadCoinLabelToBuilder
 
 class TvmCurrencyInterpreter(
     private val ctx: TvmContext,
@@ -61,6 +62,10 @@ class TvmCurrencyInterpreter(
 
         val updatedBuilder = scope.calcOnState {
             memory.allocConcrete(TvmBuilderType).also { builderCopy(builder, it) }
+        }
+
+        scope.doWithState {
+            loadCoinLabelToBuilder(builder, updatedBuilder)
         }
         scope.builderStoreGrams(updatedBuilder, grams) ?: return@with
 

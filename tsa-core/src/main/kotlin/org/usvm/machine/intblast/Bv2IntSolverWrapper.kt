@@ -108,13 +108,26 @@ class Bv2IntSolverWrapper<C1 : KSolverConfiguration, C2 : KSolverConfiguration>(
         currentScope--
         assertions.clear()
         trackedAssertions.clear()
-        isRewriteSolver = true
+    }
+
+    private inline fun wrappedCheck(check: () -> KSolverStatus): KSolverStatus {
+        if (!isRewriteSolver) {
+            return check()
+        }
+
+        val bv2intRes = check()
+        if (bv2intRes != KSolverStatus.UNKNOWN) {
+            return bv2intRes
+        }
+
+        reassertExprs()
+        return check()
     }
 
     override fun check(timeout: Duration): KSolverStatus {
         require(currentScope == 1)
 
-        return currentSolver.check(timeout)
+        return wrappedCheck { currentSolver.check(timeout) }
     }
 
     override fun checkWithAssumptions(assumptions: List<KExpr<KBoolSort>>, timeout: Duration): KSolverStatus {
@@ -124,7 +137,7 @@ class Bv2IntSolverWrapper<C1 : KSolverConfiguration, C2 : KSolverConfiguration>(
             reassertExprs()
         }
 
-        return currentSolver.checkWithAssumptions(assumptions, timeout)
+        return wrappedCheck { currentSolver.checkWithAssumptions(assumptions, timeout) }
     }
 
     override fun model(): KModel = currentSolver.model()

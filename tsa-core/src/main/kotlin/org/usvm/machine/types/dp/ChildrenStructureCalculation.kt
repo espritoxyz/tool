@@ -1,17 +1,17 @@
 package org.usvm.machine.types.dp
 
-import org.ton.TvmCompositeDataCellLabel
-import org.ton.TvmDataCellStructure
+import org.ton.TlbCompositeLabel
+import org.ton.TlbStructure
 import org.usvm.machine.TvmContext
 import org.usvm.mkSizeExpr
 
 fun calculateChildrenStructures(
     ctx: TvmContext,
-    labelsWithoutUnknowns: Collection<TvmCompositeDataCellLabel>,
-    dataLengths: List<Map<TvmCompositeDataCellLabel, AbstractSizeExpr>>,
-    individualMaxCellTlbDepth: Map<TvmCompositeDataCellLabel, Int>,
-): List<Map<TvmCompositeDataCellLabel, ChildrenStructure>> =
-    calculateMapsByTlbDepth(labelsWithoutUnknowns) { label, curDepth, prevDepthValues ->
+    labelsWithoutUnknowns: Collection<TlbCompositeLabel>,
+    dataLengths: List<Map<TlbCompositeLabel, AbstractSizeExpr>>,
+    individualMaxCellTlbDepth: Map<TlbCompositeLabel, Int>,
+): List<Map<TlbCompositeLabel, ChildrenStructure>> =
+    calculateMapsByTlbDepth(ctx.tvmOptions.tlbOptions.maxTlbDepth, labelsWithoutUnknowns) { label, curDepth, prevDepthValues ->
         val tlbDepthBound = individualMaxCellTlbDepth[label]
             ?: error("individualMaxCellTlbDepth must be calculated for all labels")
 
@@ -25,22 +25,22 @@ fun calculateChildrenStructures(
 
 private fun getChildrenStructure(
     ctx: TvmContext,
-    struct: TvmDataCellStructure,
-    structuresFromPreviousDepth: Map<TvmCompositeDataCellLabel, ChildrenStructure>,
-    dataLengthsFromPreviousDepth: Map<TvmCompositeDataCellLabel, AbstractSizeExpr>,
+    struct: TlbStructure,
+    structuresFromPreviousDepth: Map<TlbCompositeLabel, ChildrenStructure>,
+    dataLengthsFromPreviousDepth: Map<TlbCompositeLabel, AbstractSizeExpr>,
 ): ChildrenStructure? = with(ctx) {
     when (struct) {
-        is TvmDataCellStructure.Unknown -> {
+        is TlbStructure.Unknown -> {
             error("Cannot calculate ChildrenStructure for Unknown leaf")
         }
 
-        is TvmDataCellStructure.Empty -> {
+        is TlbStructure.Empty -> {
             ChildrenStructure.empty(ctx)
         }
 
-        is TvmDataCellStructure.LoadRef -> {
+        is TlbStructure.LoadRef -> {
             // no need for data shift
-            val furtherChildren = getChildrenStructure(ctx, struct.selfRest, structuresFromPreviousDepth, dataLengthsFromPreviousDepth)
+            val furtherChildren = getChildrenStructure(ctx, struct.rest, structuresFromPreviousDepth, dataLengthsFromPreviousDepth)
                 ?: return null  // cannot construct with given depth
 
             val exceededGuard = furtherChildren.children.last().exists()
@@ -52,8 +52,8 @@ private fun getChildrenStructure(
             ChildrenStructure(newChildren, exceededGuard)
         }
 
-        is TvmDataCellStructure.KnownTypePrefix -> {
-            val offset = getKnownTypePrefixDataOffset(struct, dataLengthsFromPreviousDepth)
+        is TlbStructure.KnownTypePrefix -> {
+            val offset = getKnownTypePrefixDataLength(struct, dataLengthsFromPreviousDepth)
                 ?: return null  // cannot construct with given depth
 
             val furtherChildren = getChildrenStructure(
@@ -64,11 +64,11 @@ private fun getChildrenStructure(
             )?.shift(offset)
                 ?: return null  // cannot construct with given depth
 
-            if (struct.typeOfPrefix !is TvmCompositeDataCellLabel) {
+            if (struct.typeLabel !is TlbCompositeLabel) {
                 return furtherChildren
             }
 
-            val innerChildren = structuresFromPreviousDepth[struct.typeOfPrefix]
+            val innerChildren = structuresFromPreviousDepth[struct.typeLabel]?.addTlbLevel(struct)
                 ?: return null  // cannot construct with given depth
 
             var newExceeded = innerChildren.numberOfChildrenExceeded or furtherChildren.numberOfChildrenExceeded
@@ -90,7 +90,7 @@ private fun getChildrenStructure(
             ChildrenStructure(newChildren, newExceeded)
         }
 
-        is TvmDataCellStructure.SwitchPrefix -> {
+        is TlbStructure.SwitchPrefix -> {
             var atLeastOneBranch = false
             val switchSize = mkSizeExpr(struct.switchSize)
             val result = struct.variants.entries.fold(ChildrenStructure.empty(ctx)) { acc, (key, rest) ->
