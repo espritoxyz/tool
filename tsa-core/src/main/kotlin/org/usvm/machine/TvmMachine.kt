@@ -141,6 +141,8 @@ class TvmMachine(
 
         const val DEFAULT_MAX_RECURSION_DEPTH: Int = 2
         private const val LOOP_ITERATIONS_LIMIT: Int = 2 // TODO find the best value
+        const val DEFAULT_MAX_TLB_DEPTH = 10
+        const val DEFAULT_MAX_CELL_DEPTH_FOR_DEFAULT_CELLS_CONSISTENT_WITH_TLB = 10
 
         val defaultOptions: UMachineOptions = UMachineOptions(
             pathSelectionStrategies = listOf(PathSelectionStrategy.DFS),

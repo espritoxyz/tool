@@ -1,23 +1,24 @@
 package org.usvm.machine.types.dp
 
-import org.ton.TvmAtomicDataCellLabel
-import org.ton.TvmCompositeDataCellLabel
-import org.ton.TvmDataCellStructure
+import org.ton.TlbAtomicLabel
+import org.ton.TlbCompositeLabel
+import org.ton.TlbStructure
 import org.usvm.machine.TvmContext
-import org.usvm.machine.types.maximumLength
+import org.usvm.machine.types.lengthUpperBound
 import kotlin.math.min
 
 /**
  * Maximum TL-B depth is calculated based on data length.
  * */
 fun calculateMaxCellTlbDepths(
-    labels: Collection<TvmCompositeDataCellLabel>
-): Map<TvmCompositeDataCellLabel, Int> {
-    val result = hashMapOf<TvmCompositeDataCellLabel, Int>()
+    maxTlbDepth: Int,
+    labels: Collection<TlbCompositeLabel>
+): Map<TlbCompositeLabel, Int> {
+    val result = hashMapOf<TlbCompositeLabel, Int>()
 
     // Calculate trimmed maximum possible data length
     // Then, based on that, calculate maximum TL-B depth
-    calculateMapsByTlbDepth(labels) { label, curDepth, prevDepthValues ->
+    calculateMapsByTlbDepth(maxTlbDepth, labels) { label, curDepth, prevDepthValues ->
         val curResult = result[label]
         if (curResult != null)
             return@calculateMapsByTlbDepth TvmContext.MAX_DATA_LENGTH + 1
@@ -32,7 +33,7 @@ fun calculateMaxCellTlbDepths(
 
     labels.forEach { label ->
         if (label !in result) {
-            result[label] = MAX_TLB_DEPTH
+            result[label] = maxTlbDepth
         }
     }
 
@@ -40,31 +41,31 @@ fun calculateMaxCellTlbDepths(
 }
 
 private fun getMaxCellLength(
-    struct: TvmDataCellStructure,
-    maxLengthFromPreviousDepth: Map<TvmCompositeDataCellLabel, Int>
+    struct: TlbStructure,
+    maxLengthFromPreviousDepth: Map<TlbCompositeLabel, Int>
 ): Int? {
     return when (struct) {
-        is TvmDataCellStructure.Unknown, is TvmDataCellStructure.Empty -> {
+        is TlbStructure.Unknown, is TlbStructure.Empty -> {
             0
         }
 
-        is TvmDataCellStructure.LoadRef -> {
-            getMaxCellLength(struct.selfRest, maxLengthFromPreviousDepth)
+        is TlbStructure.LoadRef -> {
+            getMaxCellLength(struct.rest, maxLengthFromPreviousDepth)
         }
 
-        is TvmDataCellStructure.KnownTypePrefix -> {
+        is TlbStructure.KnownTypePrefix -> {
             val further = getMaxCellLength(struct.rest, maxLengthFromPreviousDepth)
                 ?: return null
 
-            val offset = when (struct.typeOfPrefix) {
-                is TvmAtomicDataCellLabel -> struct.typeOfPrefix.maximumLength()
-                is TvmCompositeDataCellLabel -> maxLengthFromPreviousDepth[struct.typeOfPrefix]
+            val offset = when (struct.typeLabel) {
+                is TlbAtomicLabel -> struct.typeLabel.lengthUpperBound()
+                is TlbCompositeLabel -> maxLengthFromPreviousDepth[struct.typeLabel]
             } ?: return null
 
             offset + further
         }
 
-        is TvmDataCellStructure.SwitchPrefix -> {
+        is TlbStructure.SwitchPrefix -> {
             var longestVariant: Int? = null
             for (variant in struct.variants.values) {
                 val further = getMaxCellLength(variant, maxLengthFromPreviousDepth)

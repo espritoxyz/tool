@@ -5,6 +5,7 @@ import org.usvm.machine.types.TvmCellType
 import org.usvm.machine.types.TvmContinuationType
 import org.ton.bytecode.TvmContinuation
 import org.usvm.UAddressSort
+import org.usvm.UConcreteHeapRef
 import org.usvm.machine.types.TvmIntegerType
 import org.usvm.machine.types.TvmRealReferenceType
 import org.usvm.machine.types.TvmSliceType
@@ -100,7 +101,7 @@ fun TvmStack.takeLastSlice(): UHeapRef? =
     }?.also { ensureSymbolicSliceInitialized(it) }
 
 context(TvmState)
-fun TvmStack.takeLastBuilder(): UHeapRef? =
+fun TvmStack.takeLastBuilder(): UConcreteHeapRef? =
     takeLastRef(this, TvmBuilderType, TvmStackValue::builderValue) {
         generateSymbolicBuilder()
     }?.also { ensureSymbolicBuilderInitialized(it) }
@@ -143,12 +144,12 @@ fun TvmStack.takeLastContinuation(): TvmContinuation {
 }
 
 context(TvmState)
-private fun takeLastRef(
+private fun <Ref : UHeapRef> takeLastRef(
     stack: TvmStack,
     referenceType: TvmRealReferenceType,
-    extractValue: TvmStackValue.() -> UHeapRef?,
+    extractValue: TvmStackValue.() -> Ref?,
     generateSymbolicRef: (Int) -> UHeapRef
-): UHeapRef? {
+): Ref? {
     val lastRefValue = stack.takeLast(referenceType, generateSymbolicRef)
     return lastRefValue.extractValue()?.also { assertType(it, referenceType) }
 }

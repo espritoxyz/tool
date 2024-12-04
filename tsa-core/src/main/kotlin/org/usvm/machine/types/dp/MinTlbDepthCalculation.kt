@@ -1,19 +1,20 @@
 package org.usvm.machine.types.dp
 
-import org.ton.TvmCompositeDataCellLabel
-import org.ton.TvmDataCellStructure
+import org.ton.TlbCompositeLabel
+import org.ton.TlbStructure
 
 fun calculateMinTlbDepth(
-    compositeLabels: Collection<TvmCompositeDataCellLabel>
-): Map<TvmCompositeDataCellLabel, Int> {
-    val result = hashMapOf<TvmCompositeDataCellLabel, Int>()
+    maxTlbDepth: Int,
+    compositeLabels: Collection<TlbCompositeLabel>
+): Map<TlbCompositeLabel, Int> {
+    val result = hashMapOf<TlbCompositeLabel, Int>()
     compositeLabels.forEach { label ->
         if (zeroDepthIsPossible(label)) {
             result[label] = 0
         }
     }
-    for (curDepth in 1..MAX_TLB_DEPTH) {
-        val newLabels = mutableListOf<TvmCompositeDataCellLabel>()
+    for (curDepth in 1..maxTlbDepth) {
+        val newLabels = mutableListOf<TlbCompositeLabel>()
         compositeLabels.forEach { label ->
             if (result[label] != null)
                 return@forEach
@@ -26,31 +27,31 @@ fun calculateMinTlbDepth(
     return result
 }
 
-private fun zeroDepthIsPossible(label: TvmCompositeDataCellLabel) =
+private fun zeroDepthIsPossible(label: TlbCompositeLabel) =
     zeroDepthIsPossible(label.internalStructure)
 
-private fun zeroDepthIsPossible(struct: TvmDataCellStructure): Boolean =
+private fun zeroDepthIsPossible(struct: TlbStructure): Boolean =
     constructionIsPossible(struct) { false }
 
 private fun constructionIsPossible(
-    struct: TvmDataCellStructure,
-    possibleCompositeLabel: (TvmCompositeDataCellLabel) -> Boolean
+    struct: TlbStructure,
+    possibleCompositeLabel: (TlbCompositeLabel) -> Boolean
 ): Boolean =
     when (struct) {
-        is TvmDataCellStructure.Unknown, is TvmDataCellStructure.Empty -> {
+        is TlbStructure.Unknown, is TlbStructure.Empty -> {
             true
         }
-        is TvmDataCellStructure.LoadRef -> {
-            constructionIsPossible(struct.selfRest, possibleCompositeLabel)
+        is TlbStructure.LoadRef -> {
+            constructionIsPossible(struct.rest, possibleCompositeLabel)
         }
-        is TvmDataCellStructure.KnownTypePrefix -> {
-            if (struct.typeOfPrefix is TvmCompositeDataCellLabel) {
-                possibleCompositeLabel(struct.typeOfPrefix)
+        is TlbStructure.KnownTypePrefix -> {
+            if (struct.typeLabel is TlbCompositeLabel) {
+                possibleCompositeLabel(struct.typeLabel)
             } else {
                 constructionIsPossible(struct.rest, possibleCompositeLabel)
             }
         }
-        is TvmDataCellStructure.SwitchPrefix -> {
+        is TlbStructure.SwitchPrefix -> {
             struct.variants.any { constructionIsPossible(it.value, possibleCompositeLabel) }
         }
     }

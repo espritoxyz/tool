@@ -3,9 +3,13 @@ package org.usvm.test.resolver
 import io.ksmt.expr.KBitVecValue
 import io.ksmt.utils.BvUtils.toBigIntegerSigned
 import kotlinx.collections.immutable.persistentListOf
-import org.ton.TvmAtomicDataCellLabel
-import org.ton.TvmCompositeDataCellLabel
+import org.ton.TlbAtomicLabel
+import org.ton.TlbBuiltinLabel
+import org.ton.TlbCompositeLabel
+import org.ton.TlbIntegerLabel
+import org.ton.TlbIntegerLabelOfConcreteSize
 import org.ton.TvmParameterInfo
+import org.ton.TlbResolvedBuiltinLabel
 import org.ton.bytecode.TvmCodeBlock
 import org.ton.bytecode.TvmInst
 import org.usvm.NULL_ADDRESS
@@ -47,17 +51,17 @@ import org.usvm.machine.types.TvmFinalReferenceType
 import org.usvm.machine.types.TvmReadingOfUnexpectedType
 import org.usvm.machine.types.TvmReadingOutOfSwitchBounds
 import org.usvm.machine.types.TvmSliceType
-import org.usvm.machine.types.TvmSymbolicCellDataBitArray
-import org.usvm.machine.types.TvmSymbolicCellDataCoins
-import org.usvm.machine.types.TvmSymbolicCellDataInteger
-import org.usvm.machine.types.TvmSymbolicCellDataMsgAddr
-import org.usvm.machine.types.TvmSymbolicCellDataType
-import org.usvm.machine.types.TvmSymbolicCellMaybeConstructorBit
+import org.usvm.machine.types.TvmCellDataBitArrayRead
+import org.usvm.machine.types.TvmCellDataCoinsRead
+import org.usvm.machine.types.TvmCellDataIntegerRead
+import org.usvm.machine.types.TvmCellDataMsgAddrRead
+import org.usvm.machine.types.TvmCellDataTypeRead
+import org.usvm.machine.types.TvmCellMaybeConstructorBitRead
 import org.usvm.machine.types.TvmType
 import org.usvm.machine.types.TvmUnexpectedDataReading
 import org.usvm.machine.types.TvmUnexpectedEndOfReading
 import org.usvm.machine.types.TvmUnexpectedRefReading
-import org.usvm.machine.types.defaultCellValueOfMinimalLength
+import org.usvm.machine.types.defaultCellValue
 import org.usvm.machine.types.dp.getDefaultDict
 import org.usvm.machine.types.getPossibleTypes
 import org.usvm.memory.UMemory
@@ -117,7 +121,8 @@ class TvmTestStateResolver(
                 resolveCellDataType(structuralExit.readingType),
             )
             is TvmReadingOfUnexpectedType -> TvmReadingOfUnexpectedType(
-                labelType = structuralExit.labelType,
+                expectedLabel = resolveBuiltinLabel(structuralExit.expectedLabel, structuralExit.typeArgs),
+                typeArgs = emptyList(),
                 actualType = resolveCellDataType(structuralExit.actualType),
             )
             is TvmUnexpectedEndOfReading -> TvmUnexpectedEndOfReading
@@ -126,6 +131,17 @@ class TvmTestStateResolver(
         }
         return TvmExecutionWithStructuralError(lastStmt, stack, resolvedExit)
     }
+
+    private fun resolveBuiltinLabel(label: TlbBuiltinLabel, args: List<UExpr<TvmSizeSort>>) =
+        when (label) {
+            is TlbIntegerLabel -> {
+                val concreteSize = resolveInt(label.bitSize(ctx, args))
+                TlbIntegerLabelOfConcreteSize(concreteSize, label.isSigned, label.endian)
+            }
+            is TlbResolvedBuiltinLabel -> {
+                label
+            }
+        }
 
     fun resolveGasUsage(): Int = model.eval(state.calcConsumedGas()).intValue()
 
@@ -268,10 +284,10 @@ class TvmTestStateResolver(
             }
             is TvmParameterInfo.DataCellInfo -> {
                 when (val label = cellInfo.dataCellStructure) {
-                    is TvmAtomicDataCellLabel -> {
-                        TvmTestDataCellValue(data = label.defaultCellValueOfMinimalLength())
+                    is TlbAtomicLabel -> {
+                        TvmTestDataCellValue(data = label.defaultCellValue(ctx))
                     }
-                    is TvmCompositeDataCellLabel -> {
+                    is TlbCompositeLabel -> {
                         val defaultValue = state.dataCellInfoStorage.mapper.calculatedTlbLabelInfo.getDefaultCell(label)
                         check(defaultValue != null) {
                             "Default cell for label ${label.name} must be calculated"
@@ -373,13 +389,13 @@ class TvmTestStateResolver(
         return resolved.toSet().sortedBy { it.offset }
     }
 
-    private fun resolveCellDataType(type: TvmSymbolicCellDataType): TvmCellDataType =
+    private fun resolveCellDataType(type: TvmCellDataTypeRead): TvmTestCellDataTypeRead =
         when (type) {
-            is TvmSymbolicCellDataInteger -> TvmCellDataInteger(resolveInt(type.sizeBits), type.isSigned, type.endian)
-            is TvmSymbolicCellMaybeConstructorBit -> TvmCellDataMaybeConstructorBit
-            is TvmSymbolicCellDataBitArray -> TvmCellDataBitArray(resolveInt(type.sizeBits))
-            is TvmSymbolicCellDataMsgAddr -> TvmCellDataMsgAddr
-            is TvmSymbolicCellDataCoins -> TvmCellDataCoins(resolveInt(type.coinsPrefix))
+            is TvmCellDataIntegerRead -> TvmTestCellDataIntegerRead(resolveInt(type.sizeBits), type.isSigned, type.endian)
+            is TvmCellMaybeConstructorBitRead -> TvmTestCellDataMaybeConstructorBitRead
+            is TvmCellDataBitArrayRead -> TvmTestCellDataBitArrayRead(resolveInt(type.sizeBits))
+            is TvmCellDataMsgAddrRead -> TvmTestCellDataMsgAddrRead
+            is TvmCellDataCoinsRead -> TvmTestCellDataCoinsRead(resolveInt(type.coinsPrefix))
         }
 
     private fun resolveInt257(expr: UExpr<out USort>): TvmTestIntegerValue {

@@ -1,0 +1,12 @@
+#include "../imports/stdlib.fc";
+
+
+() recv_internal(int value) impure {
+    cell some_cell = begin_cell()
+        .store_uint(value, 10)
+        .end_cell();
+
+    slice cs = some_cell.begin_parse();
+    int read_value = cs~load_int(10);
+    read_value~impure_touch();
+}

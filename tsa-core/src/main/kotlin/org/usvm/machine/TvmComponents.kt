@@ -1,5 +1,6 @@
 package org.usvm.machine
 
+import io.ksmt.solver.KTheory
 import io.ksmt.solver.wrapper.bv2int.KBv2IntRewriter.SignednessMode
 import io.ksmt.solver.wrapper.bv2int.KBv2IntRewriterConfig
 import io.ksmt.solver.wrapper.bv2int.KBv2IntSolver
@@ -34,13 +35,23 @@ class TvmComponents(
     override fun <Context : UContext<TvmSizeSort>> mkSolver(ctx: Context): USolverBase<TvmType> {
         val (translator, decoder) = buildTranslatorAndLazyDecoder(ctx)
 
+        val bvSolver = KYicesSolver(ctx).apply {
+            configure {
+                optimizeForTheories(setOf(KTheory.UF, KTheory.Array, KTheory.BV))
+            }
+        }
+        val intSolver = KZ3Solver(ctx).apply {
+            configure {
+                optimizeForTheories(setOf(KTheory.UF, KTheory.Array, KTheory.LIA, KTheory.NIA))
+            }
+        }
         val solver = Bv2IntSolverWrapper(
             bv2intSolver = KBv2IntSolver(
                 ctx,
-                KZ3Solver(ctx),
+                intSolver,
                 KBv2IntRewriterConfig(signednessMode = SignednessMode.SIGNED)
             ),
-            regularSolver = KYicesSolver(ctx),
+            regularSolver = bvSolver,
             exprFilter = Bv2IntExprFilter(
                 ctx,
                 excludeNonConstBvand = true,

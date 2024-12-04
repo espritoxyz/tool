@@ -1,8 +1,8 @@
 package org.usvm.machine.types
 
-import org.ton.TvmAtomicDataCellLabel
-import org.ton.TvmCompositeDataCellLabel
-import org.ton.TvmDataCellStructure
+import org.ton.TlbAtomicLabel
+import org.ton.TlbCompositeLabel
+import org.ton.TlbStructure
 import org.ton.TvmInputInfo
 import org.ton.TvmParameterInfo
 import org.usvm.UBoolExpr
@@ -58,24 +58,25 @@ class TvmDataCellInfoStorage private constructor(
                 return@fold acc
             }
             when (val label = curInfo.dataCellStructure) {
-                is TvmAtomicDataCellLabel -> {
+                is TlbAtomicLabel -> {
+                    check(label.arity == 0)
                     val refNumberGuard = endOfCell.refNumber eq zeroSizeExpr
-                    val dataLengthGuard = endOfCell.offset eq label.offset(state, endOfCell.cellAddress, zeroSizeExpr)
+                    val dataLengthGuard = endOfCell.offset eq label.dataLength(state, emptyList())
                     acc and (guard implies (refNumberGuard and dataLengthGuard))
                 }
-                is TvmCompositeDataCellLabel -> {
+                is TlbCompositeLabel -> {
                     val leafInfo = mapper.calculatedTlbLabelInfo.getLeavesInfo(state, endOfCell.cellAddress, label)
                         ?: return@fold acc
 
                     leafInfo.fold(acc) { innerAcc, (struct, sizeInfo) ->
                         when (struct) {
-                            is TvmDataCellStructure.Unknown -> {
+                            is TlbStructure.Unknown -> {
                                 val newGuard = mkSizeGeExpr(endOfCell.offset, sizeInfo.dataLength) and
                                         mkSizeGeExpr(endOfCell.refNumber, sizeInfo.refsLength)
                                 innerAcc and ((guard and sizeInfo.guard) implies  newGuard)
                             }
 
-                            is TvmDataCellStructure.Empty -> {
+                            is TlbStructure.Empty -> {
                                 val newGuard = (endOfCell.offset eq sizeInfo.dataLength) and
                                         (endOfCell.refNumber eq sizeInfo.refsLength)
                                 innerAcc and ((guard and sizeInfo.guard) implies  newGuard)
@@ -99,19 +100,19 @@ class TvmDataCellInfoStorage private constructor(
                 return@fold acc
             }
             when (val label = curInfo.dataCellStructure) {
-                is TvmAtomicDataCellLabel -> {
+                is TlbAtomicLabel -> {
                     acc and (guard implies (loadRef.refNumber eq zeroSizeExpr))
                 }
-                is TvmCompositeDataCellLabel -> {
+                is TlbCompositeLabel -> {
                     val leafInfo = mapper.calculatedTlbLabelInfo.getLeavesInfo(state, loadRef.cellAddress, label)
                         ?: return@fold acc
 
                     leafInfo.fold(acc) { innerAcc, (struct, sizeInfo) ->
                         when (struct) {
-                            is TvmDataCellStructure.Unknown -> {
+                            is TlbStructure.Unknown -> {
                                 innerAcc
                             }
-                            is TvmDataCellStructure.Empty -> {
+                            is TlbStructure.Empty -> {
                                 val newGuard = mkSizeLeExpr(loadRef.refNumber, sizeInfo.refsLength)
                                 innerAcc and ((guard and sizeInfo.guard) implies newGuard)
                             }
@@ -132,7 +133,7 @@ class TvmDataCellInfoStorage private constructor(
         ): TvmDataCellInfoStorage {
             val inputAddresses = extractInputParametersAddresses(state, info)
             val labels = inputAddresses.cellToInfo.values.mapNotNull {
-                (it as? TvmParameterInfo.DataCellInfo)?.dataCellStructure as? TvmCompositeDataCellLabel
+                (it as? TvmParameterInfo.DataCellInfo)?.dataCellStructure as? TlbCompositeLabel
             }
             val calculatedTlbLabelInfo = CalculatedTlbLabelInfo(state.ctx, labels)
             val mapper = TvmAddressToLabelMapper(state, inputAddresses, calculatedTlbLabelInfo, excludeInputsThatDoNotMatchGivenScheme)

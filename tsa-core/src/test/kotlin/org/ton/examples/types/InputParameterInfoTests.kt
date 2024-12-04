@@ -1,25 +1,28 @@
 package org.ton.examples.types
 
 import org.ton.Endian
-import org.ton.TvmCoinsLabel
-import org.ton.TvmEmptyLabel
+import org.ton.TlbCoinsLabel
+import org.ton.TlbEmptyLabel
 import org.ton.TvmInputInfo
-import org.ton.TvmIntegerLabel
-import org.ton.TvmMaybeRefLabel
-import org.ton.TvmMsgAddrLabel
+import org.ton.TlbIntegerLabel
+import org.ton.TlbIntegerLabelOfConcreteSize
+import org.ton.TlbMaybeRefLabel
+import org.ton.TlbMsgAddrLabel
 import org.ton.TvmParameterInfo.DataCellInfo
 import org.ton.TvmParameterInfo.SliceInfo
 import org.ton.examples.checkInvariants
 import org.ton.examples.funcCompileAndAnalyzeAllMethods
 import org.ton.examples.propertiesFound
+import org.usvm.machine.TlbOptions
 import org.usvm.machine.TvmOptions
+import org.usvm.machine.getResourcePath
 import org.usvm.machine.types.TvmReadingOfUnexpectedType
 import org.usvm.machine.types.TvmUnexpectedDataReading
 import org.usvm.machine.types.TvmUnexpectedEndOfReading
 import org.usvm.machine.types.TvmUnexpectedRefReading
-import org.usvm.test.resolver.TvmCellDataCoins
-import org.usvm.test.resolver.TvmCellDataInteger
-import org.usvm.test.resolver.TvmCellDataMaybeConstructorBit
+import org.usvm.test.resolver.TvmTestCellDataCoinsRead
+import org.usvm.test.resolver.TvmTestCellDataIntegerRead
+import org.usvm.test.resolver.TvmTestCellDataMaybeConstructorBitRead
 import org.usvm.test.resolver.TvmExecutionWithStructuralError
 import org.usvm.test.resolver.TvmMethodFailure
 import org.usvm.test.resolver.TvmSuccessfulExecution
@@ -48,6 +51,22 @@ class InputParameterInfoTests {
     private val loadRefThenLoadIntPath = "/types/load_ref_then_load_int.fc"
     private val int32FromRefPath = "/types/int32_from_ref.fc"
     private val int64FromRefPath = "/types/int64_from_ref.fc"
+    private val varIntPath = "/types/load_var_int.fc"
+    private val doubleVarIntPath = "/types/load_double_var_int.fc"
+    private val coinsByPartsPath = "/types/load_coins_by_parts.fc"
+    private val coinsByPartsWrongPath = "/types/load_coins_by_parts_wrong.fc"
+    private val skipEmptyLoadPath = "/types/skip_empty_load.fc"
+    private val skipEmptyLoad2Path = "/types/skip_empty_load_2.fc"
+    private val skipAndLoadPath = "/types/skip_and_load.fc"
+    private val skipConstPath = "/types/skip_consts.fc"
+    private val readStoredInconsistentPath = "/types/read_stored_inconsistent.fc"
+    private val readStoredConstPath = "/types/read_stored_const.fc"
+    private val readStoredConstNegativePath = "/types/read_stored_const_negative.fc"
+    private val readStoredIntInsteadOfUIntPath = "/types/read_stored_int_instead_of_uint.fc"
+    private val readStoredCoinsInconsistentPath = "/types/read_stored_coins_inconsistent.fc"
+    private val readStoredCoinsPath = "/types/read_stored_coins.fc"
+    private val readStoredSymbolicIntPath = "/types/read_stored_symbolic_int.fc"
+    private val storeEmptyCoinsPath = "/types/store_empty_coins.fc"
 
     @Test
     fun testCorrectMaybe() {
@@ -88,7 +107,7 @@ class InputParameterInfoTests {
             listOf { test ->
                 val exit = test.result as? TvmExecutionWithStructuralError ?: return@listOf false
                 val error = exit.exit as? TvmReadingOfUnexpectedType ?: return@listOf false
-                error.actualType is TvmCellDataMaybeConstructorBit && error.labelType is TvmIntegerLabel
+                error.actualType is TvmTestCellDataMaybeConstructorBitRead && error.expectedLabel is TlbIntegerLabel
             }
         )
     }
@@ -99,7 +118,7 @@ class InputParameterInfoTests {
             ?: error("Cannot find resource $maybePath")
 
         val inputInfo =
-            TvmInputInfo(mapOf(0 to SliceInfo(DataCellInfo(TvmEmptyLabel))))
+            TvmInputInfo(mapOf(0 to SliceInfo(DataCellInfo(TlbEmptyLabel))))
         val results = funcCompileAndAnalyzeAllMethods(resourcePath, inputInfo = mapOf(BigInteger.ZERO to inputInfo))
         assertEquals(1, results.testSuites.size)
         val tests = results.testSuites.first()
@@ -110,7 +129,7 @@ class InputParameterInfoTests {
             listOf { test ->
                 val exit = test.result as? TvmExecutionWithStructuralError ?: return@listOf false
                 val error = exit.exit as? TvmUnexpectedDataReading ?: return@listOf false
-                error.readingType is TvmCellDataMaybeConstructorBit
+                error.readingType is TvmTestCellDataMaybeConstructorBitRead
             }
         )
     }
@@ -121,7 +140,7 @@ class InputParameterInfoTests {
             ?: error("Cannot find resource $maybePath")
 
         val inputInfo =
-            TvmInputInfo(mapOf(0 to SliceInfo(DataCellInfo(TvmEmptyLabel))))
+            TvmInputInfo(mapOf(0 to SliceInfo(DataCellInfo(TlbEmptyLabel))))
         val options = TvmOptions(
             turnOnTLBParsingChecks = false,
             excludeInputsThatDoNotMatchGivenScheme = false,
@@ -143,7 +162,7 @@ class InputParameterInfoTests {
             ?: error("Cannot find resource $endOfCellPath")
 
         val inputInfo =
-            TvmInputInfo(mapOf(0 to SliceInfo(DataCellInfo(TvmEmptyLabel))))
+            TvmInputInfo(mapOf(0 to SliceInfo(DataCellInfo(TlbEmptyLabel))))
         val results = funcCompileAndAnalyzeAllMethods(resourcePath, inputInfo = mapOf(BigInteger.ZERO to inputInfo))
         assertEquals(1, results.testSuites.size)
         val tests = results.testSuites.first()
@@ -259,7 +278,7 @@ class InputParameterInfoTests {
             listOf { test ->
                 val exit = test.result as? TvmExecutionWithStructuralError ?: return@listOf false
                 val error = exit.exit as? TvmReadingOfUnexpectedType ?: return@listOf false
-                error.actualType is TvmCellDataMaybeConstructorBit && error.labelType is TvmCoinsLabel
+                error.actualType is TvmTestCellDataMaybeConstructorBitRead && error.expectedLabel is TlbCoinsLabel
             }
         )
     }
@@ -304,7 +323,7 @@ class InputParameterInfoTests {
                 { test ->
                     val exit = test.result as? TvmExecutionWithStructuralError ?: return@listOf false
                     val error = exit.exit as? TvmReadingOfUnexpectedType ?: return@listOf false
-                    error.actualType is TvmCellDataCoins && error.labelType is TvmMsgAddrLabel
+                    error.actualType is TvmTestCellDataCoinsRead && error.expectedLabel is TlbMsgAddrLabel
                 },
                 { test ->
                     val param = test.usedParameters.lastOrNull() as? TvmTestSliceValue
@@ -376,7 +395,7 @@ class InputParameterInfoTests {
             listOf { test ->
                 val exit = test.result as? TvmExecutionWithStructuralError ?: return@listOf false
                 val error = exit.exit as? TvmReadingOfUnexpectedType ?: return@listOf false
-                error.actualType is TvmCellDataCoins && error.labelType is TvmMaybeRefLabel
+                error.actualType is TvmTestCellDataCoinsRead && error.expectedLabel is TlbMaybeRefLabel
             }
         )
     }
@@ -399,13 +418,12 @@ class InputParameterInfoTests {
             listOf { test ->
                 val exit = test.result as? TvmExecutionWithStructuralError ?: return@listOf false
                 val error = exit.exit as? TvmReadingOfUnexpectedType ?: return@listOf false
-                val expectedType = error.labelType
-                error.actualType is TvmCellDataInteger && error.actualType.bitSize == 64 &&
-                        expectedType is TvmIntegerLabel && expectedType.bitSize == 32
+                val expectedType = error.expectedLabel
+                error.actualType is TvmTestCellDataIntegerRead && error.actualType.bitSize == 64 &&
+                        expectedType is TlbIntegerLabelOfConcreteSize && expectedType.concreteSize == 32
             }
         )
     }
-
 
     @Test
     fun testIntSwitchCorrect() {
@@ -426,7 +444,6 @@ class InputParameterInfoTests {
             }
         )
     }
-
 
     @Test
     fun testIntSwitch2Correct() {
@@ -474,9 +491,9 @@ class InputParameterInfoTests {
             listOf { test ->
                 val exit = test.result as? TvmExecutionWithStructuralError ?: return@listOf false
                 val error = exit.exit as? TvmReadingOfUnexpectedType ?: return@listOf false
-                val expectedType = error.labelType
-                error.actualType is TvmCellDataInteger && error.actualType.bitSize == 32 &&
-                        expectedType is TvmIntegerLabel && expectedType.bitSize == 16
+                val expectedType = error.expectedLabel
+                error.actualType is TvmTestCellDataIntegerRead && error.actualType.bitSize == 32 &&
+                        expectedType is TlbIntegerLabelOfConcreteSize && expectedType.concreteSize == 16
             }
         )
     }
@@ -628,7 +645,7 @@ class InputParameterInfoTests {
             ?: error("Cannot find resource $endOfCellPath")
 
         val inputInfo =
-            TvmInputInfo(mapOf(0 to SliceInfo(DataCellInfo(TvmIntegerLabel(100, true, Endian.BigEndian)))))
+            TvmInputInfo(mapOf(0 to SliceInfo(DataCellInfo(TlbIntegerLabelOfConcreteSize(100, true, Endian.BigEndian)))))
         val results = funcCompileAndAnalyzeAllMethods(resourcePath, inputInfo = mapOf(BigInteger.ZERO to inputInfo))
         assertEquals(1, results.testSuites.size)
         val tests = results.testSuites.first()
@@ -754,5 +771,357 @@ class InputParameterInfoTests {
                 exit is TvmReadingOfUnexpectedType
             }
         )
+    }
+
+    @Test
+    fun testLoadVarInt() {
+        val resourcePath = getResourcePath<InputParameterInfoTests>(varIntPath)
+
+        val inputInfo = TvmInputInfo(
+            mapOf(
+                0 to SliceInfo(
+                    DataCellInfo(
+                        customVarInteger
+                    )
+                )
+            )
+        )
+
+        val results = funcCompileAndAnalyzeAllMethods(resourcePath, inputInfo = mapOf(BigInteger.ZERO to inputInfo))
+        assertEquals(1, results.testSuites.size)
+        val tests = results.testSuites.first()
+        assertTrue(tests.all { it.result !is TvmExecutionWithStructuralError })
+        assertTrue(tests.all { (it.result as? TvmMethodFailure)?.exitCode != 1001u })
+    }
+
+    @Test
+    fun testLoadDoubleVarInt() {
+        val resourcePath = getResourcePath<InputParameterInfoTests>(doubleVarIntPath)
+
+        val inputInfo = TvmInputInfo(
+            mapOf(
+                0 to SliceInfo(
+                    DataCellInfo(
+                        doubleCustomVarInteger
+                    )
+                )
+            )
+        )
+
+        val results = funcCompileAndAnalyzeAllMethods(resourcePath, inputInfo = mapOf(BigInteger.ZERO to inputInfo))
+        assertEquals(1, results.testSuites.size)
+        val tests = results.testSuites.first()
+        assertTrue(tests.all { it.result !is TvmExecutionWithStructuralError })
+        assertTrue(tests.all { (it.result as? TvmMethodFailure)?.exitCode != 1000u })
+
+        propertiesFound(
+            tests,
+            listOf(
+                { test -> (test.result as? TvmMethodFailure)?.exitCode == 1001u },
+                { test -> (test.result as? TvmMethodFailure)?.exitCode == 1002u }
+            )
+        )
+    }
+
+    @Test
+    fun testLoadCoinsByParts() {
+        val resourcePath = getResourcePath<InputParameterInfoTests>(coinsByPartsPath)
+
+        val inputInfo =
+            TvmInputInfo(mapOf(0 to SliceInfo(DataCellInfo(coinsStructure))))
+        val results = funcCompileAndAnalyzeAllMethods(resourcePath, inputInfo = mapOf(BigInteger.ZERO to inputInfo))
+        assertEquals(1, results.testSuites.size)
+        val tests = results.testSuites.first()
+        assertTrue(tests.any { it.result is TvmSuccessfulExecution })
+        assertTrue(tests.all { it.result !is TvmMethodFailure })
+
+        checkInvariants(
+            tests,
+            listOf { test ->
+                test.result !is TvmExecutionWithStructuralError
+            }
+        )
+    }
+
+    @Test
+    fun testLoadCoinsByPartsWrong() {
+        val resourcePath = getResourcePath<InputParameterInfoTests>(coinsByPartsWrongPath)
+
+        val inputInfo =
+            TvmInputInfo(mapOf(0 to SliceInfo(DataCellInfo(coinsStructure))))
+        val results = funcCompileAndAnalyzeAllMethods(resourcePath, inputInfo = mapOf(BigInteger.ZERO to inputInfo))
+        assertEquals(1, results.testSuites.size)
+        val tests = results.testSuites.first()
+        assertTrue(tests.any { it.result is TvmSuccessfulExecution })
+
+        propertiesFound(
+            tests,
+            listOf { test ->
+                val exit = (test.result as? TvmExecutionWithStructuralError)?.exit ?: return@listOf false
+                exit is TvmReadingOfUnexpectedType
+            }
+        )
+    }
+
+    @Test
+    fun testSkipEmptyLoad() {
+        val resourcePath = getResourcePath<InputParameterInfoTests>(skipEmptyLoadPath)
+
+        val inputInfo = TvmInputInfo(
+            mapOf(
+                0 to SliceInfo(
+                    DataCellInfo(
+                        doubleCustomVarInteger
+                    )
+                )
+            )
+        )
+
+        val results = funcCompileAndAnalyzeAllMethods(resourcePath, inputInfo = mapOf(BigInteger.ZERO to inputInfo))
+        assertEquals(1, results.testSuites.size)
+        val tests = results.testSuites.first()
+        assertTrue(tests.all { it.result !is TvmExecutionWithStructuralError })
+
+        propertiesFound(
+            tests,
+            listOf(
+                { test -> (test.result as? TvmMethodFailure)?.exitCode == 1000u },
+                { test -> (test.result as? TvmMethodFailure)?.exitCode == 1001u }
+            )
+        )
+    }
+
+    @Test
+    fun testReadStoredInconsistent() {
+        val resourcePath = getResourcePath<InputParameterInfoTests>(readStoredInconsistentPath)
+        val results = funcCompileAndAnalyzeAllMethods(
+            resourcePath,
+            tvmOptions = TvmOptions(
+                enableInternalArgsConstraints = false,
+                tlbOptions = TlbOptions(performTlbChecksOnAllocatedCells = true),
+            )
+        )
+        assertEquals(1, results.testSuites.size)
+        val tests = results.testSuites.first()
+        propertiesFound(
+            tests,
+            listOf { test -> test.result is TvmExecutionWithStructuralError}
+        )
+    }
+
+    @Test
+    fun testSkipEmptyLoad2() {
+        val resourcePath = getResourcePath<InputParameterInfoTests>(skipEmptyLoad2Path)
+
+        val inputInfo = TvmInputInfo(
+            mapOf(
+                0 to SliceInfo(
+                    DataCellInfo(
+                        customVarIntegerWithSuffix
+                    )
+                )
+            )
+        )
+
+        val results = funcCompileAndAnalyzeAllMethods(resourcePath, inputInfo = mapOf(BigInteger.ZERO to inputInfo))
+        assertEquals(1, results.testSuites.size)
+        val tests = results.testSuites.first()
+        assertTrue(tests.all { it.result !is TvmExecutionWithStructuralError })
+
+        propertiesFound(
+            tests,
+            listOf(
+                { test -> (test.result as? TvmMethodFailure)?.exitCode == 1000u },
+                { test -> test.result is TvmSuccessfulExecution }
+            )
+        )
+    }
+
+    @Test
+    fun testReadStoredConst() {
+        val resourcePath = getResourcePath<InputParameterInfoTests>(readStoredConstPath)
+        val results = funcCompileAndAnalyzeAllMethods(
+            resourcePath,
+            tvmOptions = TvmOptions(
+                enableInternalArgsConstraints = false,
+                tlbOptions = TlbOptions(performTlbChecksOnAllocatedCells = true),
+            )
+        )
+        assertEquals(1, results.testSuites.size)
+        val tests = results.testSuites.first()
+        assertTrue { tests.all { it.result is TvmSuccessfulExecution } }
+    }
+
+    @Test
+    fun testSkipAndLoadWrong() {
+        val resourcePath = getResourcePath<InputParameterInfoTests>(skipAndLoadPath)
+
+        val inputInfo = TvmInputInfo(mapOf(0 to SliceInfo(DataCellInfo(intAndInt))))
+        val results = funcCompileAndAnalyzeAllMethods(resourcePath, inputInfo = mapOf(BigInteger.ZERO to inputInfo))
+        assertEquals(1, results.testSuites.size)
+        val tests = results.testSuites.first()
+
+        propertiesFound(
+            tests,
+            listOf { test ->
+                val exit = (test.result as? TvmExecutionWithStructuralError)?.exit as? TvmReadingOfUnexpectedType
+                    ?: return@listOf false
+                exit.actualType is TvmTestCellDataCoinsRead
+            }
+        )
+    }
+
+    @Test
+    fun testSkipAndLoadCorrect() {
+        val resourcePath = getResourcePath<InputParameterInfoTests>(skipAndLoadPath)
+
+        val inputInfo = TvmInputInfo(mapOf(0 to SliceInfo(DataCellInfo(intAndCoins))))
+        val results = funcCompileAndAnalyzeAllMethods(resourcePath, inputInfo = mapOf(BigInteger.ZERO to inputInfo))
+        assertEquals(1, results.testSuites.size)
+        val tests = results.testSuites.first()
+        assertTrue { tests.all { it.result is TvmSuccessfulExecution } }
+    }
+
+    @Test
+    fun testAllocatedCellChecksOption() {
+        val resourcePath = getResourcePath<InputParameterInfoTests>(readStoredInconsistentPath)
+        val results = funcCompileAndAnalyzeAllMethods(
+            resourcePath,
+            tvmOptions = TvmOptions(
+                enableInternalArgsConstraints = false,
+                tlbOptions = TlbOptions(performTlbChecksOnAllocatedCells = false),
+            )
+        )
+        assertEquals(1, results.testSuites.size)
+        val tests = results.testSuites.first()
+        assertTrue { tests.all { it.result !is TvmExecutionWithStructuralError } }
+    }
+
+    @Test
+    fun testReadStoredConstNegative() {
+        val resourcePath = getResourcePath<InputParameterInfoTests>(readStoredConstNegativePath)
+        val results = funcCompileAndAnalyzeAllMethods(
+            resourcePath,
+            tvmOptions = TvmOptions(
+                enableInternalArgsConstraints = false,
+                tlbOptions = TlbOptions(performTlbChecksOnAllocatedCells = true),
+            )
+        )
+        assertEquals(1, results.testSuites.size)
+        val tests = results.testSuites.first()
+        assertTrue { tests.all { it.result is TvmSuccessfulExecution } }
+    }
+
+    @Test
+    fun testSkipAndLoadCorrect2() {
+        val resourcePath = getResourcePath<InputParameterInfoTests>(skipAndLoadPath)
+
+        val inputInfo = TvmInputInfo(mapOf(0 to SliceInfo(DataCellInfo(doubleIntAndCoins))))
+        val results = funcCompileAndAnalyzeAllMethods(resourcePath, inputInfo = mapOf(BigInteger.ZERO to inputInfo))
+        assertEquals(1, results.testSuites.size)
+        val tests = results.testSuites.first()
+        assertTrue { tests.all { it.result is TvmSuccessfulExecution } }
+    }
+
+    @Test
+    fun testReadStoredIntInsteadOfUInt() {
+        val resourcePath = getResourcePath<InputParameterInfoTests>(readStoredIntInsteadOfUIntPath)
+        val results = funcCompileAndAnalyzeAllMethods(
+            resourcePath,
+            tvmOptions = TvmOptions(
+                enableInternalArgsConstraints = false,
+                tlbOptions = TlbOptions(performTlbChecksOnAllocatedCells = true),
+            )
+        )
+        assertEquals(1, results.testSuites.size)
+        val tests = results.testSuites.first()
+        propertiesFound(
+            tests,
+            listOf { test -> test.result is TvmExecutionWithStructuralError}
+        )
+    }
+
+    @Test
+    fun testReadStoredCoinsInconsistent() {
+        val resourcePath = getResourcePath<InputParameterInfoTests>(readStoredCoinsInconsistentPath)
+        val results = funcCompileAndAnalyzeAllMethods(
+            resourcePath,
+            tvmOptions = TvmOptions(
+                enableInternalArgsConstraints = false,
+                tlbOptions = TlbOptions(performTlbChecksOnAllocatedCells = true),
+            )
+        )
+        assertEquals(1, results.testSuites.size)
+        val tests = results.testSuites.first()
+        propertiesFound(
+            tests,
+            listOf { test -> test.result is TvmExecutionWithStructuralError}
+        )
+    }
+
+    @Test
+    fun testReadStoredCoins() {
+        val resourcePath = getResourcePath<InputParameterInfoTests>(readStoredCoinsPath)
+        val results = funcCompileAndAnalyzeAllMethods(
+            resourcePath,
+            tvmOptions = TvmOptions(
+                enableInternalArgsConstraints = false,
+                tlbOptions = TlbOptions(performTlbChecksOnAllocatedCells = true),
+            )
+        )
+        assertEquals(1, results.testSuites.size)
+        val tests = results.testSuites.first()
+        assertTrue { tests.all { it.result !is TvmExecutionWithStructuralError } }
+    }
+
+    @Test
+    fun testReadStoredSymbolicInt() {
+        val resourcePath = getResourcePath<InputParameterInfoTests>(readStoredSymbolicIntPath)
+        val results = funcCompileAndAnalyzeAllMethods(
+            resourcePath,
+            tvmOptions = TvmOptions(
+                enableInternalArgsConstraints = false,
+                tlbOptions = TlbOptions(performTlbChecksOnAllocatedCells = true),
+            )
+        )
+        assertEquals(1, results.testSuites.size)
+        val tests = results.testSuites.first()
+        propertiesFound(
+            tests,
+            listOf (
+                { test -> test.result is TvmExecutionWithStructuralError},
+                { test -> test.result is TvmSuccessfulExecution },
+            )
+        )
+    }
+
+    @Test
+    fun testStoreEmptyCoins() {
+        val resourcePath = getResourcePath<InputParameterInfoTests>(storeEmptyCoinsPath)
+        val results = funcCompileAndAnalyzeAllMethods(
+            resourcePath,
+            tvmOptions = TvmOptions(
+                enableInternalArgsConstraints = false,
+                tlbOptions = TlbOptions(performTlbChecksOnAllocatedCells = true),
+            )
+        )
+        assertEquals(1, results.testSuites.size)
+        val tests = results.testSuites.first()
+        assertTrue { tests.all { it.result !is TvmExecutionWithStructuralError } }
+    }
+
+    @Test
+    fun testSkipConst() {
+        val resourcePath = getResourcePath<InputParameterInfoTests>(skipConstPath)
+        val results = funcCompileAndAnalyzeAllMethods(
+            resourcePath,
+            tvmOptions = TvmOptions(
+                enableInternalArgsConstraints = false,
+                tlbOptions = TlbOptions(performTlbChecksOnAllocatedCells = true),
+            )
+        )
+        assertEquals(1, results.testSuites.size)
+        val tests = results.testSuites.first()
+        assertTrue { tests.all { it.result !is TvmExecutionWithStructuralError } }
     }
 }

@@ -1,8 +1,9 @@
 package org.usvm.machine.types.dp
 
-import org.ton.TvmAtomicDataCellLabel
-import org.ton.TvmCompositeDataCellLabel
-import org.ton.TvmDataCellStructure
+import kotlinx.collections.immutable.PersistentList
+import org.ton.TlbAtomicLabel
+import org.ton.TlbCompositeLabel
+import org.ton.TlbStructure
 import org.ton.TvmParameterInfo
 import org.usvm.UBoolExpr
 import org.usvm.UConcreteHeapRef
@@ -11,13 +12,14 @@ import org.usvm.machine.TvmContext
 import org.usvm.machine.TvmSizeSort
 import org.usvm.machine.state.TvmState
 import org.usvm.machine.state.preloadDataBitsFromCellWithoutChecks
-import org.usvm.machine.types.offset
+import org.usvm.machine.types.dataLength
 import org.usvm.mkSizeAddExpr
 import org.usvm.mkSizeExpr
 
 data class AbstractionForUExpr(
     val address: UConcreteHeapRef,
     val prefixSize: UExpr<TvmSizeSort>,
+    val path: PersistentList<Int>,
     val state: TvmState,
 )
 
@@ -41,8 +43,8 @@ value class AbstractGuard(
     }
 
     context(TvmContext)
-    fun shift(numOfBits: UExpr<TvmSizeSort>) = AbstractGuard { (address, prefixSize, state) ->
-        apply(AbstractionForUExpr(address, mkSizeAddExpr(prefixSize, numOfBits), state))
+    fun shift(numOfBits: UExpr<TvmSizeSort>) = AbstractGuard { (address, prefixSize, path, state) ->
+        apply(AbstractionForUExpr(address, mkSizeAddExpr(prefixSize, numOfBits), path, state))
     }
 
     context(TvmContext)
@@ -51,8 +53,14 @@ value class AbstractGuard(
     context(TvmContext)
     fun shift(numOfBits: AbstractSizeExpr) = AbstractGuard { param ->
         val offset = numOfBits.apply(param)
-        val (address, prefixSize, state) = param
-        apply(AbstractionForUExpr(address, mkSizeAddExpr(prefixSize, offset), state))
+        val (address, prefixSize, path, state) = param
+        apply(AbstractionForUExpr(address, mkSizeAddExpr(prefixSize, offset), path, state))
+    }
+
+    fun addTlbLevel(
+        struct: TlbStructure.KnownTypePrefix
+    ) = AbstractGuard { (address, prefixSize, path, state) ->
+        apply(AbstractionForUExpr(address, prefixSize, path.add(0, struct.id), state))
     }
 }
 
@@ -61,19 +69,28 @@ value class AbstractSizeExpr(
     val apply: (AbstractionForUExpr) -> UExpr<TvmSizeSort>
 ) {
     context(TvmContext)
-    fun shift(numOfBits: UExpr<TvmSizeSort>) = AbstractSizeExpr { (address, prefixSize, state) ->
-        apply(AbstractionForUExpr(address, mkSizeAddExpr(prefixSize, numOfBits), state))
+    fun shift(
+        numOfBits: UExpr<TvmSizeSort>,
+    ) = AbstractSizeExpr { (address, prefixSize, path, state) ->
+        apply(AbstractionForUExpr(address, mkSizeAddExpr(prefixSize, numOfBits), path, state))
     }
 
     context(TvmContext)
-    fun shift(numOfBits: Int) = shift(mkSizeExpr(numOfBits))
+    fun shift(numOfBits: Int) =
+        shift(mkSizeExpr(numOfBits))
 
     context(TvmContext)
     fun shiftAndAdd(numOfBits: AbstractSizeExpr) = AbstractSizeExpr { param ->
-        val (address, prefixSize, state) = param
+        val (address, prefixSize, path, state) = param
         val offset = numOfBits.apply(param)
-        val newParam = AbstractionForUExpr(address, mkSizeAddExpr(prefixSize, offset), state)
+        val newParam = AbstractionForUExpr(address, mkSizeAddExpr(prefixSize, offset), path, state)
         mkSizeAddExpr(offset, apply(newParam))
+    }
+
+    fun addTlbLevel(
+        struct: TlbStructure.KnownTypePrefix
+    ) = AbstractSizeExpr { (address, prefixSize, path, state) ->
+        apply(AbstractionForUExpr(address, prefixSize, path.add(0, struct.id), state))
     }
 }
 
@@ -112,6 +129,11 @@ class ChildrenStructure(
         numberOfChildrenExceeded.shift(offset)
     )
 
+    fun addTlbLevel(struct: TlbStructure.KnownTypePrefix) = ChildrenStructure(
+        children.map { it.addTlbLevel(struct) },
+        numberOfChildrenExceeded.addTlbLevel(struct)
+    )
+
     context(TvmContext)
     infix fun and(newGuard: AbstractGuard) = ChildrenStructure(
         children.map { it and newGuard },
@@ -146,6 +168,12 @@ class ChildStructure(val variants: Map<TvmParameterInfo.CellInfo, AbstractGuard>
         }
     )
 
+    fun addTlbLevel(addedStruct: TlbStructure.KnownTypePrefix) = ChildStructure(
+        variants.entries.associate { (struct, guard) ->
+            struct to guard.addTlbLevel(addedStruct)
+        }
+    )
+
     context(TvmContext)
     infix fun union(other: ChildStructure): ChildStructure {
         val result = variants.toMutableMap()
@@ -164,36 +192,39 @@ class ChildStructure(val variants: Map<TvmParameterInfo.CellInfo, AbstractGuard>
     )
 }
 
-fun TvmContext.getKnownTypePrefixDataOffset(
-    struct: TvmDataCellStructure.KnownTypePrefix,
-    lengthsFromPreviousDepth: Map<TvmCompositeDataCellLabel, AbstractSizeExpr>,
-): AbstractSizeExpr? = when (struct.typeOfPrefix) {
-    is TvmAtomicDataCellLabel -> {
-        AbstractSizeExpr { (address, prefixSize, state) ->
-            struct.typeOfPrefix.offset(state, address, prefixSize)
+context(TvmContext)
+fun getKnownTypePrefixDataLength(
+    struct: TlbStructure.KnownTypePrefix,
+    lengthsFromPreviousDepth: Map<TlbCompositeLabel, AbstractSizeExpr>,
+): AbstractSizeExpr? = when (struct.typeLabel) {
+    is TlbAtomicLabel -> {
+        AbstractSizeExpr { (address, _, cnt, state) ->
+            val typeArgs = struct.typeArgs(state, address, cnt)
+            struct.typeLabel.dataLength(state, typeArgs)
         }
     }
-    is TvmCompositeDataCellLabel -> {
-        lengthsFromPreviousDepth[struct.typeOfPrefix]
+    is TlbCompositeLabel -> {
+        lengthsFromPreviousDepth[struct.typeLabel]?.addTlbLevel(struct)
     }
 }
 
 context(TvmContext)
-fun generateSwitchGuard(switchSize: Int, key: String) = AbstractGuard { (address, prefixSize, state) ->
+fun generateSwitchGuard(switchSize: Int, key: String) = AbstractGuard { (address, prefixSize, _, state) ->
     val actualPrefix = state.preloadDataBitsFromCellWithoutChecks(address, prefixSize, switchSize)
     val expectedPrefix = mkBv(key, switchSize.toUInt())
     actualPrefix eq expectedPrefix
 }
 
 fun <T> calculateMapsByTlbDepth(
-    labels: Iterable<TvmCompositeDataCellLabel>,
-    makeCalculation: (TvmCompositeDataCellLabel, Int, Map<TvmCompositeDataCellLabel, T>) -> T?,
-): List<Map<TvmCompositeDataCellLabel, T>> {
-    var cur = mapOf<TvmCompositeDataCellLabel, T>()
-    val result = mutableListOf<Map<TvmCompositeDataCellLabel, T>>()
+    maxTlbDepth: Int,
+    labels: Iterable<TlbCompositeLabel>,
+    makeCalculation: (TlbCompositeLabel, Int, Map<TlbCompositeLabel, T>) -> T?,
+): List<Map<TlbCompositeLabel, T>> {
+    var cur = mapOf<TlbCompositeLabel, T>()
+    val result = mutableListOf<Map<TlbCompositeLabel, T>>()
 
-    for (curDepth in 0..MAX_TLB_DEPTH) {
-        val newMap = hashMapOf<TvmCompositeDataCellLabel, T>()
+    for (curDepth in 0..maxTlbDepth) {
+        val newMap = hashMapOf<TlbCompositeLabel, T>()
         labels.forEach { label ->
             val newValue = makeCalculation(label, curDepth, cur)
             newValue?.let {

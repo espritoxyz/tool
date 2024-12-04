@@ -3,6 +3,9 @@ package org.ton
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.NoOpCliktCommand
 import com.github.ajalt.clikt.core.subcommands
+import com.github.ajalt.clikt.parameters.arguments.argument
+import com.github.ajalt.clikt.parameters.arguments.multiple
+import com.github.ajalt.clikt.parameters.arguments.unique
 import com.github.ajalt.clikt.parameters.groups.OptionGroup
 import com.github.ajalt.clikt.parameters.groups.provideDelegate
 import com.github.ajalt.clikt.parameters.options.help
@@ -11,12 +14,14 @@ import com.github.ajalt.clikt.parameters.options.required
 import com.github.ajalt.clikt.parameters.options.validate
 import com.github.ajalt.clikt.parameters.types.path
 import org.ton.sarif.toSarifReport
+import org.ton.test.gen.generateTests
 import org.ton.tlb.readFromJson
 import org.usvm.machine.BocAnalyzer
 import org.usvm.machine.FiftAnalyzer
 import org.usvm.machine.FuncAnalyzer
+import org.usvm.machine.InterContractAnalyzer
 import org.usvm.machine.TactAnalyzer
-import org.ton.test.gen.generateTests
+import org.usvm.machine.TvmOptions
 import java.math.BigInteger
 import java.nio.file.Path
 import kotlin.io.path.exists
@@ -178,8 +183,30 @@ class BocAnalysis : CliktCommand(name = "boc", help = "Options for analyzing a s
     }
 }
 
+class InterContractAnalysis : CliktCommand(name = "inter", help = "Options for analyzing multiple smart contracts with inter-communication") {
+    private val funcSourcesPath by argument(name = "inputs", help = "The paths to the FunC sources of the smart contract (in the order of their communication)")
+        .path(mustExist = true, canBeFile = true, canBeDir = false)
+        .multiple(required = true) // TODO support cyclic messages?
+        .unique()
+
+    private val fiftOptions by FiftOptions()
+    private val funcOptions by FuncOptions()
+
+    override fun run() {
+        InterContractAnalyzer(
+            funcStdlibPath = funcOptions.funcStdlibPath,
+            fiftStdlibPath = fiftOptions.fiftStdlibPath
+        ).analyzeInternalMessagesWithInterContract(
+            funcSourcesPath,
+            TvmOptions(turnOnTLBParsingChecks = false),
+        ).let {
+            echo(it.toSarifReport(methodsMapping = emptyMap()))
+        }
+    }
+}
+
 class TonAnalysis : NoOpCliktCommand()
 
 fun main(args: Array<String>) = TonAnalysis()
-    .subcommands(TactAnalysis(), FuncAnalysis(), FiftAnalysis(), BocAnalysis(), TestGeneration())
+    .subcommands(TactAnalysis(), FuncAnalysis(), FiftAnalysis(), BocAnalysis(), TestGeneration(), InterContractAnalysis())
     .main(args)

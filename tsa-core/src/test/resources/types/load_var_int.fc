@@ -1,0 +1,13 @@
+#include "../imports/stdlib.fc";
+
+
+() recv_internal(int msg_value, cell in_msg_cell, slice in_msg) impure {
+    int len = in_msg~load_uint(16);
+
+    throw_unless(1000, len == 1);
+
+    if (in_msg.slice_bits() != 10) {
+        ;; must not be reachable with correct TL-B scheme
+        throw(1001);
+    }
+}

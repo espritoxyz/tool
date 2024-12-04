@@ -3,6 +3,7 @@ package org.ton.examples.gas
 import org.ton.examples.compileFiftCodeBlocksContract
 import org.ton.examples.executionCode
 import org.ton.examples.runFiftCodeBlock
+import org.usvm.machine.TvmOptions
 import org.usvm.machine.analyzeAllMethods
 import java.nio.file.FileVisitResult
 import java.nio.file.Path
@@ -28,7 +29,10 @@ class GasTest {
         val concreteResults = codeBlocks.map { runFiftCodeBlock(fiftWorkDir, it) }
         val contract = compileFiftCodeBlocksContract(fiftWorkDir, codeBlocks)
 
-        val symbolicResult = analyzeAllMethods(contract)
+        val symbolicResult = analyzeAllMethods(
+            contract,
+            tvmOptions = TvmOptions(turnOnTLBParsingChecks = false)
+        )
 
         for ((methodId, _, tests) in symbolicResult) {
             val methodIdInt = methodId.toInt()

@@ -1,16 +1,18 @@
 package org.usvm.machine.types
 
 import kotlinx.serialization.Serializable
-import org.ton.TvmBuiltinDataCellLabel
+import org.ton.TlbBuiltinLabel
+import org.usvm.UExpr
+import org.usvm.machine.TvmSizeSort
 
 @Serializable
-sealed interface TvmStructuralExit<out DataCellType> {
+sealed interface TvmStructuralExit<out DataCellType, out ExpectedCellType : TlbBuiltinLabel> {
     val ruleId: String
 }
 
 data class TvmUnexpectedDataReading<DataCellType>(
     val readingType: DataCellType,
-) : TvmStructuralExit<DataCellType> {
+) : TvmStructuralExit<DataCellType, Nothing> {
     override val ruleId: String
         get() = "unexpected-data-reading"
 
@@ -20,7 +22,7 @@ data class TvmUnexpectedDataReading<DataCellType>(
 
 data class TvmReadingOutOfSwitchBounds<DataCellType>(
     val readingType: DataCellType,
-) : TvmStructuralExit<DataCellType> {
+) : TvmStructuralExit<DataCellType, Nothing> {
     override val ruleId: String
         get() = "out-of-switch-bounds"
 
@@ -28,7 +30,7 @@ data class TvmReadingOutOfSwitchBounds<DataCellType>(
         "Reading of $readingType is out of switch bounds"
 }
 
-object TvmUnexpectedRefReading : TvmStructuralExit<Nothing> {
+object TvmUnexpectedRefReading : TvmStructuralExit<Nothing, Nothing> {
     override val ruleId: String
         get() = "unexpected-ref-reading"
 
@@ -36,7 +38,7 @@ object TvmUnexpectedRefReading : TvmStructuralExit<Nothing> {
         "Unexpected reading of a reference: slice should have no references left."
 }
 
-object TvmUnexpectedEndOfReading : TvmStructuralExit<Nothing> {
+object TvmUnexpectedEndOfReading : TvmStructuralExit<Nothing, Nothing> {
     override val ruleId: String
         get() = "unexpected-end-of-cell"
 
@@ -44,13 +46,14 @@ object TvmUnexpectedEndOfReading : TvmStructuralExit<Nothing> {
         "Unexpected end of reading: slice is not supposed to be empty"
 }
 
-data class TvmReadingOfUnexpectedType<DataCellType>(
-    val labelType: TvmBuiltinDataCellLabel,
+data class TvmReadingOfUnexpectedType<DataCellType, ExpectedCellType : TlbBuiltinLabel>(
+    val expectedLabel: ExpectedCellType,
+    val typeArgs: List<UExpr<TvmSizeSort>>,
     val actualType: DataCellType,
-) : TvmStructuralExit<DataCellType> {
+) : TvmStructuralExit<DataCellType, ExpectedCellType> {
     override val ruleId: String
         get() = "unexpected-cell-type"
 
     override fun toString() =
-        "Reading of unexpected type: expected reading of $labelType, but read $actualType"
+        "Reading of unexpected type: expected reading of $expectedLabel, but read $actualType"
 }

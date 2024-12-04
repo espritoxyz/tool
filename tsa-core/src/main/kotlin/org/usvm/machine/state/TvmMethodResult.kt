@@ -1,12 +1,13 @@
 package org.usvm.machine.state
 
 import kotlinx.serialization.Serializable
+import org.ton.TlbBuiltinLabel
 import org.usvm.UBv32Sort
 import org.usvm.UExpr
 import org.usvm.machine.state.TvmMethodResult.TvmErrorExit
 import org.usvm.machine.state.TvmMethodResult.TvmSuccessfulExit
 import org.usvm.machine.types.TvmStructuralExit
-import org.usvm.machine.types.TvmSymbolicCellDataType
+import org.usvm.machine.types.TvmCellDataTypeRead
 
 /**
  * Represents a result of a method invocation.
@@ -47,7 +48,7 @@ sealed interface TvmMethodResult {
 
     @JvmInline
     value class TvmStructuralError(
-        val exit: TvmStructuralExit<TvmSymbolicCellDataType>,
+        val exit: TvmStructuralExit<TvmCellDataTypeRead, TlbBuiltinLabel>,
     ) : TvmMethodResult
 }
 

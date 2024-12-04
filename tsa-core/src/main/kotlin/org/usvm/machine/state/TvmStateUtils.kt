@@ -124,7 +124,7 @@ fun TvmState.initializeSymbolicSlice(ref: UConcreteHeapRef) = with(ctx) {
     assertType(cell, TvmDataCellType)
 }
 
-fun TvmState.generateSymbolicBuilder(): UHeapRef =
+fun TvmState.generateSymbolicBuilder(): UConcreteHeapRef =
     generateSymbolicRef(TvmBuilderType).also { initializeSymbolicBuilder(it) }
 
 fun TvmState.ensureSymbolicBuilderInitialized(ref: UHeapRef) =

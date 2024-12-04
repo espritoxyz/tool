@@ -1,7 +1,8 @@
 package org.usvm.machine.types.dp
 
-import org.ton.TvmCompositeDataCellLabel
-import org.ton.TvmDataCellStructure
+import kotlinx.collections.immutable.persistentListOf
+import org.ton.TlbCompositeLabel
+import org.ton.TlbStructure
 import org.ton.TvmParameterInfo
 import org.usvm.UBoolExpr
 import org.usvm.UConcreteHeapRef
@@ -12,21 +13,21 @@ import org.usvm.machine.state.TvmState
 import org.usvm.machine.types.forEach
 import org.usvm.test.resolver.TvmTestDataCellValue
 
-const val MAX_TLB_DEPTH = 10
-const val MAX_CELL_DEPTH_FOR_DEFAULT = 10
-
 class CalculatedTlbLabelInfo(
     private val ctx: TvmContext,
-    givenCompositeLabels: Collection<TvmCompositeDataCellLabel>,
+    givenCompositeLabels: Collection<TlbCompositeLabel>,
 ) {
     private val compositeLabels = calculateClosure(givenCompositeLabels)
 
-    fun labelHasUnknownLeaves(label: TvmCompositeDataCellLabel): Boolean? = hasUnknownLeaves[label]
+    private val maxTlbDepth: Int
+        get() = ctx.tvmOptions.tlbOptions.maxTlbDepth
 
-    fun minimalLabelDepth(label: TvmCompositeDataCellLabel): Int? = minTlbDepth[label]
+    fun labelHasUnknownLeaves(label: TlbCompositeLabel): Boolean? = hasUnknownLeaves[label]
 
-    fun maxRefSize(label: TvmCompositeDataCellLabel, maxDepth: Int = MAX_TLB_DEPTH): Int? {
-        require(maxDepth in 0..MAX_TLB_DEPTH) {
+    fun minimalLabelDepth(label: TlbCompositeLabel): Int? = minTlbDepth[label]
+
+    fun maxRefSize(label: TlbCompositeLabel, maxDepth: Int = maxTlbDepth): Int? {
+        require(maxDepth in 0..maxTlbDepth) {
             "Cannot calculate maxRefSize for depth $maxDepth"
         }
         return maxRefSizes[maxDepth][label]
@@ -35,33 +36,33 @@ class CalculatedTlbLabelInfo(
     fun getDataCellSize(
         state: TvmState,
         address: UConcreteHeapRef,
-        label: TvmCompositeDataCellLabel,
-        maxDepth: Int = MAX_TLB_DEPTH,
+        label: TlbCompositeLabel,
+        maxDepth: Int = maxTlbDepth,
     ): UExpr<TvmSizeSort>? {
-        require(maxDepth in 0..MAX_TLB_DEPTH) {
+        require(maxDepth in 0..maxTlbDepth) {
             "Cannot calculate dataCellSize for depth $maxDepth"
         }
         val abstractValue = dataLengths[maxDepth][label] ?: return null
-        return abstractValue.apply(AbstractionForUExpr(address, ctx.zeroSizeExpr, state))
+        return abstractValue.apply(AbstractionForUExpr(address, ctx.zeroSizeExpr, persistentListOf(), state))
     }
 
     fun getLabelChildStructure(
         state: TvmState,
         address: UConcreteHeapRef,
-        parentLabel: TvmCompositeDataCellLabel,
+        parentLabel: TlbCompositeLabel,
         childIdx: Int,
-        maxDepth: Int = MAX_TLB_DEPTH,
+        maxDepth: Int = maxTlbDepth,
     ): Map<TvmParameterInfo.CellInfo, UBoolExpr>? {
         require(childIdx in 0..<TvmContext.MAX_REFS_NUMBER) {
             "childIdx $childIdx is out of range"
         }
-        require(maxDepth in 0..MAX_TLB_DEPTH) {
+        require(maxDepth in 0..maxTlbDepth) {
             "Cannot calculate childLabel for depth $maxDepth"
         }
         val childStructure = labelChildren[maxDepth][parentLabel]?.children?.get(childIdx)
             ?: return null
         return childStructure.variants.entries.associate { (struct, abstractGuard) ->
-            val guard = abstractGuard.apply(AbstractionForUExpr(address, ctx.zeroSizeExpr, state))
+            val guard = abstractGuard.apply(AbstractionForUExpr(address, ctx.zeroSizeExpr, persistentListOf(), state))
             struct to guard
         }
     }
@@ -69,43 +70,43 @@ class CalculatedTlbLabelInfo(
     fun getConditionForNumberOfChildrenExceeded(
         state: TvmState,
         address: UConcreteHeapRef,
-        parentLabel: TvmCompositeDataCellLabel,
-        maxDepth: Int = MAX_TLB_DEPTH,
+        parentLabel: TlbCompositeLabel,
+        maxDepth: Int = maxTlbDepth,
     ): UBoolExpr? {
-        require(maxDepth in 0..MAX_TLB_DEPTH) {
+        require(maxDepth in 0..maxTlbDepth) {
             "Cannot calculate conditionForNumberOfChildrenExceeded for depth $maxDepth"
         }
         val childrenStructure = labelChildren[maxDepth][parentLabel]
             ?: return null
-        return childrenStructure.numberOfChildrenExceeded.apply(AbstractionForUExpr(address, ctx.zeroSizeExpr, state))
+        return childrenStructure.numberOfChildrenExceeded.apply(AbstractionForUExpr(address, ctx.zeroSizeExpr, persistentListOf(), state))
     }
 
-    fun getSwitchConstraints(
+    fun getDataConstraints(
         state: TvmState,
         address: UConcreteHeapRef,
-        label: TvmCompositeDataCellLabel,
-        maxDepth: Int = MAX_TLB_DEPTH,
+        label: TlbCompositeLabel,
+        maxDepth: Int = maxTlbDepth,
     ): UBoolExpr? {
-        require(maxDepth in 0..MAX_TLB_DEPTH) {
+        require(maxDepth in 0..maxTlbDepth) {
             "Cannot calculate switch constraints for depth $maxDepth"
         }
-        val abstract = switchConstraints[maxDepth][label]
+        val abstract = dataConstraints[maxDepth][label]
             ?: return null
-        return abstract.apply(AbstractionForUExpr(address, ctx.zeroSizeExpr, state))
+        return abstract.apply(AbstractionForUExpr(address, ctx.zeroSizeExpr, persistentListOf(), state))
     }
 
-    fun getIndividualTlbDepthBound(label: TvmCompositeDataCellLabel): Int? = individualMaxCellTlbDepth[label]
+    fun getIndividualTlbDepthBound(label: TlbCompositeLabel): Int? = individualMaxCellTlbDepth[label]
 
-    fun getDefaultCell(label: TvmCompositeDataCellLabel): TvmTestDataCellValue? =
+    fun getDefaultCell(label: TlbCompositeLabel): TvmTestDataCellValue? =
         defaultCells[label]
 
     fun getSizeConstraints(
         state: TvmState,
         address: UConcreteHeapRef,
-        label: TvmCompositeDataCellLabel,
-        maxDepth: Int = MAX_TLB_DEPTH,
+        label: TlbCompositeLabel,
+        maxDepth: Int = maxTlbDepth,
     ): UBoolExpr? {
-        require(maxDepth in 1..MAX_TLB_DEPTH) {
+        require(maxDepth in 1..maxTlbDepth) {
             "Cannot calculate size constraints for depth $maxDepth"
         }
         if (label !in compositeLabels) {
@@ -123,10 +124,10 @@ class CalculatedTlbLabelInfo(
     fun getLeavesInfo(
         state: TvmState,
         address: UConcreteHeapRef,
-        label: TvmCompositeDataCellLabel,
-        maxDepth: Int = MAX_TLB_DEPTH,
-    ): List<Pair<TvmDataCellStructure.Leaf, VertexCalculatedSize>>? {
-        require(maxDepth in 1..MAX_TLB_DEPTH) {
+        label: TlbCompositeLabel,
+        maxDepth: Int = maxTlbDepth,
+    ): List<Pair<TlbStructure.Leaf, VertexCalculatedSize>>? {
+        require(maxDepth in 1..maxTlbDepth) {
             "Cannot calculate information about sizes for depth $maxDepth"
         }
         if (label !in compositeLabels) {
@@ -141,48 +142,48 @@ class CalculatedTlbLabelInfo(
         )
     }
 
-    private val hasUnknownLeaves: Map<TvmCompositeDataCellLabel, Boolean> = compositeLabels.associateWith {
+    private val hasUnknownLeaves: Map<TlbCompositeLabel, Boolean> = compositeLabels.associateWith {
         hasUnknownLeaves(it)
     }
 
     private val labelsWithoutUnknownLeaves = compositeLabels.filter { hasUnknownLeaves[it] == false }
 
-    private val minTlbDepth: Map<TvmCompositeDataCellLabel, Int> = calculateMinTlbDepth(compositeLabels)
+    private val minTlbDepth: Map<TlbCompositeLabel, Int> = calculateMinTlbDepth(maxTlbDepth, compositeLabels)
 
-    private val individualMaxCellTlbDepth: Map<TvmCompositeDataCellLabel, Int> =
-        calculateMaxCellTlbDepths(compositeLabels)
+    private val individualMaxCellTlbDepth: Map<TlbCompositeLabel, Int> =
+        calculateMaxCellTlbDepths(maxTlbDepth, compositeLabels)
 
-    private val defaultCells: Map<TvmCompositeDataCellLabel, TvmTestDataCellValue> =
-        calculateDefaultCells(compositeLabels, individualMaxCellTlbDepth)
+    private val defaultCells: Map<TlbCompositeLabel, TvmTestDataCellValue> =
+        calculateDefaultCells(ctx, compositeLabels, individualMaxCellTlbDepth)
 
-    private val maxRefSizes: List<Map<TvmCompositeDataCellLabel, Int>> =
-        calculateMaximumRefs(compositeLabels, individualMaxCellTlbDepth)
+    private val maxRefSizes: List<Map<TlbCompositeLabel, Int>> =
+        calculateMaximumRefs(maxTlbDepth, compositeLabels, individualMaxCellTlbDepth)
 
-    private val dataLengths: List<Map<TvmCompositeDataCellLabel, AbstractSizeExpr>> =
+    private val dataLengths: List<Map<TlbCompositeLabel, AbstractSizeExpr>> =
         calculateDataLengths(ctx, labelsWithoutUnknownLeaves, individualMaxCellTlbDepth)
 
-    private val labelChildren: List<Map<TvmCompositeDataCellLabel, ChildrenStructure>> =
+    private val labelChildren: List<Map<TlbCompositeLabel, ChildrenStructure>> =
         calculateChildrenStructures(ctx, labelsWithoutUnknownLeaves, dataLengths, individualMaxCellTlbDepth)
 
-    private val switchConstraints: List<Map<TvmCompositeDataCellLabel, AbstractGuard>> =
-        calculateSwitchConstraints(ctx, compositeLabels, dataLengths, individualMaxCellTlbDepth)
+    private val dataConstraints: List<Map<TlbCompositeLabel, AbstractGuard>> =
+        calculateDataConstraints(ctx, compositeLabels, dataLengths, individualMaxCellTlbDepth)
 
     init {
         // check correctness of declarations
         compositeLabels.forEach {
             it.internalStructure.forEach { struct ->
-                if (struct is TvmDataCellStructure.KnownTypePrefix && struct.typeOfPrefix is TvmCompositeDataCellLabel) {
-                    require(hasUnknownLeaves[struct.typeOfPrefix] != true) {
+                if (struct is TlbStructure.KnownTypePrefix && struct.typeLabel is TlbCompositeLabel) {
+                    require(hasUnknownLeaves[struct.typeLabel] != true) {
                         "Declarations with `Unknown` cannot be used in other declarations"
                     }
                 }
             }
         }
 
-        // check that all minDepths are <= MAX_TLB_DEPTH
+        // check that all minDepths are <= maxTlbDepth
         compositeLabels.forEach {
             require(it in minTlbDepth) {
-                "Minimal depth of ${it.name} is greater than MAX_TLB_DEPTH=$MAX_TLB_DEPTH"
+                "Minimal depth of ${it.name} is greater than maxTlbDepth=$maxTlbDepth"
             }
         }
 
@@ -195,34 +196,34 @@ class CalculatedTlbLabelInfo(
     }
 }
 
-private fun hasUnknownLeaves(label: TvmCompositeDataCellLabel): Boolean =
+private fun hasUnknownLeaves(label: TlbCompositeLabel): Boolean =
     hasUnknownLeaves(label.internalStructure)
 
-private fun hasUnknownLeaves(struct: TvmDataCellStructure): Boolean =
+private fun hasUnknownLeaves(struct: TlbStructure): Boolean =
     when (struct) {
-        is TvmDataCellStructure.Empty -> false
-        is TvmDataCellStructure.Unknown -> true
-        is TvmDataCellStructure.KnownTypePrefix -> hasUnknownLeaves(struct.rest)
-        is TvmDataCellStructure.SwitchPrefix -> struct.variants.any { hasUnknownLeaves(it.value) }
-        is TvmDataCellStructure.LoadRef -> hasUnknownLeaves(struct.selfRest)
+        is TlbStructure.Empty -> false
+        is TlbStructure.Unknown -> true
+        is TlbStructure.KnownTypePrefix -> hasUnknownLeaves(struct.rest)
+        is TlbStructure.SwitchPrefix -> struct.variants.any { hasUnknownLeaves(it.value) }
+        is TlbStructure.LoadRef -> hasUnknownLeaves(struct.rest)
     }
 
-private fun calculateClosure(labels: Collection<TvmCompositeDataCellLabel>): Set<TvmCompositeDataCellLabel> {
+private fun calculateClosure(labels: Collection<TlbCompositeLabel>): Set<TlbCompositeLabel> {
     val result = labels.toMutableSet()
     val queue = ArrayDeque(labels)
     while (queue.isNotEmpty()) {
         val label = queue.removeFirst()
         label.internalStructure.forEach { struct ->
-            if (struct is TvmDataCellStructure.KnownTypePrefix && struct.typeOfPrefix is TvmCompositeDataCellLabel) {
-                val newLabel = struct.typeOfPrefix
+            if (struct is TlbStructure.KnownTypePrefix && struct.typeLabel is TlbCompositeLabel) {
+                val newLabel = struct.typeLabel
                 if (newLabel !in result) {
                     result.add(newLabel)
                     queue.add(newLabel)
                 }
             }
-            if (struct is TvmDataCellStructure.LoadRef && struct.ref is TvmParameterInfo.DataCellInfo) {
+            if (struct is TlbStructure.LoadRef && struct.ref is TvmParameterInfo.DataCellInfo) {
                 val newLabel = struct.ref.dataCellStructure
-                if (newLabel is TvmCompositeDataCellLabel && newLabel !in result) {
+                if (newLabel is TlbCompositeLabel && newLabel !in result) {
                     result.add(newLabel)
                     queue.add(newLabel)
                 }

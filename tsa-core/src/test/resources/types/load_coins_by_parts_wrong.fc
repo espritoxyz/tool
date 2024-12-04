@@ -1,0 +1,13 @@
+#include "../imports/stdlib.fc";
+
+
+() recv_internal(int msg_value, cell in_msg_cell, slice in_msg) impure {
+    int coins_prefix = in_msg~load_uint(4);
+    int coins = in_msg~load_uint(coins_prefix);
+
+    var some_cell = begin_cell()
+        .store_int(coins, 130)
+        .end_cell();
+
+    some_cell~impure_touch();
+}

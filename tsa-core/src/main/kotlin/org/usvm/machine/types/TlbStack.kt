@@ -1,10 +1,12 @@
 package org.usvm.machine.types
 
-import org.ton.TvmAtomicDataCellLabel
-import org.ton.TvmCompositeDataCellLabel
-import org.ton.TvmDataCellLabel
-import org.ton.TvmDataCellStructure
+import kotlinx.collections.immutable.persistentListOf
+import org.ton.TlbAtomicLabel
+import org.ton.TlbCompositeLabel
+import org.ton.TlbLabel
+import org.ton.createWrapperStructure
 import org.usvm.UBoolExpr
+import org.usvm.isFalse
 import org.usvm.machine.TvmContext
 import org.usvm.machine.state.TvmMethodResult
 import org.usvm.machine.state.TvmState
@@ -15,33 +17,43 @@ data class TlbStack(
 ) {
     fun step(
         state: TvmState,
-        loadData: TvmDataCellLoadedTypeInfo.LoadData,
-    ): Map<UBoolExpr, StepResult> {
+        loadData: LimitedLoadData,
+    ): Map<UBoolExpr, StepResult> = with(state.ctx) {
 
         val ctx = state.ctx
         val result = hashMapOf<UBoolExpr, StepResult>()
 
+        val emptyRead = ctx.mkEq(loadData.type.sizeBits, ctx.zeroSizeExpr)
+
         if (frames.isEmpty()) {
             // finished parsing
-            val emptyRead = ctx.mkEq(loadData.type.sizeBits, ctx.zeroSizeExpr)
             return mapOf(
-                emptyRead to NewStack(this),
+                emptyRead to NewStack(this@TlbStack),
                 ctx.mkNot(emptyRead) to Error(TvmMethodResult.TvmStructuralError(TvmUnexpectedDataReading(loadData.type)))
             )
         }
 
+        result[emptyRead] = NewStack(this@TlbStack)
+
         val lastFrame = frames.last()
 
         lastFrame.step(state, loadData).forEach { (guard, stackFrameStepResult) ->
+            if (guard.isFalse) {
+                return@forEach
+            }
+
             when (stackFrameStepResult) {
                 is EndOfStackFrame -> {
-                    val newStack = TlbStack(frames.subList(0, frames.size - 1))
-                    result[guard] = NewStack(newStack)
+                    val newFrames = popFrames(ctx, frames.subList(0, frames.size - 1))
+                    result[guard and emptyRead.not()] = NewStack(TlbStack(newFrames, deepestError))
                 }
 
                 is NextFrame -> {
-                    val newStack = TlbStack(frames.subList(0, frames.size - 1) + stackFrameStepResult.frame)
-                    result[guard] = NewStack(newStack)
+                    val newStack = TlbStack(
+                        frames.subList(0, frames.size - 1) + stackFrameStepResult.frame,
+                        deepestError,
+                    )
+                    result[guard and emptyRead.not()] = NewStack(newStack)
                 }
 
                 is StepError -> {
@@ -54,7 +66,7 @@ data class TlbStack(
                         )
                         newStack.step(state, loadData).forEach { (innerGuard, stepResult) ->
                             val newGuard = ctx.mkAnd(guard, innerGuard)
-                            result[newGuard] = stepResult
+                            result[newGuard and emptyRead.not()] = stepResult
                         }
                     } else {
 
@@ -73,13 +85,41 @@ data class TlbStack(
                             "Error was not set after unsuccessful TlbStack step."
                         }
 
-                        result[guard] = Error(error)
+                        result[guard and emptyRead.not()] = Error(error)
+                    }
+                }
+
+                is PassLoadToNextFrame -> {
+                    val newLoadData = stackFrameStepResult.loadData
+                    val newFrames = popFrames(ctx, frames)
+                    val newStack = TlbStack(newFrames, deepestError)
+                    newStack.step(state, newLoadData).forEach { (innerGuard, stepResult) ->
+                        val newGuard = ctx.mkAnd(guard, innerGuard)
+                        result[newGuard and emptyRead.not()] = stepResult
                     }
                 }
             }
         }
 
+        result.remove(falseExpr)
+
         return result
+    }
+
+    private fun popFrames(ctx: TvmContext, framesToPop: List<TlbStackFrame>): List<TlbStackFrame> {
+        if (framesToPop.isEmpty()) {
+            return framesToPop
+        }
+        val prevFrame = framesToPop.last()
+        check(prevFrame.isSkippable) {
+            "$prevFrame must be skippable, but it is not"
+        }
+        val newFrame = prevFrame.skipLabel(ctx)
+        return if (newFrame == null) {
+            popFrames(ctx, framesToPop.subList(0, framesToPop.size - 1))
+        } else {
+            framesToPop.subList(0, framesToPop.size - 1) + newFrame
+        }
     }
 
     sealed interface StepResult
@@ -89,12 +129,13 @@ data class TlbStack(
     data class NewStack(val stack: TlbStack) : StepResult
 
     companion object {
-        fun new(ctx: TvmContext, label: TvmDataCellLabel): TlbStack {
+        fun new(ctx: TvmContext, label: TlbLabel): TlbStack {
             val struct = when (label) {
-                is TvmCompositeDataCellLabel -> label.internalStructure
-                is TvmAtomicDataCellLabel -> TvmDataCellStructure.KnownTypePrefix(label, TvmDataCellStructure.Empty)
+                is TlbCompositeLabel -> label.internalStructure
+                is TlbAtomicLabel -> createWrapperStructure(label)
             }
-            val frames = buildFrameForStructure(ctx, struct, tlbLevel = 0)?.let { listOf(it) } ?: emptyList()
+            val frame = buildFrameForStructure(ctx, struct, persistentListOf())
+            val frames = frame?.let { listOf(it) } ?: emptyList()
             return TlbStack(frames)
         }
     }

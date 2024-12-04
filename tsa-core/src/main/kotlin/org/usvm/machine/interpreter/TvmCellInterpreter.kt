@@ -147,9 +147,10 @@ import org.usvm.machine.types.TvmCellType
 import org.usvm.machine.types.TvmDataCellType
 import org.usvm.machine.types.TvmIntegerType
 import org.usvm.machine.types.TvmSliceType
-import org.usvm.machine.types.TvmSymbolicCellDataBitArray
-import org.usvm.machine.types.TvmSymbolicCellDataInteger
+import org.usvm.machine.types.TvmCellDataBitArrayRead
+import org.usvm.machine.types.TvmCellDataIntegerRead
 import org.usvm.machine.types.assertEndOfCell
+import org.usvm.machine.types.loadIntLabelToBuilder
 import org.usvm.machine.types.makeCellToSlice
 import org.usvm.machine.types.makeSliceRefLoad
 import org.usvm.machine.types.makeSliceTypeLoad
@@ -446,7 +447,7 @@ class TvmCellInterpreter(
         }
 
         val updatedSliceAddress = scope.calcOnState { memory.allocConcrete(TvmSliceType) }
-        scope.makeSliceTypeLoad(slice, TvmSymbolicCellDataInteger(mkBv(sizeBits), isSigned, Endian.BigEndian), updatedSliceAddress) {
+        scope.makeSliceTypeLoad(slice, TvmCellDataIntegerRead(mkBv(sizeBits), isSigned, Endian.BigEndian), updatedSliceAddress) {
 
             // hide the original [scope] from this closure
             @Suppress("NAME_SHADOWING", "UNUSED_VARIABLE")
@@ -494,7 +495,7 @@ class TvmCellInterpreter(
         val updatedSliceAddress = scope.calcOnState { memory.allocConcrete(TvmSliceType) }
         scope.makeSliceTypeLoad(
             slice,
-            TvmSymbolicCellDataInteger(sizeBits.extractToSizeSort(), isSigned, Endian.BigEndian),
+            TvmCellDataIntegerRead(sizeBits.extractToSizeSort(), isSigned, Endian.BigEndian),
             updatedSliceAddress
         ) {
 
@@ -532,7 +533,7 @@ class TvmCellInterpreter(
         val updatedSliceAddress = scope.calcOnState { memory.allocConcrete(TvmSliceType) }
         scope.makeSliceTypeLoad(
             slice,
-            TvmSymbolicCellDataInteger(mkBv(sizeBits), isSigned, Endian.LittleEndian),
+            TvmCellDataIntegerRead(mkBv(sizeBits), isSigned, Endian.LittleEndian),
             updatedSliceAddress
         ) {
 
@@ -590,7 +591,7 @@ class TvmCellInterpreter(
         val updatedSliceAddress = scope.calcOnState { memory.allocConcrete(TvmSliceType) }
         scope.makeSliceTypeLoad(
             slice,
-            TvmSymbolicCellDataBitArray(mkBv(sizeBits)), updatedSliceAddress
+            TvmCellDataBitArrayRead(mkBv(sizeBits)), updatedSliceAddress
         ) {
 
             // hide the original [scope] from this closure
@@ -623,7 +624,7 @@ class TvmCellInterpreter(
         }
 
         val updatedSliceAddress = scope.calcOnState { memory.allocConcrete(TvmSliceType) }
-        scope.makeSliceTypeLoad(slice, TvmSymbolicCellDataBitArray(sizeBits.extractToSizeSort()), updatedSliceAddress) {
+        scope.makeSliceTypeLoad(slice, TvmCellDataBitArrayRead(sizeBits.extractToSizeSort()), updatedSliceAddress) {
 
             // hide the original [scope] from this closure
             @Suppress("NAME_SHADOWING", "UNUSED_VARIABLE")
@@ -1048,6 +1049,9 @@ class TvmCellInterpreter(
         }
         checkOutOfRange(notOutOfRangeExpr, scope) ?: return
 
+        scope.doWithStateCtx {
+            loadIntLabelToBuilder(builder, updatedBuilder, mkSizeExpr(bits), intValue, isSigned, Endian.BigEndian)
+        }
         scope.builderStoreInt(updatedBuilder, intValue, bits.toBv257(), isSigned) ?: return@with
 
         scope.doWithState {
@@ -1086,6 +1090,9 @@ class TvmCellInterpreter(
         }
         checkOutOfRange(valueNotOutOfRangeExpr, scope) ?: return
 
+        scope.doWithStateCtx {
+            loadIntLabelToBuilder(builder, updatedBuilder, bits.extractToSizeSort(), intValue, isSigned, Endian.BigEndian)
+        }
         scope.builderStoreInt(updatedBuilder, intValue, bits, isSigned) ?: return@with
 
         scope.doWithState {
@@ -1120,6 +1127,8 @@ class TvmCellInterpreter(
         }
 
         scope.doWithState {
+            dataCellInfoStorage.mapper.setCellInfoFromBuilder(builder, cell)
+
             addOnStack(cell, TvmCellType)
             newStmt(stmt.nextStmt())
         }

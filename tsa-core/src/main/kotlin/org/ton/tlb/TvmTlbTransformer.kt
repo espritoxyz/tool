@@ -1,28 +1,30 @@
 package org.ton.tlb
 
 import org.ton.Endian.BigEndian
-import org.ton.TvmBasicMsgAddrLabel
-import org.ton.TvmCoinsLabel
-import org.ton.TvmCompositeDataCellLabel
-import org.ton.TvmDataCellLabel
-import org.ton.TvmDataCellStructure
-import org.ton.TvmDataCellStructure.Empty
-import org.ton.TvmDataCellStructure.KnownTypePrefix
-import org.ton.TvmDataCellStructure.LoadRef
-import org.ton.TvmDataCellStructure.SwitchPrefix
-import org.ton.TvmDataCellStructure.Unknown
-import org.ton.TvmFullMsgAddrLabel
-import org.ton.TvmIntegerLabel
-import org.ton.TvmMaybeRefLabel
+import org.ton.TlbBasicMsgAddrLabel
+import org.ton.TlbCoinsLabel
+import org.ton.TlbCompositeLabel
+import org.ton.TlbLabel
+import org.ton.TlbStructure
+import org.ton.TlbStructure.Empty
+import org.ton.TlbStructure.KnownTypePrefix
+import org.ton.TlbStructure.LoadRef
+import org.ton.TlbStructure.SwitchPrefix
+import org.ton.TlbStructure.Unknown
+import org.ton.TlbFullMsgAddrLabel
+import org.ton.TlbIntegerLabelOfConcreteSize
+import org.ton.TlbMaybeRefLabel
+import org.ton.TlbStructureIdProvider
 import org.ton.TvmParameterInfo
 import org.ton.TvmParameterInfo.DataCellInfo
+import org.usvm.machine.TvmContext
 
 class TvmTlbTransformer(
     definitions: List<TvmTlbTypeDefinition>,
     private val onlyBasicAddresses: Boolean = false,
 ) {
     private val typeDefinitions = definitions.associateBy { it.id }
-    private val transformed = hashMapOf<Pair<TvmTlbTypeDefinition, List<TvmTlbTypeExpr>>, TvmDataCellLabel>()
+    private val transformed = hashMapOf<Pair<TvmTlbTypeDefinition, List<TvmTlbTypeExpr>>, TlbLabel>()
     private val cellTypeId = definitions.first { it.name == "Cell" }.id
     private val anyTypeId = definitions.first { it.name == "Any" }.id
 
@@ -32,7 +34,7 @@ class TvmTlbTransformer(
     fun transformTypeDefinition(
         def: TvmTlbTypeDefinition,
         args: List<TvmTlbTypeExpr> = emptyList(),
-    ): TvmDataCellLabel? {
+    ): TlbLabel? {
         return transformed.getOrPut(def to args) {
             if (def.isBuiltin) {
                 transformBuiltins(def, args) ?: return null
@@ -51,24 +53,24 @@ class TvmTlbTransformer(
     private fun transformBuiltins(
         def: TvmTlbTypeDefinition,
         args: List<TvmTlbTypeExpr>,
-    ): TvmDataCellLabel? {
+    ): TlbLabel? {
         val name = def.name
 
         // TODO check `isSigned` and `endian` fields
         return when {
-            name == "#" -> TvmIntegerLabel(bitSize = 32, isSigned = false, endian = BigEndian)
-            name == "##" -> TvmIntegerLabel(bitSize = args.toIntConst(), isSigned = true, endian = BigEndian)
+            name == "#" -> TlbIntegerLabelOfConcreteSize(32, isSigned = false, endian = BigEndian)
+            name == "##" -> TlbIntegerLabelOfConcreteSize(args.toIntConst(), isSigned = true, endian = BigEndian)
             name == "bits" -> TODO()
-            name == "uint" -> TvmIntegerLabel(bitSize = args.toIntConst(), isSigned = false, endian = BigEndian)
-            name == "int" -> TvmIntegerLabel(bitSize = args.toIntConst(), isSigned = true, endian = BigEndian)
+            name == "uint" -> TlbIntegerLabelOfConcreteSize(args.toIntConst(), isSigned = false, endian = BigEndian)
+            name == "int" -> TlbIntegerLabelOfConcreteSize(args.toIntConst(), isSigned = true, endian = BigEndian)
             name.startsWith("bits") -> TODO()
             name.startsWith("int") -> {
                 val bits = name.removePrefix("int").toInt()
-                TvmIntegerLabel(bitSize = bits, isSigned = true, endian = BigEndian)
+                TlbIntegerLabelOfConcreteSize(bits, isSigned = true, endian = BigEndian)
             }
             name.startsWith("uint") -> {
                 val bits = name.removePrefix("uint").toInt()
-                TvmIntegerLabel(bitSize = bits, isSigned = false, endian = BigEndian)
+                TlbIntegerLabelOfConcreteSize(bits, isSigned = false, endian = BigEndian)
             }
             name == "Cell" || name == "Any" -> null
             else -> TODO()
@@ -78,7 +80,7 @@ class TvmTlbTransformer(
     private fun transformComplexType(
         def: TvmTlbTypeDefinition,
         args: List<TvmTlbTypeExpr>,
-    ): TvmDataCellLabel {
+    ): TlbLabel {
         // special cases
         when (def.name) {
             "Maybe" -> {
@@ -86,23 +88,24 @@ class TvmTlbTransformer(
                 when (val arg = args.single()) {
                     is TvmTlbReference -> {
                         val (internal, hasAny) = transformSequenceOfExprs(listOf(arg.ref))
-                        val label = TvmCompositeDataCellLabel(
+                        val label = TlbCompositeLabel(
                             "<anonymous-label>",
                             internal,
                             hasAny,
                         )
-                        return TvmMaybeRefLabel(DataCellInfo(label))
+                        return TlbMaybeRefLabel(DataCellInfo(label))
                     }
                     else -> {
                         val (internal, hasAny) = transformSequenceOfExprs(listOf(arg))
                         val structure = SwitchPrefix(
+                            id = TlbStructureIdProvider.provideId(),
                             switchSize = 1,
                             mapOf(
                                 "0" to Empty,
                                 "1" to internal
                             )
                         )
-                        return TvmCompositeDataCellLabel("Maybe", structure, hasAny)
+                        return TlbCompositeLabel("Maybe", structure, hasAny)
                     }
                 }
 
@@ -112,19 +115,20 @@ class TvmTlbTransformer(
                 val (left, leftHasAny) = transformSequenceOfExprs(listOf(args[0]))
                 val (right, rightHasAny) = transformSequenceOfExprs(listOf(args[1]))
                 val structure = SwitchPrefix(
+                    id = TlbStructureIdProvider.provideId(),
                     switchSize = 1,
                     mapOf(
                         "0" to left,
                         "1" to right
                     )
                 )
-                return TvmCompositeDataCellLabel("Either", structure, hasAny = leftHasAny || rightHasAny)
+                return TlbCompositeLabel("Either", structure, hasAny = leftHasAny || rightHasAny)
             }
             "MsgAddress" -> {
-                return if (onlyBasicAddresses) TvmBasicMsgAddrLabel else TvmFullMsgAddrLabel
+                return if (onlyBasicAddresses) TlbBasicMsgAddrLabel else TlbFullMsgAddrLabel
             }
             "Grams", "Coins" -> {  // TODO: add variant for `VarUInteger`
-                return TvmCoinsLabel
+                return TlbCoinsLabel
             }
         }
 
@@ -141,10 +145,10 @@ class TvmTlbTransformer(
             val structure = transformConstructors(
                 def.constructors.map { ConstructorTagSuffix(it, it.tag) }
             )
-            return TvmCompositeDataCellLabel(def.name, structure, hasAny = true)
+            return TlbCompositeLabel(def.name, structure, hasAny = true)
         }
 
-        return TvmCompositeDataCellLabel(
+        return TlbCompositeLabel(
             name = def.name
         ).also { label ->
             transformed[def to args] = label
@@ -157,7 +161,7 @@ class TvmTlbTransformer(
 
     private fun transformConstructors(
         constructors: List<ConstructorTagSuffix>,
-    ): TvmDataCellStructure {
+    ): TlbStructure {
         if (constructors.size == 1 && constructors.single().tagSuffix.isEmpty()) {
             return transformConstructor(constructors.single().constructor)
         }
@@ -175,6 +179,7 @@ class TvmTlbTransformer(
         val variants = groupedConstructors.mapValues { transformConstructors(it.value) }
 
         return SwitchPrefix(
+            id = TlbStructureIdProvider.provideId(),
             minLen,
             variants,
         )
@@ -182,8 +187,8 @@ class TvmTlbTransformer(
 
     private fun transformSequenceOfExprs(
         sequence: List<TvmTlbTypeExpr>,
-    ): Pair<TvmDataCellStructure, Boolean> {
-        var last: TvmDataCellStructure = Empty
+    ): Pair<TlbStructure, Boolean> {
+        var last: TlbStructure = Empty
         var foundAny = false
         sequence.asReversed().forEach { expr ->
             last = when (expr) {
@@ -197,7 +202,7 @@ class TvmTlbTransformer(
                         DataCellInfo(it)
                     } ?: TvmParameterInfo.UnknownCellInfo
 
-                    LoadRef(dataInfo, last)
+                    LoadRef(TlbStructureIdProvider.provideId(), dataInfo, last)
                 }
 
                 is TvmTlbType -> {
@@ -205,11 +210,12 @@ class TvmTlbTransformer(
 
                     transformTypeDefinition(typeDef, expr.args)?.let { label ->
                         // unfold last label, if it has `Any`
-                        if (last is Empty && label is TvmCompositeDataCellLabel && label.definitelyHasAny) {
+                        if (last is Empty && label is TlbCompositeLabel && label.definitelyHasAny) {
                             foundAny = true
                             label.internalStructure
                         } else {
-                            KnownTypePrefix(label, last)
+                            check(label.arity == 0)
+                            KnownTypePrefix(TlbStructureIdProvider.provideId(), label, typeArgIds = emptyList(), last)
                         }
                     } ?: let {
                         foundAny = true
@@ -226,7 +232,7 @@ class TvmTlbTransformer(
 
     private fun transformConstructor(
         constructor: TvmTlbTypeConstructor
-    ): TvmDataCellStructure {
+    ): TlbStructure {
         val exprs = constructor.fields.map { it.typeExpr }
         return transformSequenceOfExprs(exprs).first
     }

@@ -1,17 +1,17 @@
 package org.usvm.machine.types.dp
 
-import org.ton.TvmCompositeDataCellLabel
-import org.ton.TvmDataCellStructure
+import org.ton.TlbCompositeLabel
+import org.ton.TlbStructure
 import org.usvm.machine.TvmContext
 import org.usvm.mkSizeAddExpr
 import org.usvm.mkSizeExpr
 
 fun calculateDataLengths(
     ctx: TvmContext,
-    labelsWithoutUnknowns: Collection<TvmCompositeDataCellLabel>,
-    individualMaxCellTlbDepth: Map<TvmCompositeDataCellLabel, Int>,
-): List<Map<TvmCompositeDataCellLabel, AbstractSizeExpr>> =
-    calculateMapsByTlbDepth(labelsWithoutUnknowns) { label, curDepth, prevDepthValues ->
+    labelsWithoutUnknowns: Collection<TlbCompositeLabel>,
+    individualMaxCellTlbDepth: Map<TlbCompositeLabel, Int>,
+): List<Map<TlbCompositeLabel, AbstractSizeExpr>> =
+    calculateMapsByTlbDepth(ctx.tvmOptions.tlbOptions.maxTlbDepth, labelsWithoutUnknowns) { label, curDepth, prevDepthValues ->
         val tlbDepthBound = individualMaxCellTlbDepth[label]
             ?: error("individualMaxCellTlbDepth must be calculated for all labels")
 
@@ -27,34 +27,33 @@ fun calculateDataLengths(
  * */
 private fun getDataLength(
     ctx: TvmContext,
-    struct: TvmDataCellStructure,
-    lengthsFromPreviousDepth: Map<TvmCompositeDataCellLabel, AbstractSizeExpr>,
+    struct: TlbStructure,
+    lengthsFromPreviousDepth: Map<TlbCompositeLabel, AbstractSizeExpr>,
 ): AbstractSizeExpr? = with(ctx) {
     when (struct) {
-        is TvmDataCellStructure.Unknown -> {
+        is TlbStructure.Unknown -> {
             error("Cannot calculate length for Unknown leaf")
         }
 
-        is TvmDataCellStructure.Empty -> {
+        is TlbStructure.Empty -> {
             AbstractSizeExpr { zeroSizeExpr }
         }
 
-        is TvmDataCellStructure.LoadRef -> {
-            // no need for shift
-            getDataLength(ctx, struct.selfRest, lengthsFromPreviousDepth)
+        is TlbStructure.LoadRef -> {
+            getDataLength(ctx, struct.rest, lengthsFromPreviousDepth)
         }
 
-        is TvmDataCellStructure.KnownTypePrefix -> {
+        is TlbStructure.KnownTypePrefix -> {
             val furtherWithoutShift = getDataLength(ctx, struct.rest, lengthsFromPreviousDepth)
                 ?: return null  // cannot construct with given depth
 
-            val offset = getKnownTypePrefixDataOffset(struct, lengthsFromPreviousDepth)
+            val offset = getKnownTypePrefixDataLength(struct, lengthsFromPreviousDepth)
                 ?: return null  // cannot construct with given depth
 
             furtherWithoutShift.shiftAndAdd(offset)
         }
 
-        is TvmDataCellStructure.SwitchPrefix -> {
+        is TlbStructure.SwitchPrefix -> {
             val switchSize = struct.switchSize
             val childLengths = struct.variants.mapNotNull { (key, variant) ->
 

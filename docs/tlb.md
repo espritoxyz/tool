@@ -9,9 +9,11 @@ These 2 goals are achieved by different mechanisms, both of which work with inte
 
 ## API for storing TL-B schemes
 
-For storing TL-B schemes we introduce two core classes: `TvmDataCellStructure` and `TvmDataCellLabel`.
+For storing TL-B schemes we introduce two core classes: `TlbStructure` and `TlbLabel`.
 
-`TvmDataCellLabel` might be atomic or composite. Each composite `TvmDataCellLabel` has an internal structure of type `TvmDataCellStructure`. It corresponds to a TL-B definition with applied arguments.
+`TlbLabel` might be atomic or composite. Each composite `TlbLabel` has an internal structure of type `TlbStructure`. It corresponds to a TL-B definition with applied arguments.
+
+Some `TlbLabel`s are built-in. That means that they have corresponding TVM read instruction.
 
 ## Eliminating inputs with wrong format
 
@@ -39,4 +41,23 @@ We store a position of each slice as `TlbStack`. Some of the conflicts are detec
 
 ## Auxiliary TL-B characteristics
 
-All described operations (generating structural constraints, detecting TL-B conflicts) use some precalculated values for instances of `TvmDataCellLabel` like symbolic data/refs length, maximum number of children, default cell content. All of these are contained within `CalculatedTlbLabelInfo`. They are calculated at the very beginning of the analysis using dynamic programming approach.
+All described operations (generating structural constraints, detecting TL-B conflicts) use some precalculated values for instances of `TlbLabel` like symbolic data/refs length, maximum number of children, default cell content. All of these are contained within `CalculatedTlbLabelInfo`. They are calculated at the very beginning of the analysis using dynamic programming approach.
+
+## TL-B for builders
+
+Class for storing TL-B info for builders is `TlbStructureBuilder`. It produces `TlbStructure` with `end` method.
+
+TL-B structures for allocated cells are based on used `store` operation. Usually `store_x` adds the corresponding `TlbLabel` in the building structure. A special case is `store_(u)int` for constant value. That produces `switch` with one variant, the stored constant.
+
+## Some TL-B parsing rules
+
+- `skip_bits` is allowed only for integers and switches of size 1.
+
+## What's not supported
+
+- After `load_bits`, TL-B scheme in the read slice is lost
+- `store_slice`
+- Comparing produced TL-B scheme for a builded cell with the expected one
+- `bits` in TL-B scheme
+- Type arguments are supported only for `int` (though not supported by TL-B parser yet)
+- Some other complex constructions in TL-B definitions
