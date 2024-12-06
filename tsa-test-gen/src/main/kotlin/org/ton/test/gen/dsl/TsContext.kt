@@ -18,8 +18,13 @@ class TsContext {
     val trueValue = TsBooleanValue(value = true)
 
     val zeroValue = 0.toTsValue()
+    val oneValue = 1.toTsValue()
+    val twoValue = 2.toTsValue()
+    val tenValue = 10.toTsValue()
 
     val zeroBigintValue = BigInteger.ZERO.toTsValue()
+    val oneBigIntValue = BigInteger.ONE.toTsValue()
+    val twoBigIntValue = BigInteger.TWO.toTsValue()
 
     internal fun TsReference<*>.isMutable(): Boolean = this in mutableVariables
 

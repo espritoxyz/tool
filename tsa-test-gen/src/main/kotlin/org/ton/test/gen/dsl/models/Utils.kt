@@ -53,6 +53,20 @@ fun compileContract(target: String): TsExpression<TsCell> =
         type = TsCell
     )
 
+fun initializeContract(
+    blockchain: TsExpression<TsBlockchain>,
+    address: TsExpression<TsAddress>,
+    code: TsExpression<TsCell>,
+    data: TsExpression<TsCell>,
+    balance: TsExpression<TsBigint> = toNano("100")
+) = TsMethodCall(
+    caller = null,
+    executableName = "initializeContract",
+    arguments = listOf(blockchain, address, code, data, balance),
+    async = true,
+    type = TsVoid
+)
+
 fun cellFromHex(hex: String): TsExpression<TsCell> =
     TsMethodCall(
         caller = null,
@@ -62,11 +76,83 @@ fun cellFromHex(hex: String): TsExpression<TsCell> =
         type = TsCell
     )
 
+fun beginCell(): TsExpression<TsBuilder> =
+    TsMethodCall(
+        caller = null,
+        executableName = "beginCell",
+        arguments = emptyList(),
+        async = false,
+        type = TsBuilder
+    )
+
+fun TsExpression<TsBuilder>.storeUint(
+    value: TsExpression<TsInt>,
+    bits: TsExpression<TsInt>
+): TsExpression<TsBuilder> = TsMethodCall(
+    caller = this,
+    executableName = "storeUint",
+    arguments = listOf(value, bits),
+    async = false,
+    type = TsBuilder
+)
+
+fun TsExpression<TsBuilder>.storeInt(
+    value: TsExpression<TsInt>,
+    bits: TsExpression<TsInt>
+): TsExpression<TsBuilder> = TsMethodCall(
+    caller = this,
+    executableName = "storeInt",
+    arguments = listOf(value, bits),
+    async = false,
+    type = TsBuilder
+)
+
+fun TsExpression<TsBuilder>.storeAddress(
+    address: TsExpression<TsAddress>
+): TsExpression<TsBuilder> = TsMethodCall(
+    caller = this,
+    executableName = "storeAddress",
+    arguments = listOf(address),
+    async = false,
+    type = TsBuilder
+)
+
+fun TsExpression<TsBuilder>.storeCoins(
+    coins: TsExpression<TsInt>
+): TsExpression<TsBuilder> = TsMethodCall(
+    caller = this,
+    executableName = "storeCoins",
+    arguments = listOf(coins),
+    async = false,
+    type = TsBuilder
+)
+
+fun TsExpression<TsBuilder>.storeRef(
+    cell: TsExpression<TsCell>
+): TsExpression<TsBuilder> = TsMethodCall(
+    caller = this,
+    executableName = "storeRef",
+    arguments = listOf(cell),
+    async = false,
+    type = TsBuilder
+)
+
+fun TsExpression<TsBuilder>.endCell(): TsExpression<TsCell> = TsMethodCall(
+    caller = this,
+    executableName = "endCell",
+    arguments = listOf(),
+    async = false,
+    type = TsCell
+)
+
 operator fun <T : TsNum> TsExpression<T>.plus(value: TsExpression<T>): TsExpression<T> =
     TsNumAdd(this, value)
 
 operator fun <T : TsNum> TsExpression<T>.minus(value: TsExpression<T>): TsExpression<T> =
     TsNumSub(this, value)
+
+operator fun <T : TsNum> TsExpression<T>.div(value: TsExpression<T>): TsExpression<T> =
+    TsNumDiv(this, value)
 
 fun <T : TsWrapper> TsExpression<TsBlockchain>.openContract(wrapper: TsExpression<T>) =
     TsMethodCall(

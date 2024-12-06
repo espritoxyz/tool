@@ -34,7 +34,7 @@ fun generateTests(
     analysisResult: TvmContractSymbolicTestResult,
     projectPath: Path,
     sourceRelativePath: Path,
-) {
+): String {
     val entryTests = analysisResult.testSuites
         .single { it.methodId == TvmContext.RECEIVE_INTERNAL_ID }
         .filter { it.result is TvmMethodFailure }
@@ -46,6 +46,7 @@ fun generateTests(
     val renderedTests = TsRenderer(ctx).renderTests(test)
 
     writeRenderedTest(projectPath, renderedTests)
+    return renderedTests.fileName
 }
 
 private fun TsContext.recvInternalTests(

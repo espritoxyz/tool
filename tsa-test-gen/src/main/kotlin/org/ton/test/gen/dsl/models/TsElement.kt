@@ -62,9 +62,11 @@ sealed interface TsElement {
             is TsReference<*> -> visit(element)
             is TsNumAdd<*> -> visit(element)
             is TsNumSub<*> -> visit(element)
+            is TsNumDiv<*> -> visit(element)
             is TsMethodCall<*> -> visit(element)
             is TsFieldRead<*, *> -> visit(element)
             is TsConstructorCall<*> -> visit(element)
+            is TsEquals<*> -> visit(element)
         }
 }
 
@@ -144,6 +146,10 @@ data class TsBuilderValue(val value: TvmTestBuilderValue) : TsExpression<TsBuild
     override val type: TsBuilder
         get() = TsBuilder
 }
+data class TsEquals<T : TsType>(val lhs: TsExpression<T>, val rhs: TsExpression<T>) : TsExpression<T> {
+    override val type: T
+        get() = lhs.type
+}
 
 /* arithmetic */
 
@@ -152,6 +158,10 @@ data class TsNumAdd<T : TsNum>(val lhs: TsExpression<T>, val rhs: TsExpression<T
         get() = lhs.type
 }
 data class TsNumSub<T : TsNum>(val lhs: TsExpression<T>, val rhs: TsExpression<T>) : TsExpression<T> {
+    override val type: T
+        get() = lhs.type
+}
+data class TsNumDiv<T : TsNum>(val lhs: TsExpression<T>, val rhs: TsExpression<T>) : TsExpression<T> {
     override val type: T
         get() = lhs.type
 }

@@ -20,6 +20,7 @@ import org.ton.test.gen.dsl.models.TsDeclaration
 import org.ton.test.gen.dsl.models.TsDictValue
 import org.ton.test.gen.dsl.models.TsElement
 import org.ton.test.gen.dsl.models.TsEmptyLine
+import org.ton.test.gen.dsl.models.TsEquals
 import org.ton.test.gen.dsl.models.TsExecutableCall
 import org.ton.test.gen.dsl.models.TsExpectToEqual
 import org.ton.test.gen.dsl.models.TsExpectToHaveTransaction
@@ -31,6 +32,7 @@ import org.ton.test.gen.dsl.models.TsIntValue
 import org.ton.test.gen.dsl.models.TsMethodCall
 import org.ton.test.gen.dsl.models.TsNum
 import org.ton.test.gen.dsl.models.TsNumAdd
+import org.ton.test.gen.dsl.models.TsNumDiv
 import org.ton.test.gen.dsl.models.TsNumSub
 import org.ton.test.gen.dsl.models.TsReference
 import org.ton.test.gen.dsl.models.TsSandboxContract
@@ -56,6 +58,8 @@ import org.usvm.test.resolver.TvmTestValue
 
 class TsRenderer(val ctx: TsContext) : TsVisitor<Unit> {
     private val printer = TsPrinterImpl()
+
+    private val maxPrecedence = 18
 
     fun renderTests(test: TsTestFile): TsRenderedTest {
         printer.clear()
@@ -217,7 +221,7 @@ class TsRenderer(val ctx: TsContext) : TsVisitor<Unit> {
     }
 
     override fun <R : TsType, T : TsType> visit(element: TsFieldRead<R, T>) {
-        element.receiver.accept(this)
+        precedencePrint(element.receiver, element)
         printer.print(".${element.fieldName}")
     }
 
@@ -255,6 +259,17 @@ class TsRenderer(val ctx: TsContext) : TsVisitor<Unit> {
     }
 
     override fun <T : TsType> visit(element: TsExpectToEqual<T>) {
+        if (element.actual.type == TsBigint) {
+            // workaround, since jest cannot serialize BigInt with --json flag
+
+            printer.print("expect(")
+            TsEquals(element.actual, element.expected).accept(this)
+            printer.print(").toBe(true)")
+            endStatement()
+
+            return
+        }
+
         printer.print("expect(")
         element.actual.accept(this)
         printer.print(").toEqual(")
@@ -291,15 +306,21 @@ class TsRenderer(val ctx: TsContext) : TsVisitor<Unit> {
     }
 
     override fun <T : TsNum> visit(element: TsNumAdd<T>) {
-        element.lhs.accept(this)
+        precedencePrint(element.lhs, element)
         printer.print(" + ")
-        element.rhs.accept(this)
+        precedencePrint(element.rhs, element)
     }
 
     override fun <T : TsNum> visit(element: TsNumSub<T>) {
-        element.lhs.accept(this)
+        precedencePrint(element.lhs, element)
         printer.print(" - ")
-        element.rhs.accept(this)
+        precedencePrint(element.rhs, element)
+    }
+
+    override fun <T : TsNum> visit(element: TsNumDiv<T>) {
+        precedencePrint(element.lhs, element)
+        printer.print(" / ")
+        precedencePrint(element.rhs, element)
     }
 
     override fun visit(element: TsBooleanValue) {
@@ -334,6 +355,46 @@ class TsRenderer(val ctx: TsContext) : TsVisitor<Unit> {
     override fun visit(element: TsBuilderValue) {
         printer.print(renderTestValue(element.value))
     }
+
+    override fun <T : TsType> visit(element: TsEquals<T>) {
+        precedencePrint(element.lhs, element)
+        printer.print(" == ")
+        precedencePrint(element.rhs, element)
+    }
+
+    private fun precedencePrint(element: TsExpression<*>, parent: TsExpression<*>) {
+        // TODO support associativity
+
+        if (element.precedence() <= parent.precedence() && element.precedence() != maxPrecedence) {
+            printer.print("(")
+            element.accept(this)
+            printer.print(")")
+        } else {
+            element.accept(this)
+        }
+    }
+
+    private fun TsExpression<*>.precedence(): Int =
+        // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Operator_precedence#table
+        when (val element = this) {
+            is TsIntValue -> maxPrecedence
+            is TsBigintValue -> maxPrecedence
+            is TsBooleanValue -> maxPrecedence
+            is TsStringValue -> maxPrecedence
+            is TsBuilderValue -> maxPrecedence
+            is TsDataCellValue -> maxPrecedence
+            is TsSliceValue -> maxPrecedence
+            is TsDictValue -> maxPrecedence
+            is TsReference -> maxPrecedence
+
+            is TsFieldRead<*, *> -> 17
+            is TsConstructorCall<*> -> if (element.arguments.isEmpty()) 16 else 17
+            is TsMethodCall<*> -> if (element.async) 14 else maxPrecedence
+            is TsNumDiv<*> -> 12
+            is TsNumAdd<*> -> 11
+            is TsNumSub<*> -> 11
+            is TsEquals<*> -> 8
+        }
 
     private fun renderTestValue(arg: TvmTestValue): String =
         when (arg) {
@@ -408,7 +469,7 @@ class TsRenderer(val ctx: TsContext) : TsVisitor<Unit> {
         private const val STATEMENT_END: String = ""
 
         private val TEST_FILE_IMPORTS = """
-            import {Blockchain, SandboxContract, SendMessageResult} from '@ton/sandbox'
+            import {Blockchain, createShardAccount, SandboxContract, SendMessageResult} from '@ton/sandbox'
             import {Address, beginCell, Builder, Cell, Dictionary, DictionaryValue, Slice, toNano} from '@ton/core'
             import '@ton/test-utils'
             import {compileFunc} from "@ton-community/func-js"
@@ -430,6 +491,23 @@ class TsRenderer(val ctx: TsContext) : TsVisitor<Unit> {
                 }
     
                 return Cell.fromBoc(Buffer.from(compileResult.codeBoc, "base64"))[0]
+            }
+            
+            async function initializeContract(
+                blockchain: Blockchain, 
+                address: Address, 
+                code: Cell, 
+                data: Cell, 
+                balance: bigint = toNano(100)
+            ) {
+                const contr = await blockchain.getContract(address);
+                contr.account = createShardAccount({
+                    address: address,
+                    code: code,
+                    data: data,
+                    balance: balance,
+                    workchain: 0
+                })
             }
             
             const sliceValue: DictionaryValue<Slice> = {

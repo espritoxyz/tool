@@ -11,17 +11,19 @@ import org.ton.bytecode.TvmMethod
 import org.ton.cell.Cell
 import org.usvm.machine.FuncAnalyzer.Companion.FIFT_EXECUTABLE
 import org.usvm.machine.state.ContractId
+import org.usvm.machine.state.TvmState
+import org.usvm.statistics.UMachineObserver
+import org.usvm.stopstrategies.StopStrategy
 import org.usvm.test.resolver.TvmContractSymbolicTestResult
+import org.usvm.test.resolver.TvmMethodCoverage
 import org.usvm.test.resolver.TvmTestResolver
 import org.usvm.utils.FileUtils
+import org.usvm.utils.executeCommandWithTimeout
+import org.usvm.utils.toText
 import java.math.BigInteger
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.util.concurrent.TimeUnit
-import org.usvm.machine.state.TvmState
-import org.usvm.statistics.UMachineObserver
-import org.usvm.stopstrategies.StopStrategy
-import org.usvm.test.resolver.TvmMethodCoverage
 import kotlin.io.path.ExperimentalPathApi
 import kotlin.io.path.absolutePathString
 import kotlin.io.path.copyTo
@@ -98,18 +100,16 @@ data object TactAnalyzer : TvmAnalyzer {
     }
 
     private fun compileTact(configFile: Path) {
-        val command = "$TACT_EXECUTABLE --config ${configFile.absolutePathString()}"
-        val compilerProcess = ProcessBuilder(listOf("/bin/sh", "-c", command))
-            .start()
-        val exited = compilerProcess.waitFor(COMPILER_TIMEOUT, TimeUnit.SECONDS)
+        val tactCommand = "$TACT_EXECUTABLE --config ${configFile.absolutePathString()}"
+        val executionCommand = tactCommand.toExecutionCommand()
+        val (exitValue, completedInTime, _, errors) = executeCommandWithTimeout(executionCommand, COMPILER_TIMEOUT)
 
-        check(exited) {
-            compilerProcess.destroyForcibly()
+        check(completedInTime) {
             "Tact compilation process has not finished in $COMPILER_TIMEOUT seconds"
         }
 
-        check(compilerProcess.exitValue() == 0) {
-            "Compilation failed, error: ${compilerProcess.errorStream.bufferedReader().readText()}"
+        check(exitValue == 0) {
+            "Tact compilation failed with an error, exit code $exitValue, errors: \n${errors.toText()}"
         }
     }
 
@@ -258,17 +258,19 @@ class FuncAnalyzer(
     }
 
     fun compileFuncSourceToFift(funcSourcesPath: Path, fiftFilePath: Path) {
-        val command = "$funcExecutablePath -AP $funcStdlibPath ${funcSourcesPath.absolutePathString()}"
-        val compilerProcess = ProcessBuilder(listOf("/bin/sh", "-c", command))
-            .start()
-        val exited = compilerProcess.waitFor(COMPILER_TIMEOUT, TimeUnit.SECONDS)
-        check(exited) {
-            compilerProcess.destroyForcibly()
-            "Compiler process has not finished in $COMPILER_TIMEOUT seconds"
+        val funcCommand = "$funcExecutablePath -AP $funcStdlibPath ${funcSourcesPath.absolutePathString()}"
+        val executionCommand = funcCommand.toExecutionCommand()
+        val (exitValue, completedInTime, output, errors) = executeCommandWithTimeout(executionCommand, COMPILER_TIMEOUT)
+
+        check(completedInTime) {
+            "FunC compilation to Fift has not finished in $COMPILER_TIMEOUT seconds"
+        }
+
+        check(exitValue == 0) {
+            "FunC compilation failed with an error, exit code $exitValue, errors: \n${errors.toText()}"
         }
         val fiftIncludePreamble = """"Fift.fif" include"""
-        val output = compilerProcess.inputReader().readText()
-        val fiftCode = "$fiftIncludePreamble\n$output"
+        val fiftCode = "$fiftIncludePreamble\n${output.toText()}"
 
         fiftFilePath.writeText(fiftCode)
     }
@@ -277,16 +279,15 @@ class FuncAnalyzer(
         val funcCommand = "$funcExecutablePath -W ${bocFilePath.absolutePathString()} $funcStdlibPath ${funcSourcesPath.absolutePathString()}"
         val fiftCommand = "$fiftExecutablePath -I $fiftStdlibPath"
         val command = "$funcCommand | $fiftCommand"
-        val compilerProcess = ProcessBuilder(listOf("/bin/sh", "-c", command))
-            .start()
-        val exited = compilerProcess.waitFor(COMPILER_TIMEOUT, TimeUnit.SECONDS)
-        check(exited) {
-            compilerProcess.destroyForcibly()
-            "Compiler process has not finished in $COMPILER_TIMEOUT seconds"
+        val executionCommand = command.toExecutionCommand()
+        val (exitValue, completedInTime, _, errors) = executeCommandWithTimeout(executionCommand, COMPILER_TIMEOUT)
+
+        check(completedInTime) {
+            "FunC compilation to BoC has not finished in $COMPILER_TIMEOUT seconds"
         }
 
-        check(bocFilePath.exists() && bocFilePath.readBytes().isNotEmpty()) {
-            "Compilation failed, error: ${compilerProcess.errorStream.bufferedReader().readText()}"
+        check(exitValue == 0) {
+            "FunC compilation to BoC failed with an error, exit code $exitValue, errors: \n${errors.toText()}"
         }
     }
 
@@ -405,24 +406,20 @@ class FiftAnalyzer(
     """.trimIndent()
 
         val fiftCommand = "echo '$fiftTextWithOutputCommand' | $fiftExecutablePath -n"
-        val compilerProcess = ProcessBuilder(listOf("/bin/sh", "-c", fiftCommand))
-            .directory(fiftStdlibPath.toFile())
-            .start()
-        val exited = compilerProcess.waitFor(COMPILER_TIMEOUT, TimeUnit.SECONDS)
-        check(exited) {
-            compilerProcess.destroyForcibly()
-            "Compiler process has not finished in $COMPILER_TIMEOUT seconds"
+        val executionCommand = fiftCommand.toExecutionCommand()
+        val (exitValue, completedInTime, _, errors) = executeCommandWithTimeout(
+            executionCommand,
+            COMPILER_TIMEOUT,
+            fiftStdlibPath.toFile()
+        )
+
+        check(completedInTime) {
+            "Fift compilation has not finished in $COMPILER_TIMEOUT seconds"
         }
 
-        check(compilerProcess.exitValue() == 0 && bocFilePath.exists() && bocFilePath.readBytes().isNotEmpty()) {
-            "Compilation failed, error: ${compilerProcess.errorStream.bufferedReader().readText()}"
+        check(exitValue == 0 && bocFilePath.exists() && bocFilePath.readBytes().isNotEmpty()) {
+            "Fift compilation failed with an error, exit code $exitValue, errors: \n${errors.toText()}"
         }
-    }
-
-    private fun ProcessBuilder.addFiftStdlib(): ProcessBuilder {
-        val env = environment()
-        env["FIFTPATH"] = fiftStdlibPath.toString()
-        return this
     }
 
     private fun runFiftInterpreter(
@@ -430,21 +427,23 @@ class FiftAnalyzer(
         fiftInterpreterCommand: String
     ): FiftInterpreterResult{
         val fiftCommand = "echo '$fiftInterpreterCommand' | $fiftExecutablePath -n"
-        val interpreterProcess = ProcessBuilder(listOf("/bin/sh", "-c", fiftCommand))
-            .directory(fiftWorkDir.toFile())
-            .addFiftStdlib()
-            .start()
+        val executionCommand = fiftCommand.toExecutionCommand()
+        val (exitValue, completedInTime, output, errors) = executeCommandWithTimeout(
+            executionCommand,
+            COMPILER_TIMEOUT,
+            fiftWorkDir.toFile(),
+            mapOf("FIFTPATH" to fiftStdlibPath.toString())
+        )
 
-        val stdout = interpreterProcess.inputStream.bufferedReader().readText()
-        val stderr = interpreterProcess.errorStream.bufferedReader().readText()
-
-        val exited = interpreterProcess.waitFor(COMPILER_TIMEOUT, TimeUnit.SECONDS)
-        check(exited) {
-            interpreterProcess.destroyForcibly()
-            "`fift` process has not finished in $COMPILER_TIMEOUT seconds"
+        check(completedInTime) {
+            "`fift` process has not has not finished in $COMPILER_TIMEOUT seconds"
         }
 
-        val finalStackState = stdout.lines()
+        check(exitValue == 0) {
+            "`fift` process failed with an error, exit code $exitValue, errors: \n${errors.toText()}"
+        }
+
+        val finalStackState = output
             .lastOrNull { it.trim().endsWith(FINAL_STACK_STATE_MARKER) }
             ?.trim()?.removeSuffix(FINAL_STACK_STATE_MARKER)?.trim()
             ?: error("No final stack state")
@@ -455,7 +454,7 @@ class FiftAnalyzer(
 
         val stackEntriesWithoutExitCode = stackEntries.dropLast(1)
 
-        val tvmState = stderr.lines()
+        val tvmState = errors
             .mapNotNull { TVM_EXECUTION_STATUS_PATTERN.matchEntire(it) }
             .lastOrNull()
             ?: error("No TVM state")
@@ -485,23 +484,21 @@ data object BocAnalyzer : TvmAnalyzer {
 
     fun loadContractFromBoc(bocFilePath: Path): TvmContractCode {
         val disasmArgs = DISASSEMBLER_RUN_COMMAND.split(" ") + bocFilePath.absolutePathString()
-        val disasmProcess = ProcessBuilder(disasmArgs)
-            .directory(Paths.get(DISASSEMBLER_PATH).toFile())
-            .start()
+        val (exitValue, completedInTime, bytecodeJson, errors) = executeCommandWithTimeout(
+            disasmArgs,
+            DISASSEMBLER_TIMEOUT,
+            Paths.get(DISASSEMBLER_PATH).toFile()
+        )
 
-        val bytecodeJson = disasmProcess.inputStream.bufferedReader().readText()
-        val stderr = disasmProcess.errorStream.bufferedReader().readText()
-
-        val exited = disasmProcess.waitFor(DISASSEMBLER_TIMEOUT, TimeUnit.SECONDS)
-        check(exited) {
-            disasmProcess.destroyForcibly()
+        check(completedInTime) {
             "Disassembler process has not finished in $DISASSEMBLER_TIMEOUT seconds"
         }
-        check(disasmProcess.exitValue() == 0) {
-            "Disassembler process finished with an error:\n$stderr"
+
+        check(exitValue == 0) {
+            "Disassembler process finished with an error, exit code $exitValue, errors: \n${errors.toText()}"
         }
 
-        return TvmContractCode.fromJson(bytecodeJson)
+        return TvmContractCode.fromJson(bytecodeJson.toText())
     }
 
     private val DISASSEMBLER_PATH: String by lazy {
@@ -510,7 +507,9 @@ data object BocAnalyzer : TvmAnalyzer {
         disassemblerPath.absolutePath
     }
     private const val DISASSEMBLER_RUN_COMMAND = "node dist/index.js"
-    private const val DISASSEMBLER_TIMEOUT = 5.toLong() // seconds
+
+    // For the large contracts disassembling can take up to the one minute
+    private const val DISASSEMBLER_TIMEOUT = 60.toLong() // seconds
 }
 
 private fun runAnalysisInCatchingBlock(
@@ -614,6 +613,8 @@ fun analyzeAllMethods(
 
     return TvmTestResolver.resolve(methodStates)
 }
+
+private fun String.toExecutionCommand(): List<String> = listOf("/bin/sh", "-c", this)
 
 data class FiftInterpreterResult(
     val exitCode: Int,
