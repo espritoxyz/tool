@@ -305,6 +305,7 @@ import org.usvm.sizeSort
 import org.usvm.solver.USatResult
 import org.usvm.targets.UTargetsSet
 import java.math.BigInteger
+import org.ton.bytecode.TvmContBasicCallxargsVarInst
 
 // TODO there are a lot of `scope.calcOnState` and `scope.doWithState` invocations that are not inline - optimize it
 class TvmInterpreter(
@@ -1812,6 +1813,16 @@ class TvmInterpreter(
                 scope.consumeDefaultGas(stmt)
 
                 scope.switchToContinuation(stmt, stmt.cont, returnToTheNextStmt = true)
+            }
+            is TvmContBasicCallxargsVarInst -> {
+                scope.consumeDefaultGas(stmt)
+
+                // TODO correct implementation
+                // if instructions for manual continuation registers handling are not used (POPCTR, SETCONTCTR, ...),
+                // then this instruction is equivalent to `EXECUTE`
+
+                val continuationValue = scope.calcOnState { stack.takeLastContinuation() }
+                scope.switchToContinuation(stmt, continuationValue, returnToTheNextStmt = true)
             }
             else -> TODO("$stmt")
         }

@@ -9,6 +9,7 @@ import io.ksmt.sort.KBvSort
 import io.ksmt.utils.BvUtils.bvMaxValueUnsigned
 import io.ksmt.utils.BvUtils.toBigIntegerSigned
 import io.ksmt.utils.asExpr
+import io.ksmt.utils.powerOfTwo
 import io.ksmt.utils.toBigInteger
 import java.math.BigInteger
 import org.ton.bytecode.TvmField
@@ -119,6 +120,8 @@ class TvmContext(
 
     val sendMsgActionTag = mkBvHex("0ec3c86d", 32u)
     val reserveActionTag = mkBvHex("36e6b809", 32u)
+
+    val sendMsgFeeEstimationFlag = powerOfTwo(10u).toBv257()
 
     fun UBoolExpr.toBv257Bool(): UExpr<TvmInt257Sort> = with(ctx) {
         mkIte(
