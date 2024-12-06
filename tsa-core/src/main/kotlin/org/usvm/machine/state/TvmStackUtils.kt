@@ -67,7 +67,7 @@ fun TvmStackValue.toStackEntry(): TvmConcreteStackEntry = TvmConcreteStackEntry(
 
 fun TvmState.takeLastIntOrNull(): UExpr<TvmInt257Sort>? {
     val intStackValue = stack.takeLast(TvmIntegerType) { id ->
-        initializeIncomingMsgValue(ctx.mkRegisterReading(id, ctx.int257sort))
+        ctx.mkRegisterReading(id, ctx.int257sort)
     }
 
     if (intStackValue !is TvmStack.TvmStackIntValue) {
@@ -88,7 +88,7 @@ fun TvmStepScopeManager.takeLastIntOrThrowTypeError(): UExpr<TvmInt257Sort>? =
 
 fun TvmState.takeLastCell(): UHeapRef? =
     takeLastRef(stack, TvmCellType, TvmStackValue::cellValue) {
-        initializeMsgBody(generateSymbolicCell())
+        generateSymbolicCell()
     }?.also { ensureSymbolicCellInitialized(it) }
 
 fun TvmStepScopeManager.takeLastCell(): UHeapRef? =
@@ -135,7 +135,7 @@ fun TvmStepScopeManager.takeLastTuple(): TvmStackTupleValue? = calcOnStateCtx {
     }
 }
 
-fun TvmStack.takeLastContinuation(): TvmContinuation {
+fun TvmStack.takeLastContinuation(): TvmContinuation? {
     val continuationStackValue = takeLast(TvmContinuationType) { _ ->
         error("Unexpected continuation as an input")
     }
@@ -152,56 +152,6 @@ private fun <Ref : UHeapRef> takeLastRef(
 ): Ref? {
     val lastRefValue = stack.takeLast(referenceType, generateSymbolicRef)
     return lastRefValue.extractValue()?.also { assertType(it, referenceType) }
-}
-
-private fun TvmState.initializeIncomingMsgValue(
-    symbolicArg: UExpr<TvmInt257Sort>
-): UExpr<TvmInt257Sort> = with(ctx) {
-    if (!tvmOptions.enableInternalArgsConstraints || !entrypoint.isReceiveInternal()) {
-        return symbolicArg
-    }
-
-    // [symbolicArg] is the msg_value or the balance
-
-    // ensure that minMessageCurrencyValue <= [symbolicArg] <= maxMessageCurrencyValue
-    val result = mkBvAddExpr(minMessageCurrencyValue, symbolicArg)
-    val constraint = mkAnd(
-        mkBvSignedLessOrEqualExpr(minMessageCurrencyValue, result),
-        mkBvSignedLessOrEqualExpr(result, maxMessageCurrencyValue)
-    )
-
-    require(models.all { it.eval(constraint).isTrue }) {
-        "$symbolicArg in not an input value"
-    }
-    pathConstraints += constraint
-
-    result
-}
-
-private fun TvmState.initializeMsgBody(
-    symbolicCell: UHeapRef
-): UHeapRef = with(ctx) {
-    if (!tvmOptions.enableInternalArgsConstraints || !entrypoint.isReceiveInternal()) {
-        return symbolicCell
-    }
-
-    // arg is the in_msg_full
-
-    // ensure that [symbolicCell] is valid in_msg_full
-    val internalMsgTag = zeroBit
-    val msgFlags = makeSymbolicPrimitive(mkBvSort(3u))
-    val srcAddressTag = mkBv(STD_ADDRESS_TAG, ADDRESS_TAG_BITS)
-    val messageSuffixLength = TvmContext.CELL_DATA_BITS - 1u - 3u - 2u
-    val messageSuffix = makeSymbolicPrimitive(mkBvSort(messageSuffixLength))
-
-    val msgData = mkBvConcatExpr(
-        mkBvConcatExpr(internalMsgTag, msgFlags),
-        mkBvConcatExpr(srcAddressTag, messageSuffix)
-    )
-
-    memory.writeField(symbolicCell, cellDataField, cellDataSort, msgData, guard = trueExpr)
-
-    symbolicCell
 }
 
 fun doXchg(scope: TvmStepScopeManager, first: Int, second: Int) {

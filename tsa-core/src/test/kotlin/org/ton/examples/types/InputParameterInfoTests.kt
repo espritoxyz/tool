@@ -1,13 +1,14 @@
 package org.ton.examples.types
 
+import java.math.BigInteger
 import org.ton.Endian
 import org.ton.TlbCoinsLabel
 import org.ton.TlbEmptyLabel
-import org.ton.TvmInputInfo
 import org.ton.TlbIntegerLabel
 import org.ton.TlbIntegerLabelOfConcreteSize
 import org.ton.TlbMaybeRefLabel
 import org.ton.TlbMsgAddrLabel
+import org.ton.TvmInputInfo
 import org.ton.TvmParameterInfo.DataCellInfo
 import org.ton.TvmParameterInfo.SliceInfo
 import org.ton.examples.checkInvariants
@@ -20,15 +21,14 @@ import org.usvm.machine.types.TvmReadingOfUnexpectedType
 import org.usvm.machine.types.TvmUnexpectedDataReading
 import org.usvm.machine.types.TvmUnexpectedEndOfReading
 import org.usvm.machine.types.TvmUnexpectedRefReading
-import org.usvm.test.resolver.TvmTestCellDataCoinsRead
-import org.usvm.test.resolver.TvmTestCellDataIntegerRead
-import org.usvm.test.resolver.TvmTestCellDataMaybeConstructorBitRead
 import org.usvm.test.resolver.TvmExecutionWithStructuralError
 import org.usvm.test.resolver.TvmMethodFailure
 import org.usvm.test.resolver.TvmSuccessfulExecution
+import org.usvm.test.resolver.TvmTestCellDataCoinsRead
+import org.usvm.test.resolver.TvmTestCellDataIntegerRead
+import org.usvm.test.resolver.TvmTestCellDataMaybeConstructorBitRead
 import org.usvm.test.resolver.TvmTestDataCellValue
 import org.usvm.test.resolver.TvmTestSliceValue
-import java.math.BigInteger
 import kotlin.io.path.Path
 import kotlin.test.Ignore
 import kotlin.test.Test

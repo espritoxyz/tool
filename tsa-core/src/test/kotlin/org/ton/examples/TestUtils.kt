@@ -39,6 +39,9 @@ private const val FIFT_STDLIB_PATH = "/fiftstdlib"
 private val FIFT_STDLIB_RESOURCE: Path = object {}.javaClass.getResource(FIFT_STDLIB_PATH)?.path?.let { Path(it) }
     ?: error("Cannot find fift stdlib in $FIFT_STDLIB_PATH")
 
+// Options for tests with fift concrete execution
+val testFiftOptions = TvmOptions(turnOnTLBParsingChecks = false, enableInternalArgsConstraints = false)
+
 fun tactCompileAndAnalyzeAllMethods(
     tactSourcesPath: Path,
     contractDataHex: String? = null,
@@ -116,7 +119,8 @@ fun runFiftCodeBlock(fiftWorkDir: Path, codeBlock: String): FiftInterpreterResul
     FiftAnalyzer(fiftStdlibPath = FIFT_STDLIB_RESOURCE).runFiftCodeBlock(fiftWorkDir, codeBlock)
 
 internal fun TvmStack.loadIntegers(n: Int) = List(n) {
-    takeLast(TvmIntegerType) { error("Impossible") }.intValue.intValue()
+    takeLast(TvmIntegerType) { error("Impossible") }.intValue?.intValue()
+        ?: error("Unexpected entry type")
 }.reversed()
 
 internal fun TvmSymbolicTest.executionCode(): Int? =

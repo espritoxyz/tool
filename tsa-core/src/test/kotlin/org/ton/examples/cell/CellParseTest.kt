@@ -2,8 +2,8 @@ package org.ton.examples.cell
 
 import org.ton.examples.compareSymbolicAndConcreteResults
 import org.ton.examples.compileAndAnalyzeFift
+import org.ton.examples.testFiftOptions
 import org.ton.examples.runFiftMethod
-import org.usvm.machine.TvmOptions
 import kotlin.io.path.Path
 import kotlin.test.Test
 
@@ -20,7 +20,7 @@ class CellParseTest {
 
         val symbolicResult = compileAndAnalyzeFift(
             fiftResourcePath,
-            tvmOptions = TvmOptions(turnOnTLBParsingChecks = false),
+            tvmOptions = testFiftOptions,
         )
         val methodIds = (0..11).toSet()
 
@@ -36,7 +36,7 @@ class CellParseTest {
 
         val symbolicResult = compileAndAnalyzeFift(
             fiftResourcePath,
-            tvmOptions = TvmOptions(turnOnTLBParsingChecks = false),
+            tvmOptions = testFiftOptions,
         )
         val methodIds = (0..6).toSet()
 
@@ -50,7 +50,7 @@ class CellParseTest {
         val fiftResourcePath = this::class.java.getResource(slicePushFiftPath)?.path?.let { Path(it) }
             ?: error("Cannot find resource fift $slicePushFiftPath")
 
-        val symbolicResult = compileAndAnalyzeFift(fiftResourcePath)
+        val symbolicResult = compileAndAnalyzeFift(fiftResourcePath, tvmOptions = testFiftOptions)
         val methodIds = (0..1).toSet()
 
         compareSymbolicAndConcreteResults(methodIds, symbolicResult) { methodId ->
@@ -65,7 +65,7 @@ class CellParseTest {
 
         val symbolicResult = compileAndAnalyzeFift(
             fiftResourcePath,
-            tvmOptions = TvmOptions(turnOnTLBParsingChecks = false),
+            tvmOptions = testFiftOptions,
         )
         val methodIds = (0..1).toSet()
 

@@ -58,6 +58,8 @@ class TvmState(
     var contractStack: PersistentList<TvmContractPosition> = persistentListOf(),
     var currentContract: ContractId,
     var addressToHash: PersistentMap<UHeapRef, UExpr<TvmContext.TvmInt257Sort>> = persistentMapOf(),
+    var fetchedValues: PersistentMap<Int, TvmStack.TvmStackEntry> = persistentMapOf(),
+    var additionalFlags: PersistentSet<String> = persistentHashSetOf(),
 ) : UState<TvmType, TvmCodeBlock, TvmInst, TvmContext, TvmTarget, TvmState>(
     ctx,
     callStack,
@@ -144,7 +146,9 @@ class TvmState(
             allowFailures = allowFailures,
             contractStack = contractStack,
             currentContract = currentContract,
-            addressToHash = persistentMapOf(),
+            addressToHash = addressToHash,
+            fetchedValues = fetchedValues,
+            additionalFlags = additionalFlags,
         ).also { newState ->
             newState.dataCellInfoStorage = dataCellInfoStorage.clone()
             newState.contractIdToInitialData = contractIdToInitialData

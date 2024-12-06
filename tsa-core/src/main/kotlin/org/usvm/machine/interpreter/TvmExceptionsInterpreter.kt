@@ -99,17 +99,21 @@ class TvmExceptionsInterpreter(private val ctx: TvmContext) {
             is TvmExceptionsTryInst -> {
                 scope.consumeDefaultGas(stmt)
 
-                val body = scope.calcOnState {
+                val cont = scope.calcOnState { stack.takeLastContinuation() }
+                    ?: return scope.doWithState(ctx.throwTypeCheckError)
+
+                scope.calcOnState {
                     val registers = registersOfCurrentContract
                     val oldC2 = registers.c2.value
                     val cc = extractCurrentContinuation(stmt, saveC0 = true, saveC1 = true, saveC2 = true)
-                    val handler = stack.takeLastContinuation().defineC2(oldC2).defineC0(cc)
+                    val handler = cont.defineC2(oldC2).defineC0(cc)
 
                     registers.c0 = C0Register(cc)
                     registers.c2 = C2Register(handler)
-
-                    stack.takeLastContinuation()
                 }
+
+                val body = scope.calcOnState { stack.takeLastContinuation() }
+                    ?: return scope.doWithState(ctx.throwTypeCheckError)
 
                 scope.jump(body)
             }

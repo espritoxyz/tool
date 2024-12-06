@@ -110,11 +110,13 @@ class TvmLoopsInterpreter(private val ctx: TvmContext) {
 
     private inline fun doRepeat(
         scope: TvmStepScopeManager,
-        crossinline extractBody: TvmState.() -> TvmContinuation,
+        crossinline extractBody: TvmState.() -> TvmContinuation?,
         crossinline extractAfter: TvmState.() -> TvmContinuation,
         hasBreak: Boolean
     ) = with(ctx) {
         val body = scope.calcOnState { extractBody() }
+            ?: return@with scope.doWithState(throwTypeCheckError)
+
         val wrappedBody = TvmLoopEntranceContinuation(body, loopIdx++)
         val count = scope.takeLastIntOrThrowTypeError() ?: return
         val inRangeConstraint = signedIntegerFitsBits(count, bits = 32u)
@@ -155,11 +157,12 @@ class TvmLoopsInterpreter(private val ctx: TvmContext) {
 
     private inline fun doUntil(
         scope: TvmStepScopeManager,
-        crossinline extractBody: TvmState.() -> TvmContinuation,
+        crossinline extractBody: TvmState.() -> TvmContinuation?,
         crossinline extractAfter: TvmState.() -> TvmContinuation,
         hasBreak: Boolean
     ) {
         val body = scope.calcOnState { extractBody() }
+            ?: return scope.doWithState(ctx.throwTypeCheckError)
         val wrappedBody = TvmLoopEntranceContinuation(body, loopIdx++)
 
         scope.doWithState {
@@ -196,12 +199,14 @@ class TvmLoopsInterpreter(private val ctx: TvmContext) {
 
     private inline fun doWhile(
         scope: TvmStepScopeManager,
-        crossinline extractBody: TvmState.() -> TvmContinuation,
+        crossinline extractBody: TvmState.() -> TvmContinuation?,
         crossinline extractAfter: TvmState.() -> TvmContinuation,
         hasBreak: Boolean
     ) {
         val body = scope.calcOnState { extractBody() }
+            ?: return scope.doWithState(ctx.throwTypeCheckError)
         val cond = scope.calcOnState { stack.takeLastContinuation() }
+            ?: return scope.doWithState(ctx.throwTypeCheckError)
         val wrappedCond = TvmLoopEntranceContinuation(cond, loopIdx++)
 
         scope.doWithState {
@@ -220,6 +225,7 @@ class TvmLoopsInterpreter(private val ctx: TvmContext) {
         hasBreak: Boolean,
     ) {
         val body = scope.calcOnState { stack.takeLastContinuation() }
+            ?: return scope.doWithState(ctx.throwTypeCheckError)
         val wrappedBody = TvmLoopEntranceContinuation(body, loopIdx++)
 
         if (hasBreak) {

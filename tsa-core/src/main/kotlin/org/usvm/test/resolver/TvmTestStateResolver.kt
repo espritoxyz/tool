@@ -68,6 +68,9 @@ import org.usvm.memory.UMemory
 import org.usvm.model.UModelBase
 import org.usvm.sizeSort
 import java.math.BigInteger
+import org.ton.bytecode.ADDRESS_PARAMETER_IDX
+import org.ton.bytecode.BALANCE_PARAMETER_IDX
+import org.usvm.machine.state.TvmStack.TvmStackValue
 
 class TvmTestStateResolver(
     private val ctx: TvmContext,
@@ -87,13 +90,26 @@ class TvmTestStateResolver(
     fun resolveInitialData(): TvmTestCellValue = resolveCell(state.rootInitialData.persistentData)
 
     fun resolveContractAddress(): TvmTestDataCellValue {
-        val contractInfo = state.rootInitialData.firstElementOfC7
-        val addressCell = contractInfo[8, stack].cell(stack)
-            ?: error("Unexpected contract address")
-        val contractAddress = (resolveStackValue(addressCell) as? TvmTestDataCellValue)
-            ?: error("Unexpected address type")
+        val address = getContractParam(ADDRESS_PARAMETER_IDX)
 
-        return contractAddress
+        return (resolveStackValue(address) as? TvmTestDataCellValue)
+            ?: error("Unexpected address type")
+    }
+
+    fun resolveContractBalance(): TvmTestIntegerValue {
+        val balance = getContractParam(BALANCE_PARAMETER_IDX).tupleValue
+            ?.get(0, stack)?.cell(stack)
+            ?: error("Unexpected contract balance")
+
+        return (resolveStackValue(balance) as? TvmTestIntegerValue)
+            ?: error("Unexpected balance type")
+    }
+
+    private fun getContractParam(idx: Int): TvmStackValue {
+        val value = state.rootInitialData.firstElementOfC7[idx, stack]
+
+        return value.cell(stack)
+            ?: error("Unexpected $idx parameter value: $value")
     }
 
     fun resolveResultStack(): TvmMethodSymbolicResult {
@@ -145,7 +161,7 @@ class TvmTestStateResolver(
 
     fun resolveGasUsage(): Int = model.eval(state.calcConsumedGas()).intValue()
 
-    private fun resolveStackValue(stackValue: TvmStack.TvmStackValue): TvmTestValue {
+    private fun resolveStackValue(stackValue: TvmStackValue): TvmTestValue {
         return when (stackValue) {
             is TvmStack.TvmStackIntValue -> resolveInt257(stackValue.intValue)
             is TvmStack.TvmStackCellValue -> resolveCell(stackValue.cellValue.also { state.ensureSymbolicCellInitialized(it) })

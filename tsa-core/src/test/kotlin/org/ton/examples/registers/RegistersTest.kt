@@ -1,12 +1,13 @@
 package org.ton.examples.registers
 
+import java.math.BigInteger
 import org.ton.examples.compareSymbolicAndConcreteResults
 import org.ton.examples.compileAndAnalyzeFift
 import org.ton.examples.compileFuncToFift
 import org.ton.examples.runFiftMethod
+import org.ton.examples.testFiftOptions
 import org.usvm.machine.MethodId
 import org.usvm.machine.mainMethodId
-import java.math.BigInteger
 import kotlin.io.path.Path
 import kotlin.io.path.createTempFile
 import kotlin.io.path.deleteIfExists
@@ -63,7 +64,11 @@ class RegistersTest {
         try {
             compileFuncToFift(resourcePath, tmpFiftFile)
 
-            val symbolicResult = compileAndAnalyzeFift(tmpFiftFile, methodsBlackList = methodsBlackList)
+            val symbolicResult = compileAndAnalyzeFift(
+                tmpFiftFile,
+                methodsBlackList = methodsBlackList,
+                tvmOptions = testFiftOptions
+            )
 
             compareSymbolicAndConcreteResults(setOf(0), symbolicResult) { methodId ->
                 runFiftMethod(tmpFiftFile, methodId)

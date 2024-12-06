@@ -41,7 +41,7 @@ class ContractsTest {
         analyzeContract(walletV4Path, methodsNumber = 7)
     }
 
-    @EnabledIfEnvironmentVariable(named = runHardTestsVar, matches = runHardTestsRegex)
+    @Ignore("slow hash validation https://github.com/explyt/tsa/issues/112")
     @Test
     fun testWalletV5() {
         analyzeContract(walletV5Path, methodsNumber = 7)
@@ -99,14 +99,13 @@ class ContractsTest {
         analyzeContract(nominatorPoolPath, methodsNumber = 10)
     }
 
-    @EnabledIfEnvironmentVariable(named = runHardTestsVar, matches = runHardTestsRegex)
+    @Ignore("slow hash validation https://github.com/explyt/tsa/issues/112")
     @Test
     fun multisig() {
         analyzeContract(multisigPath, methodsNumber = 16)
     }
 
-    //@EnabledIfEnvironmentVariable(named = runHardTestsVar, matches = runHardTestsRegex)
-    @Ignore  // Pasha told me to do so for now
+    @Ignore("ksmt bug https://github.com/UnitTestBot/ksmt/issues/160")
     @Test
     fun bridgeMultisig() {
         analyzeContract(bridgeMultisigPath, methodsNumber = 18)
@@ -123,10 +122,9 @@ class ContractsTest {
         analyzeContract(vestingPath, methodsNumber = 9)
     }
 
-    @Ignore
+    @Ignore("PFXDICTGETQ is not supported")
     @Test
     fun universalLockupWallet() {
-        // TODO support PFXDICTGETQ instruction
         analyzeContract(universalLockupWalletPath, methodsNumber = 13)
     }
 

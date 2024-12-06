@@ -259,8 +259,6 @@ fun TvmStepScopeManager.killCurrentState() = doWithCtx {
     }
 }
 
-fun TvmCodeBlock.isReceiveInternal() = this is TvmMethod && id == TvmContext.RECEIVE_INTERNAL_ID
-
 fun initializeContractExecutionMemory(
     contractsCode: List<TvmContractCode>,
     state: TvmState,
