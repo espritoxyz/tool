@@ -1,3 +1,12 @@
+---
+layout: default
+title: Getting started
+nav_order: 2
+---
+
+# Getting started
+{: .no_toc }
+
 To start using `TSA`, you can either use the prebuilt artifacts (depending on your operating system) or build the artifacts yourself from the source code.
 
 ## Running Prebuilt Artifacts
@@ -13,7 +22,7 @@ docker run --platform linux/amd64 -it --rm -v [SOURCES_DIR_ABSOLUTE_PATH]:/proje
 Here:
 
 - `SOURCES_DIR_ABSOLUTE_PATH` – the absolute path to the directory containing the source code of the project you want to analyze;
-- `ANALYZER_OPTIONS` – analyzer options (see [details](./error-checking-tests-generation-mode.md), or use the `--help` option).
+- `ANALYZER_OPTIONS` – analyzer options (see [details](modes/error-detection-tests-generation-mode), or use the `--help` option).
 
 **NOTE**: All paths in `ANALYZER_OPTIONS` must be RELATIVE to `SOURCES_DIR_ABSOLUTE_PATH`.
 
@@ -69,5 +78,5 @@ Currently, `TSA` can only be run on Windows using the JAR executables. Refer to 
     npm run build
     ```
 4. Ensure `tact`, `func`, and `fift` are in your `$PATH`
-5. Run `./gradlew tsa-cli:shadowJar` from the root of the project to build [error-checking analysis tool](./error-checking-tests-generation-mode.md) (will be located in [build dir](../tsa-cli/build/libs/tsa-cli.jar))
-   or `./gradlew tsa-safety-properties:shadowJar` to build [safety-properties checker](./safety-properties-mode.md) (will be located in [build dir](/tsa-safety-properties/build/libs/tsa-safety-properties.jar))
+5. Run `./gradlew tsa-cli:shadowJar` from the root of the project to build [error-checking analysis tool](modes/error-detection-tests-generation-mode) (will be located in [build dir](../tsa-cli/build/libs/tsa-cli.jar))
+   or `./gradlew tsa-safety-properties:shadowJar` to build [safety-properties checker](modes/safety-properties-mode.md) (will be located in [build dir](/tsa-safety-properties/build/libs/tsa-safety-properties.jar))

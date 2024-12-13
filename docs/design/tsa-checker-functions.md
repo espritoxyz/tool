@@ -1,4 +1,11 @@
-## Numeration of functions in `tsa_functions.fc`
+---
+layout: default
+title: TSA safety-properties checker functions 
+parent: Core mechanisms design
+nav_order: 3
+---
+
+# Numeration of functions in `tsa_functions.fc`
 
 Ordinary checker functions are numerated from 1.
 

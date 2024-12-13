@@ -1,9 +1,16 @@
+---
+layout: default
+title: Errors detection and tests generation mode
+parent: Modes
+nav_order: 1
+---
+
 As a static analyzer, `TSA` can operate in two modes: execution error detection for local smart contracts with report generation in [SARIF format](https://sarifweb.azurewebsites.net/) or test generation for [Blueprint](https://github.com/ton-org/blueprint) projects.
 For operating in this mode, use `tsa-cli.jar` or corresponding options in the Docker Container.
 
 ## Execution Error Detection
 
-In execution error detection mode, `TSA` accepts as input a contract file in one of the following formats: Tact (experimental) or FunC source code, or Fift assembler code, or BoC (compiled code). Optionally, it also accepts a [TL-B scheme](https://docs.ton.org/v3/documentation/data-formats/tlb/tl-b-language) for the `recv_internal` method (about TL-B schemes importance check [the internal design-document](design/tlb.md))). For detailed input format information, use the `--help` argument. 
+In execution error detection mode, `TSA` accepts as input a contract file in one of the following formats: Tact (experimental) or FunC source code, or Fift assembler code, or BoC (compiled code). Optionally, it also accepts a [TL-B scheme](https://docs.ton.org/v3/documentation/data-formats/tlb/tl-b-language) for the `recv_internal` method (about TL-B schemes importance check [the internal design-document](../design/tlb.md))). For detailed input format information, use the `--help` argument. 
 
 The output in this mode is a SARIF report containing the following information about methods that may encounter a [TVM error](https://docs.ton.org/v3/documentation/tvm/tvm-exit-codes) during execution:
 
@@ -14,7 +21,7 @@ The output in this mode is a SARIF report containing the following information a
 - Possible (but not necessarily unique) parameter set causing the error
 - Approximate gas usage up to the error
 
-For more information about error types, see the [relevant section](./error-types.md).
+For more information about error types, see the [relevant section](../error-types.md).
 
 ### Examples
 
@@ -118,14 +125,14 @@ The analyzer's output for this contract will identify the error in the following
 ```
 
 For more examples containing erroneous places, take a look at the [manually written contracts](../tsa-core/src/test/resources/).
-Feel free to run TSA by yourself for these contracts or consider [tests for them](../tsa-core/src/test/kotlin/org/ton/examples). 
+Feel free to run TSA by yourself for these contracts or consider [tests for them](../../tsa-core/src/test/kotlin/org/ton/examples). 
 
 ## Test Generation
 
 In test generation mode, `TSA` takes as input a project in the [Blueprint](https://github.com/ton-org/blueprint) format and 
 the relative path to the source code of the analyzed contract (as before, use `--help` argument for more detailed information about input format).
 
-In this mode, `TSA` generates a corresponding `wrapper` in `Typescript` under the `wrappers` directory and a test file for the contract in the `tests` directory. The test file contains regression tests for execution branches of methods that terminate with a TVM error (for more information about error types, see the [relevant section](./error-types.md)).
+In this mode, `TSA` generates a corresponding `wrapper` in `Typescript` under the `wrappers` directory and a test file for the contract in the `tests` directory. The test file contains regression tests for execution branches of methods that terminate with a TVM error (for more information about error types, see the [relevant section](../error-types.md)).
 
 ### Examples
 

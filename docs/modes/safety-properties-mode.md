@@ -1,9 +1,16 @@
-A more advanced mode of `TSA` operation is the **safety-properties mode**. `TSA` provides a [set of special functions in FunC](../tsa-safety-properties/src/main/resources/imports/tsa_functions.fc) with specific meanings for the analyzer. 
-These include contract method invocation functions ([`tsa_call_*_*`](design/tsa-checker-functions.md)), functions to enable/disable error detection (`tsa_forbid_failures`/`tsa_allow_failures`), and symbolic condition assertion functions (`tsa_assert`/`tsa_assert_not`). 
+---
+layout: default
+title: Safety properties mode
+parent: Modes
+nav_order: 2
+---
+
+A more advanced mode of `TSA` operation is the **safety-properties mode**. `TSA` provides a [set of special functions in FunC](../../tsa-safety-properties/src/main/resources/imports/tsa_functions.fc) with specific meanings for the analyzer. 
+These include contract method invocation functions ([`tsa_call_*_*`](../design/tsa-checker-functions.md)), functions to enable/disable error detection (`tsa_forbid_failures`/`tsa_allow_failures`), and symbolic condition assertion functions (`tsa_assert`/`tsa_assert_not`). 
 To operate in this mode, use `tsa-safety-properties.jar` or the `-c` option in the Docker container.
 
 These functions allow the configuration of the analyzer to validate specific contract specifications. 
-Currently, they are used to implement a [validation](../tsa-safety-properties/src/main/resources/checkers/symbolic_transfer.fc) of the [jetton-master](https://github.com/ton-blockchain/TEPs/blob/master/text/0074-jettons-standard.md) contract to ensure compliance with a [specification](https://github.com/ton-blockchain/TEPs/blob/master/text/0074-jettons-standard.md) of the corresponding `jetton-wallet`. 
+Currently, they are used to implement a [validation](../../tsa-safety-properties/src/main/resources/checkers/symbolic_transfer.fc) of the [jetton-master](https://github.com/ton-blockchain/TEPs/blob/master/text/0074-jettons-standard.md) contract to ensure compliance with a [specification](https://github.com/ton-blockchain/TEPs/blob/master/text/0074-jettons-standard.md) of the corresponding `jetton-wallet`. 
 Violations of this specification can lead to either incorrect smart contract behavior or even intentional vulnerabilities designed to exploit users. 
 In this mode, the analyzer accepts the address of a `jetton-master` contract as input and outputs a list of addresses to which token transfers are impossible.
 
