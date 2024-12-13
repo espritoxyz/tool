@@ -1,6 +1,5 @@
 package org.ton.examples
 
-import org.ton.disasm.TvmDisassembler
 import org.ton.TvmInputInfo
 import org.ton.TvmParameterInfo
 import org.ton.bytecode.TvmContractCode
@@ -27,7 +26,12 @@ import org.usvm.test.resolver.TvmTestTupleValue
 import org.usvm.test.resolver.TvmTestValue
 import java.math.BigInteger
 import java.nio.file.Path
+import org.ton.TvmContractHandlers
+import org.usvm.machine.TvmContext
+import org.usvm.machine.analyzeInterContract
+import org.usvm.machine.state.ContractId
 import kotlin.io.path.Path
+import kotlin.io.path.deleteIfExists
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -41,6 +45,10 @@ private val FIFT_STDLIB_RESOURCE: Path = object {}.javaClass.getResource(FIFT_ST
 
 // Options for tests with fift concrete execution
 val testFiftOptions = TvmOptions(turnOnTLBParsingChecks = false, enableInternalArgsConstraints = false)
+
+fun extractResource(resourcePath: String) =
+    object {}.javaClass.getResource(resourcePath)?.path?.let { Path(it) }
+        ?: error("Cannot find resource bytecode $resourcePath")
 
 fun tactCompileAndAnalyzeAllMethods(
     tactSourcesPath: Path,
@@ -117,6 +125,34 @@ fun analyzeAllMethods(
     inputInfo: Map<MethodId, TvmInputInfo> = emptyMap(),
 ): TvmContractSymbolicTestResult =
     BocAnalyzer.analyzeAllMethods(Path(bytecodePath), contractDataHex, methodsBlackList, methodWhiteList, inputInfo)
+
+fun analyzeFuncIntercontract(
+    sources: List<Path>,
+    startContract: ContractId = 0,
+    communicationScheme: Map<ContractId, TvmContractHandlers>,
+    options: TvmOptions,
+): TvmContractSymbolicTestResult {
+    val contracts = sources.map { getFuncContract(it, FUNC_STDLIB_RESOURCE, FIFT_STDLIB_RESOURCE) }
+
+    return analyzeInterContract(
+        contracts = contracts,
+        startContractId = startContract,
+        methodId = TvmContext.RECEIVE_INTERNAL_ID,
+        communicationScheme = communicationScheme,
+        options = options,
+    )
+}
+
+fun getFuncContract(path: Path, funcStdlibPath: Path, fiftStdlibPath: Path): TvmContractCode {
+    val tmpBocFile = kotlin.io.path.createTempFile(suffix = ".boc")
+    try {
+        FuncAnalyzer(funcStdlibPath, fiftStdlibPath)
+            .compileFuncSourceToBoc(path, tmpBocFile)
+        return BocAnalyzer.loadContractFromBoc(tmpBocFile)
+    } finally {
+        tmpBocFile.deleteIfExists()
+    }
+}
 
 /**
  * Run method with [methodId].

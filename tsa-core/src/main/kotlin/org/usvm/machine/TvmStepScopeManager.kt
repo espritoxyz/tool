@@ -138,6 +138,7 @@ class TvmStepScopeManager(
                 val newScopeManager = TvmStepScopeManager(state, forkBlackList, allowFailuresOnCurrentStep)
                 doForAllBlock(newScopeManager)
 
+                // TODO filter out DEAD states ?
                 val newScopeResults = newScopeManager.stepResult()
                 if (state !== originalState) {
                     forkedStates += state

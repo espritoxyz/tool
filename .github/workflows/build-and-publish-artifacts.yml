@@ -42,12 +42,6 @@ jobs:
         with:
           node-version: '22'
 
-      - name: 'Build tvm disasm'
-        working-directory: ./tvm-disasm
-        run: |
-          npm i
-          npm run build
-
       - name: Build CLI
         run: |
           ./gradlew --no-daemon tsa-cli:shadowJar

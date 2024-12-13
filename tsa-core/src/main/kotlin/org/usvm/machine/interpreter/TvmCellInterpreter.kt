@@ -117,6 +117,7 @@ import org.usvm.machine.state.builderStoreDataBits
 import org.usvm.machine.state.builderStoreInt
 import org.usvm.machine.state.builderStoreNextRef
 import org.usvm.machine.state.builderStoreSlice
+import org.usvm.machine.state.builderToCell
 import org.usvm.machine.state.checkCellDataUnderflow
 import org.usvm.machine.state.checkCellOverflow
 import org.usvm.machine.state.checkCellRefsUnderflow
@@ -1137,14 +1138,9 @@ class TvmCellInterpreter(
             return
         }
 
-        val cell = scope.calcOnState {
-            // TODO static or concrete
-            memory.allocConcrete(TvmDataCellType).also { builderCopy(builder, it) }
-        }
+        val cell = scope.builderToCell(builder)
 
         scope.doWithState {
-            dataCellInfoStorage.mapper.setCellInfoFromBuilder(builder, cell)
-
             addOnStack(cell, TvmCellType)
             newStmt(stmt.nextStmt())
         }

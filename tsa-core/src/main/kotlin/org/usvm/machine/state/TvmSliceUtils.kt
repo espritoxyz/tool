@@ -41,6 +41,7 @@ import org.usvm.machine.TvmContext.TvmInt257Sort
 import org.usvm.machine.TvmSizeSort
 import org.usvm.machine.TvmStepScopeManager
 import org.usvm.machine.intValue
+import org.usvm.machine.types.TvmBuilderType
 import org.usvm.machine.types.TvmDataCellType
 import org.usvm.machine.types.TvmCellDataCoinsRead
 import org.usvm.machine.types.makeSliceTypeLoad
@@ -241,7 +242,7 @@ fun TvmStepScopeManager.assertRefsLengthConstraint(
     assert(correctnessConstraint, unsatBlock = unsatBlock)
 }
 
-private fun TvmState.preloadDataBitsFromCellWithoutChecks(
+fun TvmState.preloadDataBitsFromCellWithoutChecks(
     cell: UHeapRef,
     offset: UExpr<TvmSizeSort>,
     sizeBits: UExpr<TvmSizeSort>
@@ -357,15 +358,15 @@ private fun TvmStepScopeManager.slicePreloadInternalOrNoneAddrLengthConstraint(
     val noneConstraint = addrNoneTag eq mkBv(NONE_ADDRESS_TAG, ADDRESS_TAG_BITS)
     val noneLength = mkSizeExpr(ADDRESS_TAG_LENGTH)
 
-    val internalAddrLengthConstraint = slicePreloadInternalAddrLengthConstraint(slice)
-        ?: return@calcOnStateCtx null // TODO should we return null or just ignore the failing assert here?
+    val (intConstraint, intLength) = slicePreloadInternalAddrLengthConstraint(slice)
+        ?: return@calcOnStateCtx null
 
     Pair(
-        noneConstraint or internalAddrLengthConstraint.first,
+        noneConstraint or intConstraint,
         mkIte(
             noneConstraint,
             noneLength,
-            internalAddrLengthConstraint.second
+            intLength
         )
     )
 }
@@ -492,6 +493,7 @@ fun TvmStepScopeManager.slicePreloadInternalAddrLength(slice: UHeapRef): UExpr<T
     return length
 }
 
+
 fun TvmStepScopeManager.slicePreloadExternalAddrLength(slice: UHeapRef): UExpr<TvmSizeSort>? {
     val (constraint, length) = slicePreloadExternalAddrLengthConstraint(slice) ?: return null
 
@@ -610,6 +612,11 @@ fun TvmState.sliceMoveRefPtr(slice: UHeapRef, shift: UExpr<TvmSizeSort> = ctx.mk
     val updatedRefPosition = mkSizeAddExpr(refPosition, shift)
     memory.writeField(slice, sliceRefPosField, sizeSort, updatedRefPosition, guard = trueExpr)
 }
+
+fun TvmState.allocEmptyBuilder(): UConcreteHeapRef =
+    memory.allocConcrete(TvmBuilderType).also {
+        builderCopy(emptyRefValue.emptyBuilder, it)
+    }
 
 fun TvmState.builderCopy(original: UHeapRef, result: UConcreteHeapRef) = with(ctx) {
     memory.copyField(original, result, cellDataField, cellDataSort)
@@ -951,3 +958,12 @@ fun TvmState.slicesAreEqual(slice1: UHeapRef, slice2: UHeapRef): UBoolExpr = wit
 
     mkAnd(dataLeft1 eq dataLeft2, shiftedData1 eq shiftedData2)
 }
+
+fun TvmStepScopeManager.builderToCell(builder: UConcreteHeapRef): UHeapRef = calcOnState {
+    // TODO static or concrete
+    memory.allocConcrete(TvmDataCellType).also {
+        builderCopy(builder, it)
+        dataCellInfoStorage.mapper.setCellInfoFromBuilder(builder, it)
+    }
+}
+

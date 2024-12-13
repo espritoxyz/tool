@@ -2,12 +2,12 @@ package org.usvm.machine.state
 
 import io.ksmt.expr.KExpr
 import io.ksmt.sort.KBvSort
-import io.ksmt.utils.asExpr
 import io.ksmt.utils.uncheckedCast
 import java.math.BigInteger
 import kotlinx.collections.immutable.PersistentList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toPersistentList
+import org.ton.bytecode.BALANCE_PARAMETER_IDX
 import org.usvm.UBoolExpr
 import org.usvm.UExpr
 import org.usvm.UHeapRef
@@ -36,6 +36,34 @@ fun TvmState.getContractInfoParam(idx: Int): TvmStackValue {
     return getContractInfo()[idx, stack].cell(stack)
         ?: error("Unexpected param value")
 }
+
+fun TvmStepScopeManager.getCellContractInfoParam(idx: Int): UHeapRef? {
+    val cell = calcOnState { getContractInfoParam(idx).cellValue }
+
+    if (cell == null) {
+        doWithStateCtx {
+            ctx.throwTypeCheckError(this)
+        }
+    }
+
+    return cell
+}
+
+fun TvmStepScopeManager.getIntContractInfoParam(idx: Int): UExpr<TvmInt257Sort>? {
+    val cell = calcOnState { getContractInfoParam(idx).intValue }
+
+    if (cell == null) {
+        doWithStateCtx {
+            ctx.throwTypeCheckError(this)
+        }
+    }
+
+    return cell
+}
+
+fun TvmState.getBalance(): UExpr<TvmInt257Sort>? =
+    getContractInfoParam(BALANCE_PARAMETER_IDX).tupleValue
+        ?.get(0, stack)?.cell(stack)?.intValue
 
 fun TvmState.setContractInfoParam(idx: Int, value: TvmStackEntry) {
     require(idx in 0..14) {

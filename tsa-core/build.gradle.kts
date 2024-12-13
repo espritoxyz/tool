@@ -25,15 +25,14 @@ dependencies {
     implementation(group = "org.slf4j", name = "slf4j-simple", version = Versions.slf4j)
     testImplementation("ch.qos.logback:logback-classic:${Versions.logback}")
 
-    implementation(group = Packages.ksmtBv2Int, name = "ksmt-core", version = Versions.ksmtBv2Int)
+    api(group = Packages.ksmtBv2Int, name = "ksmt-core", version = Versions.ksmtBv2Int)
     implementation(group = Packages.ksmtBv2Int, name = "ksmt-bv2int", version = Versions.ksmtBv2Int)
     implementation(group = Packages.ksmtBv2Int, name = "ksmt-yices", version = Versions.ksmtBv2Int)
     implementation(group = Packages.ksmtBv2Int, name = "ksmt-z3", version = Versions.ksmtBv2Int)
 
     // todo: remove ksmt-core exclude after upgrading ksmt version in USVM
-    implementation(group = Packages.usvm, name = "usvm-core", version = Versions.usvm) {
-        exclude(group = "io.ksmt", module = "ksmt-core")
-        exclude(group = "io.ksmt", module = "ksmt-z3")
+    api(group = Packages.usvm, name = "usvm-core", version = Versions.usvm) {
+        exclude(group = "io.ksmt")
     }
 }
 

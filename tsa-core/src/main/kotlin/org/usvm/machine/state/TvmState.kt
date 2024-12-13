@@ -8,6 +8,7 @@ import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.persistentMapOf
 import org.ton.bytecode.TvmCodeBlock
 import org.ton.bytecode.TvmInst
+import org.ton.bytecode.TvmMethod
 import org.ton.targets.TvmTarget
 import org.usvm.PathNode
 import org.usvm.UBv32Sort
@@ -21,6 +22,7 @@ import org.usvm.collections.immutable.internal.MutabilityOwnership
 import org.usvm.constraints.UPathConstraints
 import org.usvm.isStaticHeapRef
 import org.usvm.machine.TvmContext
+import org.usvm.machine.interpreter.OutMessage
 import org.usvm.machine.state.TvmStack.TvmStackTupleValueConcreteNew
 import org.usvm.machine.types.GlobalStructuralConstraintsHolder
 import org.usvm.machine.types.TvmDataCellInfoStorage
@@ -37,7 +39,7 @@ typealias ContractId = Int
 class TvmState(
     ctx: TvmContext,
     ownership: MutabilityOwnership,
-    override val entrypoint: TvmCodeBlock,
+    override val entrypoint: TvmMethod,
 //    val registers: TvmRegisters, // TODO do we really need keep the registers this way?
     val emptyRefValue: TvmRefEmptyValue,
     private var symbolicRefs: PersistentSet<UConcreteHeapAddress> = persistentHashSetOf(),
@@ -62,6 +64,10 @@ class TvmState(
     var addressToHash: PersistentMap<UHeapRef, UExpr<TvmContext.TvmInt257Sort>> = persistentMapOf(),
     var fetchedValues: PersistentMap<Int, TvmStack.TvmStackEntry> = persistentMapOf(),
     var additionalFlags: PersistentSet<String> = persistentHashSetOf(),
+    // inter-contract fields
+    var messageQueue: PersistentList<Pair<ContractId, OutMessage>> = persistentListOf(),
+    var lastMsgBody: UHeapRef? = null,
+    var intercontractPath: PersistentList<ContractId> = persistentListOf(),
 ) : UState<TvmType, TvmCodeBlock, TvmInst, TvmContext, TvmTarget, TvmState>(
     ctx,
     ownership,
@@ -159,6 +165,9 @@ class TvmState(
             addressToHash = addressToHash,
             fetchedValues = fetchedValues,
             additionalFlags = additionalFlags,
+            messageQueue = messageQueue,
+            lastMsgBody = lastMsgBody,
+            intercontractPath = intercontractPath,
         ).also { newState ->
             newState.dataCellInfoStorage = dataCellInfoStorage.clone()
             newState.contractIdToInitialData = contractIdToInitialData
@@ -207,10 +216,5 @@ data class TvmContractPosition(
 
 data class TvmContractExecutionMemory(
     val stack: TvmStack,
-    val c0: C0Register,
-    val c1: C1Register,
-    val c2: C2Register,
-    val c3: C3Register,
-    val c5: C5Register,
-    val c7: C7Register,
+    val registers: TvmRegisters,
 )

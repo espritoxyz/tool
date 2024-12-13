@@ -3,11 +3,12 @@ package org.usvm.machine.interpreter
 import io.ksmt.expr.KInterpretedValue
 import io.ksmt.utils.BvUtils.bvMaxValueSigned
 import io.ksmt.utils.BvUtils.bvMinValueSigned
+import java.math.BigInteger
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toPersistentMap
 import mu.KLogging
+import org.ton.TvmContractHandlers
 import org.ton.TvmInputInfo
-import org.ton.bytecode.BALANCE_PARAMETER_IDX
 import org.ton.bytecode.TvmAliasInst
 import org.ton.bytecode.TvmAppActionsInst
 import org.ton.bytecode.TvmAppAddrInst
@@ -229,7 +230,6 @@ import org.usvm.machine.state.ContractId
 import org.usvm.machine.state.TvmInitialStateData
 import org.usvm.machine.state.TvmMethodResult
 import org.usvm.machine.state.TvmRefEmptyValue
-import org.usvm.machine.state.TvmRegisters
 import org.usvm.machine.state.TvmStack.TvmStackTupleValueConcreteNew
 import org.usvm.machine.state.TvmState
 import org.usvm.machine.state.addContinuation
@@ -250,6 +250,7 @@ import org.usvm.machine.state.checkOverflow
 import org.usvm.machine.state.checkUnderflow
 import org.usvm.machine.state.consumeDefaultGas
 import org.usvm.machine.state.consumeGas
+import org.usvm.machine.state.contractEpilogue
 import org.usvm.machine.state.defineC0
 import org.usvm.machine.state.defineC1
 import org.usvm.machine.state.defineC2
@@ -267,7 +268,7 @@ import org.usvm.machine.state.doXchg
 import org.usvm.machine.state.doXchg2
 import org.usvm.machine.state.doXchg3
 import org.usvm.machine.state.generateSymbolicCell
-import org.usvm.machine.state.getContractInfoParam
+import org.usvm.machine.state.getBalance
 import org.usvm.machine.state.getSliceRemainingBitsCount
 import org.usvm.machine.state.getSliceRemainingRefsCount
 import org.usvm.machine.state.initContractInfo
@@ -304,7 +305,6 @@ import org.usvm.mkSizeGeExpr
 import org.usvm.sizeSort
 import org.usvm.solver.USatResult
 import org.usvm.targets.UTargetsSet
-import java.math.BigInteger
 
 // TODO there are a lot of `scope.calcOnState` and `scope.doWithState` invocations that are not inline - optimize it
 class TvmInterpreter(
@@ -313,6 +313,7 @@ class TvmInterpreter(
     val typeSystem: TvmTypeSystem,
     private val inputInfo: TvmInputInfo,
     var forkBlackList: UForkBlackList<TvmState, TvmInst> = UForkBlackList.createDefault(),
+    communicationScheme: Map<ContractId, TvmContractHandlers> = mapOf(),
 ) : UInterpreter<TvmState>() {
     companion object {
         val logger = object : KLogging() {}.logger
@@ -331,8 +332,8 @@ class TvmInterpreter(
     private val cryptoInterpreter = TvmCryptoInterpreter(ctx)
     private val gasInterpreter = TvmGasInterpreter(ctx)
     private val globalsInterpreter = TvmGlobalsInterpreter(ctx)
-    private val transactionInterpreter = TvmTransactionInterpreter(ctx)
-    private val tsaCheckerFunctionsInterpreter = TsaCheckerFunctionsInterpreter(contractsCode, transactionInterpreter)
+    private val transactionInterpreter = TvmTransactionInterpreter(ctx, communicationScheme)
+    private val tsaCheckerFunctionsInterpreter = TsaCheckerFunctionsInterpreter(contractsCode)
 
     fun getInitialState(
         startContractId: ContractId,
@@ -383,6 +384,7 @@ class TvmInterpreter(
             targets = UTargetsSet.from(targets),
             typeSystem = typeSystem,
             currentContract = startContractId,
+            intercontractPath = persistentListOf(startContractId),
         )
 
         state.contractIdToC4Register = (0..<contractsCode.size).associateWith {
@@ -391,7 +393,7 @@ class TvmInterpreter(
         state.contractIdToFirstElementOfC7 = (0..<contractsCode.size).associateWith {
             state.initContractInfo()
         }.toPersistentMap()
-        state.contractIdToInitialData = (0..<contractsCode.size).associateWith {
+        state.contractIdToInitialData = contractsCode.indices.associateWith {
             val c4 = state.contractIdToC4Register[it]
                 ?: error("c4 for contract $it not found")
             val c7 = state.contractIdToFirstElementOfC7[it]
@@ -400,16 +402,7 @@ class TvmInterpreter(
         }
         val executionMemory = initializeContractExecutionMemory(contractsCode, state, startContractId, allowInputStackValues = true)
         state.stack = executionMemory.stack
-        state.registersOfCurrentContract = TvmRegisters(
-            ctx,
-            c0 = executionMemory.c0,
-            c1 = executionMemory.c1,
-            c2 = executionMemory.c2,
-            c3 = executionMemory.c3,
-            c4 = state.contractIdToC4Register[startContractId] ?: error("Didn't find c4 of contract $startContractId"),
-            c5 = executionMemory.c5,
-            c7 = executionMemory.c7,
-        )
+        state.registersOfCurrentContract = executionMemory.registers
 
         val excludeInputsThatDoNotMatchGivenScheme = ctx.tvmOptions.excludeInputsThatDoNotMatchGivenScheme
 
@@ -495,9 +488,14 @@ class TvmInterpreter(
         tryCatchIf(
             condition = ctx.tvmOptions.quietMode,
             body = {
-                tryAddRecvInternalConstraints(scope, stmt)
+                recvInternalPreprocessing(scope, stmt)
                     ?: return@tryCatchIf
                 visit(scope, stmt)
+
+                globalStructuralConstraintsHolder.applyTo(scope)
+                    ?: error("Could not apply structural constraints")  // TODO: add special exit for that
+
+                processExitFromContract(scope)
             },
             exceptionHandler = {
                 logger.debug(it) {
@@ -510,11 +508,6 @@ class TvmInterpreter(
             }
         )
 
-        globalStructuralConstraintsHolder.applyTo(scope)
-            ?: error("Could not apply structural constraints")  // TODO: add special exit for that
-
-        processExitFromContract(scope)
-
         return scope.stepResult().apply {
             if (state.gasUsage === initialGasUsage || forkedStates.any { it.gasUsage === initialGasUsage }) {
                 TODO("Gas usage was not updated after: $stmt")
@@ -523,50 +516,131 @@ class TvmInterpreter(
     }
 
     private fun processExitFromContract(scope: TvmStepScopeManager) {
+        if (ctx.tvmOptions.enableIntercontract) {
+            processIntercontractExit(scope)
+        } else {
+            processCheckerExit(scope)
+        }
+    }
+
+    private fun processIntercontractExit(scope: TvmStepScopeManager) {
+        // TODO forked states ? maybe introduce artificial inst for post-processing
+        // TODO stop at failure state or at state without commitedState
+        scope.doWithState {
+            // TODO maybe refactor canBeProcessed check, again can be solved with artificial instruction
+            if (methodResult == TvmMethodResult.NoCall ||
+                entrypoint.id != RECEIVE_INTERNAL_ID ||
+                !scope.canBeProcessed
+            ) {
+                return@doWithState
+            }
+
+            processNewMessages(scope)
+                ?: return@doWithState
+
+            if (messageQueue.isEmpty()) {
+                return@doWithState
+            }
+
+            contractEpilogue()
+
+            val (nextContract, message) = messageQueue.first()
+            val nextContractCode = contractsCode.getOrNull(nextContract)
+                ?: error("Contract with id $nextContract was not found")
+            val nextMethod = nextContractCode.methods[RECEIVE_INTERNAL_ID]
+                ?: error("recv_internal in contract $nextContract was not found.")
+
+            messageQueue = messageQueue.removeAt(0)
+            intercontractPath = intercontractPath.add(nextContract)
+
+            val prevStack = stack
+            val newMemory = initializeContractExecutionMemory(contractsCode, this, currentContract, allowInputStackValues = false)
+            currentContract = nextContract
+            stack = newMemory.stack
+            stack.copyInputValues(prevStack)
+            registersOfCurrentContract = newMemory.registers
+
+            // TODO update balance using message value
+            val balance = getBalance()
+                ?: error("Unexpected incorrect config balance value")
+
+            stack.addInt(balance)
+            stack.addInt(message.msgValue)
+            addOnStack(message.fullMsgCell, TvmCellType)
+            addOnStack(message.msgBodySlice, TvmSliceType)
+
+            newStmt(nextMethod.instList.first())
+        }
+    }
+
+    private fun processNewMessages(scope: TvmStepScopeManager): Unit? = scope.calcOnState {
+        lastCommitedStateOfContracts[currentContract]
+            ?: return@calcOnState null
+
+        // TODO workaround, since `makeSliceTypeLoad` filters out terminated states
+        val prevResult = methodResult
+        methodResult = TvmMethodResult.NoCall
+        val messageDestinations = transactionInterpreter.parseActionsToDestinations(scope)
+            ?: return@calcOnState null
+        methodResult = prevResult
+
+        messageQueue = messageQueue.addAll(messageDestinations)
+    }
+
+    private fun processCheckerExit(scope: TvmStepScopeManager) {
         scope.doWithState {
             // TODO: process dead states
             // TODO: case of committed state of TvmFailure
             if (methodResult is TvmMethodResult.TvmSuccess && contractStack.isNotEmpty()) {
                 val (prevContractId, prevInst, prevMem, expectedNumberOfOutputItems) = contractStack.last()
 
-                val stackFromOtherContract = stack
                 // update global c4 and c7
-                val c4FromCommitedState = lastCommitedStateOfContracts[currentContract]
+                lastCommitedStateOfContracts[currentContract]
                     ?: error("Did not find commited state of contract $currentContract")
-                contractIdToC4Register = contractIdToC4Register.put(currentContract, c4FromCommitedState.c4)
-                // TODO: process possible errors
-                contractIdToFirstElementOfC7 = contractIdToFirstElementOfC7.put(
-                    currentContract,
-                    registersOfCurrentContract.c7.value[0, stackFromOtherContract].cell(stackFromOtherContract) as TvmStackTupleValueConcreteNew
-                )
+                contractEpilogue()
+
+                val stackFromOtherContract = stack
 
                 contractStack = contractStack.removeAt(contractStack.size - 1)
                 currentContract = prevContractId
-                methodResult = TvmMethodResult.NoCall
 
                 val prevStack = prevMem.stack
                 stack = prevStack.clone()  // we should not touch stack from contractStack, as it is contained in other states
                 stack.takeValuesFromOtherStack(stackFromOtherContract, expectedNumberOfOutputItems)
-                registersOfCurrentContract = TvmRegisters(
-                    ctx,
-                    c0 = prevMem.c0,
-                    c1 = prevMem.c1,
-                    c2 = prevMem.c2,
-                    c3 = prevMem.c3,
-                    c4 = contractIdToC4Register[currentContract] ?: error("Didn't find c4 of contract $currentContract"),
-                    c5 = prevMem.c5,
-                    c7 = prevMem.c7.copy(), // we should not touch c7 from contractStack, as it is contained in other states
-                )
+                registersOfCurrentContract = prevMem.registers
                 newStmt(prevInst.nextStmt())
             }
         }
     }
 
-    private fun tryAddRecvInternalConstraints(scope: TvmStepScopeManager, stmt: TvmInst): Unit? {
+    private fun recvInternalPreprocessing(scope: TvmStepScopeManager, stmt: TvmInst): Unit? {
         val location = stmt.location as? TvmInstMethodLocation
         val isFirstRecvInternalInst = location?.methodId == RECEIVE_INTERNAL_ID && location.index == 0
 
-        if (!ctx.tvmOptions.enableInternalArgsConstraints || !isFirstRecvInternalInst) {
+        if (!isFirstRecvInternalInst) {
+            return Unit
+        }
+
+        saveRecvInternalMsgBody(scope)
+        return addRecvInternalConstraints(scope)
+    }
+
+    private fun saveRecvInternalMsgBody(scope: TvmStepScopeManager) {
+        if (!ctx.tvmOptions.enableIntercontract) {
+            return
+        }
+
+        scope.doWithState {
+            val msgBody = stack.takeLastSlice()
+                ?: error("Unexpected null msg_body")
+
+            lastMsgBody = msgBody
+            addOnStack(msgBody, TvmSliceType)
+        }
+    }
+
+    private fun addRecvInternalConstraints(scope: TvmStepScopeManager): Unit? {
+        if (!ctx.tvmOptions.enableInternalArgsConstraints) {
             return Unit
         }
 
@@ -596,8 +670,7 @@ class TvmInterpreter(
                 mkBvSignedLessOrEqualExpr(msgValue, maxMessageCurrencyValue)
             )
 
-            val configBalance = getContractInfoParam(BALANCE_PARAMETER_IDX).tupleValue
-                ?.get(0, stack)?.cell(stack)?.intValue
+            val configBalance = getBalance()
                 ?: error("Unexpected incorrect config balance value")
             val initialBalance = mkBvSubExpr(balance, msgValue)
             val balanceConstraints = mkAnd(

@@ -84,7 +84,6 @@ class TvmContext(
 
     val zeroSizeExpr: UExpr<TvmSizeSort> = mkSizeExpr(0)
     val oneSizeExpr: UExpr<TvmSizeSort> = mkSizeExpr(1)
-    val twoSizeExpr: UExpr<TvmSizeSort> = mkSizeExpr(2)
     val threeSizeExpr: UExpr<TvmSizeSort> = mkSizeExpr(3)
     val fourSizeExpr: UExpr<TvmSizeSort> = mkSizeExpr(4)
     val sixSizeExpr: UExpr<TvmSizeSort> = mkSizeExpr(6)
@@ -227,6 +226,8 @@ class TvmContext(
 
         val RECEIVE_INTERNAL_ID: MethodId = 0.toMethodId()
         val RECEIVE_EXTERNAL_ID: MethodId = (-1).toMethodId()
+
+        const val OP_BITS: UInt = 32u
 
         val cellDataField: TvmField = TvmFieldImpl(TvmCellType, "data")
         val cellDataLengthField: TvmField = TvmFieldImpl(TvmCellType, "dataLength")

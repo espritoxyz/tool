@@ -24,7 +24,9 @@ import org.usvm.statistics.collectors.AllStatesCollector
 import org.usvm.stopstrategies.GroupedStopStrategy
 import org.usvm.stopstrategies.StepLimitStopStrategy
 import org.usvm.stopstrategies.StopStrategy
+import org.usvm.stopstrategies.TimeoutStopStrategy
 import java.math.BigInteger
+import org.ton.TvmContractHandlers
 import kotlin.time.Duration.Companion.INFINITE
 import kotlin.time.Duration.Companion.seconds
 
@@ -51,14 +53,17 @@ class TvmMachine(
         coverageStatistics: TvmCoverageStatistics,  // TODO: adapt for several contracts
         methodId: BigInteger,
         inputInfo: TvmInputInfo = TvmInputInfo(),
+        communicationScheme: Map<ContractId, TvmContractHandlers> = mapOf(),
         additionalStopStrategy: StopStrategy = StopStrategy { false },
         additionalObserver: UMachineObserver<TvmState>? = null,
+        manualStatePostProcess: (TvmState) -> List<TvmState> = { listOf(it) },
     ): List<TvmState> {
         val interpreter = TvmInterpreter(
             ctx,
             contractsCode,
             typeSystem = components.typeSystem,
             inputInfo = inputInfo,
+            communicationScheme = communicationScheme,
         )
         logger.debug("{}.analyze({})", this, contractsCode)
         val initialState = interpreter.getInitialState(startContractId, contractData, methodId)
@@ -111,8 +116,9 @@ class TvmMachine(
         } else {
             StopStrategy { false }
         }
+        val timeoutStopStrategy = TimeoutStopStrategy(options.timeout, timeStatistics)
 
-        val integrativeStopStrategy = GroupedStopStrategy(listOf(stopStrategy, additionalStopStrategy))
+        val integrativeStopStrategy = GroupedStopStrategy(listOf(stopStrategy, additionalStopStrategy, timeoutStopStrategy))
 
         val statesCollector = when (options.stateCollectionStrategy) {
             StateCollectionStrategy.COVERED_NEW, StateCollectionStrategy.REACHED_TARGET -> TODO("Unsupported strategy ${options.stateCollectionStrategy}")
@@ -136,7 +142,9 @@ class TvmMachine(
             stopStrategy = integrativeStopStrategy,
         )
 
-        return interpreter.postProcessStates(statesCollector.collectedStates)
+        return interpreter.postProcessStates(statesCollector.collectedStates).flatMap {
+            manualStatePostProcess(it)
+        }
     }
 
     private fun isStateTerminated(state: TvmState): Boolean =

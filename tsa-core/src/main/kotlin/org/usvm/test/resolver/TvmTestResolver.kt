@@ -5,6 +5,7 @@ import org.ton.bytecode.TvmInst
 import org.ton.bytecode.TvmMethod
 import org.usvm.machine.MethodId
 import org.usvm.machine.interpreter.TvmInterpreter.Companion.logger
+import org.usvm.machine.state.ContractId
 import org.usvm.machine.tryCatchIf
 import org.usvm.machine.state.TvmMethodResult.TvmFailure
 import org.usvm.machine.state.TvmState
@@ -31,7 +32,9 @@ data object TvmTestResolver {
             usedParameters = usedParameters,
             result = result,
             stackTrace = state.continuationStack,
-            gasUsage = gasUsage
+            gasUsage = gasUsage,
+            additionalFlags = state.additionalFlags,
+            intercontractPath = state.intercontractPath,
         )
     }
 
@@ -83,7 +86,9 @@ data class TvmSymbolicTest(
     val usedParameters: List<TvmTestValue>,
     val result: TvmMethodSymbolicResult,
     val stackTrace: List<TvmInst>,
-    val gasUsage: Int
+    val gasUsage: Int,
+    val additionalFlags: Set<String>,
+    val intercontractPath: List<ContractId>,
 )
 
 sealed interface TvmMethodSymbolicResult {

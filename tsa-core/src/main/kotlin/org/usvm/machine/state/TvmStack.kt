@@ -45,7 +45,12 @@ class TvmStack(
         entries.reversed().forEach { entry ->
             addStackEntry(entry)
         }
-        otherStack.inputEntryIdToStackValue.forEach { (id, value) ->
+        copyInputValues(otherStack)
+    }
+
+    fun copyInputValues(other: TvmStack) {
+        inputElements = other.inputElements
+        other.inputEntryIdToStackValue.forEach { (id, value) ->
             putInputEntryValue(TvmInputStackEntry(id), value)
         }
     }

@@ -15,6 +15,7 @@ data class TvmOptions(
     val tlbOptions: TlbOptions = TlbOptions(),
     val maxRecursionDepth: Int = DEFAULT_MAX_RECURSION_DEPTH,
     val timeout: Duration = Duration.INFINITE,
+    val enableIntercontract: Boolean = false,
     val excludeExecutionsWithFailures: Boolean = false,
 )
 

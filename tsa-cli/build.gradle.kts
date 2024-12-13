@@ -3,6 +3,7 @@ import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 plugins {
     id("tsa.kotlin-conventions")
     id("com.github.johnrengelman.shadow") version "8.1.1"
+    id("org.jetbrains.kotlin.plugin.serialization") version "1.9.22"
 }
 
 dependencies {
@@ -12,6 +13,8 @@ dependencies {
     implementation(project(":tvm-disasm"))
 
     implementation("com.github.ajalt.clikt:clikt:${Versions.clikt}")
+
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:${Versions.kotlinx_serialization}")
 
 }
 

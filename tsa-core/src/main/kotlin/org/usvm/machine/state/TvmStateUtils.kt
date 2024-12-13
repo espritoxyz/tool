@@ -36,6 +36,7 @@ import org.usvm.mkSizeLeExpr
 import org.usvm.sizeSort
 import org.usvm.types.USingleTypeStream
 import java.math.BigInteger
+import org.usvm.machine.state.TvmStack.TvmStackTupleValueConcreteNew
 
 val TvmState.lastStmt get() = pathNode.statement
 fun TvmState.newStmt(stmt: TvmInst) {
@@ -268,15 +269,36 @@ fun initializeContractExecutionMemory(
     val contractCode = contractsCode[contractId]
     val mainMethod = TvmLambda(contractCode.mainMethod.list.toMutableList())
     val ctx = state.ctx
+    val c4 = state.contractIdToC4Register[contractId]
+        ?: error("c4 for contract $contractId is not found")
     val firstElementOfC7 = state.contractIdToFirstElementOfC7[contractId]
         ?: error("First element of c7 for contract $contractId not found")
     return TvmContractExecutionMemory(
         TvmStack(ctx, allowInputValues = allowInputStackValues),
-        C0Register(ctx.quit0Cont),
-        C1Register(ctx.quit1Cont),
-        C2Register(TvmExceptionContinuation),
-        C3Register(TvmOrdContinuation(mainMethod)),
-        C5Register(TvmCellValue(state.allocEmptyCell())),
-        C7Register(state.initC7(firstElementOfC7)),
+        TvmRegisters(
+            ctx,
+            C0Register(ctx.quit0Cont),
+            C1Register(ctx.quit1Cont),
+            C2Register(TvmExceptionContinuation),
+            C3Register(TvmOrdContinuation(mainMethod)),
+            c4,
+            C5Register(TvmCellValue(state.allocEmptyCell())),
+            C7Register(state.initC7(firstElementOfC7)),
+        )
     )
+}
+
+fun TvmState.contractEpilogue() {
+    contractIdToFirstElementOfC7 = contractIdToFirstElementOfC7.put(
+        currentContract,
+        registersOfCurrentContract.c7.value[0, stack].cell(stack) as TvmStackTupleValueConcreteNew
+    )
+    lastMsgBody = null
+    methodResult = TvmMethodResult.NoCall
+
+    val commitedState = lastCommitedStateOfContracts[currentContract]
+        ?: return
+
+    contractIdToC4Register = contractIdToC4Register.put(currentContract, commitedState.c4)
+    lastCommitedStateOfContracts = lastCommitedStateOfContracts.remove(currentContract)
 }
