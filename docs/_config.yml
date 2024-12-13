@@ -11,13 +11,6 @@ plugins:
   - jekyll-seo-tag
   - webrick
 
-#defaults:
-#  - scope:
-#      path: ""
-#    values:
-#      layout: "default"
-#      show_navigation: true
-
 aux_links:
   TSA on GitHub: https://github.com/espritoxyz/tsa
 
