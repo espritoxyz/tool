@@ -18,7 +18,7 @@ This type of error is represented in TVM by error code 4. It occurs during divis
 
 For instance, in the following function, overflows can occur in two places—within the `if` branch and during the return from the function in the `else` branch:
 
-```func
+```c
 (int) add(int second, int subtrahend, int flag) method_id {
     int first = 42;
     if (flag == -1) {
@@ -37,7 +37,7 @@ This type of error, represented by TVM error code 5, occurs when specific instru
 
 Such an error may arise, for example, when writing a number to a builder where the number’s bit length exceeds the expected size, as in the following function:
 
-```func
+```c
 (builder) write() method_id {
     builder b = begin_cell();
     b~store_uint(256, 4);
@@ -56,7 +56,7 @@ Since much of smart contract code involves reading incoming messages, this type 
 
 For example, in the following function, a cell underflow error is possible in the last instruction because there is no check to ensure the slice contains at least three necessary bits:
 
-```func
+```c
 (int) read(slice value, int flag) method_id {
     if (flag) {
         if (value.slice_bits() >= 4) {
@@ -78,7 +78,7 @@ Since outgoing message generation often follows a contract's business logic, thi
 
 A simple example of this type of error is the following function, where a reference overflow occurs if the `loop_count` parameter exceeds 4:
 
-```func
+```c
 (builder) write(int loop_count) method_id {
     builder b = begin_cell();
 

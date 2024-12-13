@@ -27,7 +27,7 @@ For more information about error types, see the [relevant section](../error-type
 
 Consider a simple smart contract that may encounter a cell overflow error when the `write` method receives a value greater than 4:
 
-```func
+```c
 (builder) write(int loop_count) method_id {
     builder b = begin_cell();
 
@@ -138,7 +138,7 @@ In this mode, `TSA` generates a corresponding `wrapper` in `Typescript` under th
 
 For the [wallet-v4](https://github.com/ton-blockchain/wallet-contract) contract, a test file will be generated with tests similar to the following:
 
-```TypeScript
+```ts
 import {Blockchain} from '@ton/sandbox'
 import {Address, beginCell, Builder, Cell, Dictionary, DictionaryValue, Slice} from '@ton/core'
 import '@ton/test-utils'
