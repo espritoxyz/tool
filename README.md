@@ -1,72 +1,30 @@
-Symbolic analyzer for TVM (The Telegram Open Network Virtual Machine) based on USVM.
+TSA(TON Symbolic Analyzer) is a static analysis tool based on symbolic execution and designed for smart contracts on the [TON blockchain](https://ton.org/).
 
-## How to run
+### Quick start
 
-### Linux/MacOS
+To start using TSA, follow the [guide](docs/getting-started.md).
 
-#### Using built Docker image
+To know more about the core design, read the [corresponding documents](docs/design).
 
-```bash
-docker run --platform linux/amd64 -it --rm -v [SOURCES_DIR_ABSOLUTE_PATH]:/project ghcr.io/espritoxyz/tsa:latest [ANALYZER_OPTIONS]
-```
-, where:
+### Language Support
+TSA works on TVM bitcode level, so it is possible to analyze smart contracts written in any language, just need to compile it to BoC format.
 
-- `SOURCES_DIR_ABSOLUTE_PATH` is an absolute path to the dir where the analyzed sources are located;
-- `ANALYZER_OPTIONS` consists of a target language and corresponding options (for more details, use `--help` as provided options);
+### Use Cases
+TSA is designed for a few purposes:
 
-**NOTE**: all paths in `ANALYZER_OPTIONS` MUST be relative to the `SOURCES_DIR_ABSOLUTE_PATH`.
+- Detect possible TVM runtime errors: Find possible misbehavior while processing integers (overflow/underflow, division by zero) and slices/builders (reading or writing wrong number of bits, incorrect types, etc).
+- Generate regression tests: TSA is able to generate Blueprint-based tests based on discovered execution paths that allow to fix expected behavior and find errorneous executions.
+- Honeypots detection: TSA can detect and report malicious contracts that are created to fool users.
 
-For example, to analyze inter-contract communication between two contracts (with FunC sources provided), you can run:
+### Funding
+TSA has been funded by the [TON Foundation grant](https://github.com/ton-society/grants-and-bounties/issues/489) grant and has been developed under the [8-month roadmap](https://questbook.app/dashboard/?proposalId=667ee6b9b59d3e9ae042d6c9&chainId=10&role=builder&isRenderingProposalBody=true&grantId=65c7836df27e2e1702d2d279).
 
-```bash
-docker run --platform linux/amd64 -it --rm -v [SOURCES_DIR_ABSOLUTE_PATH]:/project ghcr.io/espritoxyz/tsa:latest inter |
-/project/[FIRST_CONTRACT_RELATIVE_PATH] /project/[SECOND_CONTRACT_RELATIVE_PATH] --func-std /project/[PATH_TO_FUNC_STDLIB] --fift-std /project/[PATH_TO_FIFT_STDLIB_DIR]
-```
+### Inspiration
 
-#### Using JAR executables
+TSA is inspired and is actively using the [Universal Symbolic Virtual Machine(USVM)](https://github.com/UnitTestBot/usvm) –
+a symbolic core engine for multiple programming languages.
 
-There are two JAR executables available at the [Releases page](https://github.com/espritoxyz/tsa/releases): 
-- `tsa-cli.jar`
-- `tsa-safety-properties.jar`
+USVM and TSA itself also widely use the [KSMT](https://github.com/UnitTestBot/ksmt) library –
+a Kotlin/Java API for SMT solvers, with some optimizations for TON blockchain.
 
-To use them, ensure you have `Java`, `fift`, `func`, and `tact` installed within your $PATH.
-
-Then, run common analysis using 
-
-```bash
-java -jar tsa-cli.jar
-```
-
-or safety-properties checker using 
-
-```bash
-java -jar tsa-safety-properties.jar
-```
-
-### Windows
-
-For now, TSA could be run on Windows only using JAR executables, see [the corresponding section](#using-jar-executables)
-
-## How to build
-
-1. Clone this repo with all submodules (using `IntelliJ Idea` or `git clone git clone --recurse-submodules https://github.com/explyt/tsa`).
-2. Build the submodule:
-
-    ```bash
-    cd tvm-disasm
-    npm i
-    npm run build
-    ```
-3. Download `fift` and `func` for the corresponding operating system from [the last TON release ](https://github.com/ton-blockchain/ton/releases/) and add them to `$PATH`.
-    - rename the downloaded files (e.g., `func-mac-arm64`, `fift-mac-arm64`)  to `fift` and `func`.
-    - if you have `Permission denied` error, do `chmod +x fift` and `chmod +x func`
-    - on MacOS you need to manually open these files once
-4. Install `tact` compiler with [yarn](https://classic.yarnpkg.com/lang/en/docs/install):
-   ```bash
-   yarn global add @tact-lang/compiler
-   ```
-   - probably, you need to manually add `tact` to path:
-       ```bash
-       export PATH="$PATH:$(yarn global bin)"
-       ```
-5. Build the project, running `./gradlew build` from the root of the repo.
+You are very welcome to contribute to both of these projects.
