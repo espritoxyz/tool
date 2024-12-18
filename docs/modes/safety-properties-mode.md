@@ -1,7 +1,7 @@
 ---
 layout: default
 title: Safety properties mode
-parent: Modes
+parent: Getting started
 nav_order: 2
 ---
 
@@ -32,4 +32,4 @@ Running the analyzer on this contract returns the following output:
 
 The first address in this list corresponds to the [STON.fi exchange router](https://ston.fi/), where the token is hosted. This indicates that the token cannot be sold after purchase, confirming it as a scam token.
 
-## Custom Checkers (Under Development)
+## Custom Checkers (Docs under development)

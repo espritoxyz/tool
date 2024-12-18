@@ -1,7 +1,7 @@
 ---
 layout: default
 title: Core mechanisms design
-nav_order: 5
+nav_order: 6
 ---
 
 # Core mechanisms design

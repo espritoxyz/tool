@@ -1,16 +1,16 @@
 ---
 layout: default
 title: Errors detection and tests generation mode
-parent: Modes
+parent: Getting started
 nav_order: 1
 ---
 
-As a static analyzer, `TSA` can operate in two modes: execution error detection for local smart contracts with report generation in [SARIF format](https://sarifweb.azurewebsites.net/) or test generation for [Blueprint](https://github.com/ton-org/blueprint) projects.
+As a static analyzer, `TSA` can operate in two modes: runtime error detection for local smart contracts with report generation in [SARIF format](https://sarifweb.azurewebsites.net/) or test generation for [Blueprint](https://github.com/ton-org/blueprint) projects.
 For operating in this mode, use `tsa-cli.jar` or corresponding options in the Docker Container.
 
-## Execution Error Detection
+## Runtime Error Detection
 
-In execution error detection mode, `TSA` accepts as input a contract file in one of the following formats: Tact (experimental) or FunC source code, or Fift assembler code, or BoC (compiled code). Optionally, it also accepts a [TL-B scheme](https://docs.ton.org/v3/documentation/data-formats/tlb/tl-b-language) for the `recv_internal` method (about TL-B schemes importance check [the internal design-document](../design/tlb.md))). For detailed input format information, use the `--help` argument. 
+In runtime error detection mode, `TSA` accepts as input a contract file in one of the following formats: Tact (experimental) or FunC source code, or Fift assembler code, or BoC (compiled code). Optionally, it also accepts a [TL-B scheme](https://docs.ton.org/v3/documentation/data-formats/tlb/tl-b-language) for the `recv_internal` method (about TL-B schemes importance check [the internal design-document](../design/tlb.md))). For detailed input format information, use the `--help` argument. 
 
 The output in this mode is a SARIF report containing the following information about methods that may encounter a [TVM error](https://docs.ton.org/v3/documentation/tvm/tvm-exit-codes) during execution:
 

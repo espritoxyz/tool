@@ -1,10 +1,10 @@
 ---
 layout: default
-title: Getting started
-nav_order: 2
+title: Installation
+nav_order: 3
 ---
 
-# Getting started
+# Installation
 {: .no_toc }
 
 To start using `TSA`, you can either use the prebuilt artifacts (depending on your operating system) or build the artifacts yourself from the source code.
