@@ -14,12 +14,12 @@ In runtime error detection mode, `TSA` accepts as input a contract file in one o
 
 The output in this mode is a SARIF report containing the following information about methods that may encounter a [TVM error](https://docs.ton.org/v3/documentation/tvm/tvm-exit-codes) during execution:
 
-- Instruction coverage percentage by the analyzer for the method
-- Method number and TVM bytecode instruction where the error may occur
-- Error code and type
-- Call stack (method number - instruction)
-- Possible (but not necessarily unique) parameter set causing the error
-- Approximate gas usage up to the error
+- Instruction coverage percentage by the analyzer for the method (`coverage` field in the report)
+- Method number (`decoratedName`) and TVM bytecode instruction(`stmt`) where the error may occur
+- Error code and type (`text` in a `message`)
+- Call stack `callFlows` (method id - instruction)
+- Possible (but not necessarily unique) parameters set `usedParameters` causing the error
+- Approximate gas usage `gasUsage` up to the error
 
 For more information about error types, see the [relevant section](../error-types.md).
 
@@ -28,6 +28,8 @@ For more information about error types, see the [relevant section](../error-type
 Consider a simple smart contract that may encounter a cell overflow error when the `write` method receives a value greater than 4:
 
 ```c
+#include "stdlib.fc";
+
 (builder) write(int loop_count) method_id {
     builder b = begin_cell();
 
@@ -50,7 +52,14 @@ Consider a simple smart contract that may encounter a cell overflow error when t
 }
 ```
 
-The analyzer's output for this contract will identify the error in the following format:
+Running the analyzer for this contract with the following command 
+(macOS ARM, assuming the contract, FunC and Fift stdlibs are located in the current directory):
+
+```bash
+docker run --platform linux/amd64 -it --rm -v $PWD:/project ghcr.io/espritoxyz/tsa:latest func -i /project/example.fc --func-std /project/stdlib.fc --fift-std /project/fiftstdlib
+```
+
+(please note that FunC stdlib is pointed using the specific option `func-stdlib`, not as a part of the input file) identifies the error in the SARIF:
 
 ```json
 {
@@ -123,6 +132,12 @@ The analyzer's output for this contract will identify the error in the following
     ]
 }
 ```
+
+Here the analyzed method has the id `75819`, 
+the analyzer covered 100% instructions of this method,
+the `integer out of expected range` error with exit code `5` occurred in the stmt `8` in the `REPEAT` loop inside this method,
+`2147483648` value passed to this method causes this error,
+and gas usage before raising the error equals to `220`.
 
 For more examples containing erroneous places, take a look at the directory in [the repository with manually written contracts](https://github.com/espritoxyz/tsa/tree/master/tsa-core/src/test/resources).
 Feel free to run TSA by yourself for these contracts or consider [tests for them](https://github.com/espritoxyz/tsa/tree/master/tsa-core/src/test/kotlin/org/ton/examples). 
