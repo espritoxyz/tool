@@ -20,12 +20,14 @@ related to code implementation and causing the TON Virtual Machine (TVM) to cras
 TVM runtime errors in TON smart contracts often arise from improper handling of data – 
 primitives (numbers) and complex structures (slices, builders, dictionaries). 
 The occurrence of [such errors](../error-types.md) makes it impossible to complete transactions, such as transferring funds, buying, or selling tokens, etc. 
-The [main mode of operation](error-detection-tests-generation-mode.md) of TSA is to detect and reproduce such errors.
+The main mode of operation of TSA is to detect and reproduce such errors – if you are interested in this functionality, 
+please refer to the [corresponding section](error-detection-tests-generation-mode.md).
 
 ## Safety Properties
 
 Sometimes, errors in smart contracts are not related to runtime errors but to incorrect business logic – 
 for example, the inability to transfer funds from a wallet under certain conditions. 
 These issues are complex in nature but can often be expressed using safety properties. 
-The TSA [Safety Properties](safety-properties-mode.md) mode assists users in verifying both the business logic and required invariants of their own smart contracts, 
-as well as checking the reliability of third-party contracts.
+The TSA Safety Properties mode assists users in verifying both the business logic and required invariants of their own smart contracts, 
+as well as checking the reliability of third-party contracts – if you are interested in this functionality,
+please refer to the [corresponding section](safety-properties-mode.md).
