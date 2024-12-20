@@ -124,8 +124,8 @@ The analyzer's output for this contract will identify the error in the following
 }
 ```
 
-For more examples containing erroneous places, take a look at the [manually written contracts](../tsa-core/src/test/resources/).
-Feel free to run TSA by yourself for these contracts or consider [tests for them](../../tsa-core/src/test/kotlin/org/ton/examples). 
+For more examples containing erroneous places, take a look at the directory in [the repository with manually written contracts](https://github.com/espritoxyz/tsa/tree/master/tsa-core/src/test/resources).
+Feel free to run TSA by yourself for these contracts or consider [tests for them](https://github.com/espritoxyz/tsa/tree/master/tsa-core/src/test/kotlin/org/ton/examples). 
 
 ## Test Generation
 
