@@ -5,6 +5,16 @@ plugins {
     id("com.github.johnrengelman.shadow") version "8.1.1"
 }
 
+dependencies {
+    implementation(project(":tsa-core"))
+    implementation(project(":tsa-sarif"))
+    implementation(project(":tsa-test-gen"))
+    implementation(project(":tvm-disasm"))
+
+    implementation("com.github.ajalt.clikt:clikt:${Versions.clikt}")
+
+}
+
 val mainClassName = "org.ton.MainKt"
 
 tasks.register<JavaExec>("run") {
@@ -16,14 +26,6 @@ tasks.withType<Jar> {
     manifest {
         attributes["Main-Class"] = mainClassName
     }
-}
-
-dependencies {
-    implementation(project(":tsa-core"))
-    implementation(project(":tsa-sarif"))
-    implementation(project(":tsa-test-gen"))
-
-    implementation("com.github.ajalt.clikt:clikt:${Versions.clikt}")
 }
 
 tasks.withType<ShadowJar> {

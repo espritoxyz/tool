@@ -36,3 +36,14 @@ data class TvmInstLambdaLocation(override val index: Int) : TvmInstLocation() {
         return "Lambda:#$index"
     }
 }
+
+@Serializable
+@SerialName("TvmMainMethodLocation")
+data class TvmMainMethodLocation(override val index: Int) : TvmInstLocation() {
+    @kotlinx.serialization.Transient
+    override lateinit var codeBlock: TvmCodeBlock
+
+    override fun toString(): String {
+        return "MainMethod:#$index"
+    }
+}

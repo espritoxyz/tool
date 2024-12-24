@@ -7,7 +7,6 @@ import org.ton.examples.compileFuncToFift
 import org.ton.examples.runFiftMethod
 import org.ton.examples.testFiftOptions
 import org.usvm.machine.MethodId
-import org.usvm.machine.mainMethodId
 import kotlin.io.path.Path
 import kotlin.io.path.createTempFile
 import kotlin.io.path.deleteIfExists
@@ -23,13 +22,13 @@ class RegistersTest {
 
     @Test
     fun testC0Register() {
-        val methodsBlackList = hashSetOf(mainMethodId, BigInteger.ONE)
+        val methodsBlackList = hashSetOf(BigInteger.ONE)
         analyzeContract(registerC0TestPath, methodsBlackList)
     }
 
     @Test
     fun testC1Register() {
-        val methodsBlackList = hashSetOf(mainMethodId, BigInteger.ONE)
+        val methodsBlackList = hashSetOf(BigInteger.ONE)
         analyzeContract(registerC1TestPath, methodsBlackList)
     }
 
@@ -55,7 +54,7 @@ class RegistersTest {
 
     private fun analyzeContract(
         contractPath: String,
-        methodsBlackList: Set<MethodId> = hashSetOf(mainMethodId),
+        methodsBlackList: Set<MethodId> = hashSetOf(),
     ) {
         val resourcePath = this::class.java.getResource(contractPath)?.path?.let { Path(it) }
             ?: error("Cannot find resource bytecode $contractPath")

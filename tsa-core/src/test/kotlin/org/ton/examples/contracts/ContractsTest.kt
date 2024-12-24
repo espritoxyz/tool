@@ -6,7 +6,6 @@ import org.ton.examples.funcCompileAndAnalyzeAllMethods
 import org.ton.runHardTestsRegex
 import org.ton.runHardTestsVar
 import org.usvm.machine.MethodId
-import org.usvm.machine.mainMethodId
 import kotlin.io.path.Path
 import kotlin.test.Ignore
 import kotlin.test.Test
@@ -131,7 +130,7 @@ class ContractsTest {
     private fun analyzeContract(
         contractPath: String,
         methodsNumber: Int,
-        methodsBlackList: Set<MethodId> = hashSetOf(mainMethodId),
+        methodsBlackList: Set<MethodId> = hashSetOf(),
     ) {
         val bytecodeResourcePath = this::class.java.getResource(contractPath)?.path?.let { Path(it) }
             ?: error("Cannot find resource bytecode $contractPath")

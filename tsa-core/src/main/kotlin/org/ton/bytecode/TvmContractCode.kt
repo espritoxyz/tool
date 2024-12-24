@@ -17,6 +17,7 @@ import org.usvm.machine.MethodId
 
 @Serializable
 data class TvmContractCode(
+    val mainMethod: TvmInstList,
     val methods: Map<@Serializable(BigIntSerializer::class) MethodId, TvmMethod>
 ) {
     var isContractWithTSACheckerFunctions: Boolean = false

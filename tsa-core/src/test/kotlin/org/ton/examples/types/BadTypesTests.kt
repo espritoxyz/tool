@@ -6,7 +6,6 @@ import org.ton.examples.compareSymbolicAndConcreteResults
 import org.ton.examples.compileAndAnalyzeFift
 import org.ton.examples.runFiftMethod
 import org.ton.examples.testFiftOptions
-import org.usvm.machine.mainMethodId
 import kotlin.io.path.Path
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -22,7 +21,7 @@ class BadTypesTests {
 
         val symbolicResult = compileAndAnalyzeFift(
             fiftResourcePath,
-            methodsBlackList = setOf(BigInteger.ZERO, mainMethodId),
+            methodsBlackList = setOf(BigInteger.ZERO),
             tvmOptions = testFiftOptions
         )
 

@@ -9,6 +9,7 @@ import org.ton.TvmInputInfo
 import org.ton.bytecode.TvmContractCode
 import org.ton.bytecode.TvmMethod
 import org.ton.cell.Cell
+import org.ton.disasm.TvmDisassembler
 import org.usvm.machine.FuncAnalyzer.Companion.FIFT_EXECUTABLE
 import org.usvm.machine.state.ContractId
 import org.usvm.machine.state.TvmState
@@ -17,7 +18,6 @@ import org.usvm.stopstrategies.StopStrategy
 import org.usvm.test.resolver.TvmContractSymbolicTestResult
 import org.usvm.test.resolver.TvmMethodCoverage
 import org.usvm.test.resolver.TvmTestResolver
-import org.usvm.utils.FileUtils
 import org.usvm.utils.executeCommandWithTimeout
 import org.usvm.utils.toText
 import java.math.BigInteger
@@ -43,7 +43,7 @@ sealed interface TvmAnalyzer {
     fun analyzeAllMethods(
         sourcesPath: Path,
         contractDataHex: String? = null,
-        methodsBlackList: Set<MethodId> = hashSetOf(mainMethodId),
+        methodsBlackList: Set<MethodId> = hashSetOf(),
         inputInfo: Map<BigInteger, TvmInputInfo> = emptyMap(),
         tvmOptions: TvmOptions = TvmOptions(quietMode = true, timeout = 10.minutes),
     ): TvmContractSymbolicTestResult
@@ -471,6 +471,7 @@ class FiftAnalyzer(
 }
 
 data object BocAnalyzer : TvmAnalyzer {
+
     override fun analyzeAllMethods(
         sourcesPath: Path,
         contractDataHex: String?,
@@ -483,33 +484,11 @@ data object BocAnalyzer : TvmAnalyzer {
     }
 
     fun loadContractFromBoc(bocFilePath: Path): TvmContractCode {
-        val disasmArgs = DISASSEMBLER_RUN_COMMAND.split(" ") + bocFilePath.absolutePathString()
-        val (exitValue, completedInTime, bytecodeJson, errors) = executeCommandWithTimeout(
-            disasmArgs,
-            DISASSEMBLER_TIMEOUT,
-            Paths.get(DISASSEMBLER_PATH).toFile()
-        )
+        val boc = bocFilePath.toFile().readBytes()
+        val bytecodeJson = TvmDisassembler.disassemble(boc)
 
-        check(completedInTime) {
-            "Disassembler process has not finished in $DISASSEMBLER_TIMEOUT seconds"
-        }
-
-        check(exitValue == 0) {
-            "Disassembler process finished with an error, exit code $exitValue, errors: \n${errors.toText()}"
-        }
-
-        return TvmContractCode.fromJson(bytecodeJson.toText())
+        return TvmContractCode.fromJson(bytecodeJson.toString())
     }
-
-    private val DISASSEMBLER_PATH: String by lazy {
-        val disassemblerPath = FileUtils.tvmTempDirectory.resolve("tvm-disasm")
-        FileUtils.extractZipFromResource("lib/tvm-disasm.zip", disassemblerPath)
-        disassemblerPath.absolutePath
-    }
-    private const val DISASSEMBLER_RUN_COMMAND = "node dist/index.js"
-
-    // For the large contracts disassembling can take up to the one minute
-    private const val DISASSEMBLER_TIMEOUT = 60.toLong() // seconds
 }
 
 private fun runAnalysisInCatchingBlock(
@@ -584,7 +563,7 @@ fun analyzeInterContract(
 
 fun analyzeAllMethods(
     contract: TvmContractCode,
-    methodsBlackList: Set<MethodId> = hashSetOf(mainMethodId),
+    methodsBlackList: Set<MethodId> = hashSetOf(),
     contractDataHex: String? = null,
     inputInfo: Map<BigInteger, TvmInputInfo> = emptyMap(),
     tvmOptions: TvmOptions = TvmOptions(),
@@ -630,8 +609,6 @@ typealias MethodId = BigInteger
 
 @Suppress("NOTHING_TO_INLINE")
 inline fun Int.toMethodId(): MethodId = toBigInteger()
-
-val mainMethodId: MethodId = Int.MAX_VALUE.toMethodId()
 
 private val logger = object : KLogging() {}.logger
 

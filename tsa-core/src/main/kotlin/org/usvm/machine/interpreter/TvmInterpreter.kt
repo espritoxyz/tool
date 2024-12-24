@@ -31,8 +31,6 @@ import org.ton.bytecode.TvmArithmDivInst
 import org.ton.bytecode.TvmArithmLogicalAbsInst
 import org.ton.bytecode.TvmArithmLogicalAndInst
 import org.ton.bytecode.TvmArithmLogicalBitsizeInst
-import org.ton.bytecode.TvmArithmLogicalChkbitAliasInst
-import org.ton.bytecode.TvmArithmLogicalChkboolAliasInst
 import org.ton.bytecode.TvmArithmLogicalFitsInst
 import org.ton.bytecode.TvmArithmLogicalFitsxInst
 import org.ton.bytecode.TvmArithmLogicalInst
@@ -87,7 +85,6 @@ import org.ton.bytecode.TvmConstDataPushrefsliceInst
 import org.ton.bytecode.TvmConstDataPushsliceInst
 import org.ton.bytecode.TvmConstDataPushsliceLongInst
 import org.ton.bytecode.TvmConstIntInst
-import org.ton.bytecode.TvmConstIntOneAliasInst
 import org.ton.bytecode.TvmConstIntPushint16Inst
 import org.ton.bytecode.TvmConstIntPushint4Inst
 import org.ton.bytecode.TvmConstIntPushint8Inst
@@ -96,10 +93,6 @@ import org.ton.bytecode.TvmConstIntPushnanInst
 import org.ton.bytecode.TvmConstIntPushnegpow2Inst
 import org.ton.bytecode.TvmConstIntPushpow2Inst
 import org.ton.bytecode.TvmConstIntPushpow2decInst
-import org.ton.bytecode.TvmConstIntTenAliasInst
-import org.ton.bytecode.TvmConstIntTrueAliasInst
-import org.ton.bytecode.TvmConstIntTwoAliasInst
-import org.ton.bytecode.TvmConstIntZeroAliasInst
 import org.ton.bytecode.TvmContBasicCallrefInst
 import org.ton.bytecode.TvmContBasicExecuteInst
 import org.ton.bytecode.TvmContBasicInst
@@ -180,10 +173,7 @@ import org.ton.bytecode.TvmStackComplexPuxcInst
 import org.ton.bytecode.TvmStackComplexPuxcpuInst
 import org.ton.bytecode.TvmStackComplexReverseInst
 import org.ton.bytecode.TvmStackComplexRevxInst
-import org.ton.bytecode.TvmStackComplexRollAliasInst
-import org.ton.bytecode.TvmStackComplexRollrevAliasInst
 import org.ton.bytecode.TvmStackComplexRollxInst
-import org.ton.bytecode.TvmStackComplexRot2AliasInst
 import org.ton.bytecode.TvmStackComplexRotInst
 import org.ton.bytecode.TvmStackComplexRotrevInst
 import org.ton.bytecode.TvmStackComplexSwap2Inst
@@ -226,7 +216,6 @@ import org.usvm.machine.TvmStepScopeManager
 import org.usvm.machine.bigIntValue
 import org.usvm.machine.extractMethodId
 import org.usvm.machine.intValue
-import org.usvm.machine.mainMethodId
 import org.usvm.machine.state.C0Register
 import org.usvm.machine.state.C1Register
 import org.usvm.machine.state.C2Register
@@ -313,6 +302,7 @@ import org.usvm.sizeSort
 import org.usvm.solver.USatResult
 import org.usvm.targets.UTargetsSet
 import org.ton.bytecode.TvmContBasicCallxargsVarInst
+import org.ton.bytecode.TvmMainMethodLocation
 
 // TODO there are a lot of `scope.calcOnState` and `scope.doWithState` invocations that are not inline - optimize it
 class TvmInterpreter(
@@ -340,7 +330,7 @@ class TvmInterpreter(
     private val gasInterpreter = TvmGasInterpreter(ctx)
     private val globalsInterpreter = TvmGlobalsInterpreter(ctx)
     private val transactionInterpreter = TvmTransactionInterpreter(ctx)
-    private val tsaCheckerFunctionsInterpreter = TsaCheckerFunctionsInterpreter(contractsCode)
+    private val tsaCheckerFunctionsInterpreter = TsaCheckerFunctionsInterpreter(contractsCode, transactionInterpreter)
 
     fun getInitialState(
         startContractId: ContractId,
@@ -832,11 +822,6 @@ class TvmInterpreter(
             is TvmStackComplexChkdepthInst -> TODO("Cannot implement stack depth yet (TvmStackComplexChkdepthInst)")
             is TvmStackComplexOnlytopxInst -> TODO("??")
             is TvmStackComplexOnlyxInst -> TODO("??")
-
-            // aliases (there are todos in their resolveAlias):
-            is TvmStackComplexRollAliasInst -> TODO()
-            is TvmStackComplexRollrevAliasInst -> TODO()
-            is TvmStackComplexRot2AliasInst -> TODO()
         }
 
         scope.doWithState {
@@ -883,11 +868,6 @@ class TvmInterpreter(
                 // todo: nothing in docs about nan
                 (BigInteger.valueOf(2).pow(x + 1) - BigInteger.ONE).toBv257()
             }
-            is TvmConstIntTenAliasInst -> resolveAlias().bv257value(ctx)
-            is TvmConstIntTrueAliasInst -> resolveAlias().bv257value(ctx)
-            is TvmConstIntTwoAliasInst -> resolveAlias().bv257value(ctx)
-            is TvmConstIntOneAliasInst -> resolveAlias().bv257value(ctx)
-            is TvmConstIntZeroAliasInst -> resolveAlias().bv257value(ctx)
         }
     }
 
@@ -1389,9 +1369,6 @@ class TvmInterpreter(
 
                 symbolicSizeBits
             }
-
-            is TvmArithmLogicalChkbitAliasInst -> return visitArithmeticLogicalInst(scope, stmt.resolveAlias())
-            is TvmArithmLogicalChkboolAliasInst -> return visitArithmeticLogicalInst(scope, stmt.resolveAlias())
         }
 
         scope.doWithState {
@@ -2145,9 +2122,7 @@ class TvmInterpreter(
 
         when (stmt) {
             is TvmDictSpecialDictigetjmpzInst -> {
-                val statementMethod = (stmt.location as? TvmInstMethodLocation)?.methodId
-                val selectorMethodId = mainMethodId
-                require(statementMethod == selectorMethodId) {
+                require(stmt.location is TvmMainMethodLocation) {
                     "The general case is not supported: $stmt"
                 }
 

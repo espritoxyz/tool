@@ -932,3 +932,22 @@ fun TvmSubSliceSerializedLoader.bitsToBv(): KBitVecValue<UBvSort> {
 private fun <Field, Sort : USort> UWritableMemory<*>.copyField(from: UHeapRef, to: UHeapRef, field: Field, sort: Sort) {
     writeField(to, field, sort, readField(from, field, sort), guard = from.ctx.trueExpr)
 }
+
+fun TvmState.slicesAreEqual(slice1: UHeapRef, slice2: UHeapRef): UBoolExpr = with(ctx) {
+    val dataLeft1 = getSliceRemainingBitsCount(slice1)
+    val dataLeft2 = getSliceRemainingBitsCount(slice2)
+
+    val dataPosition1 = memory.readField(slice1, sliceDataPosField, sizeSort)
+    val cell1 = memory.readField(slice1, sliceCellField, addressSort)
+    val data1 = preloadDataBitsFromCellWithoutChecks(cell1, dataPosition1, dataLeft1)
+
+    val dataPosition2 = memory.readField(slice2, sliceDataPosField, sizeSort)
+    val cell2 = memory.readField(slice2, sliceCellField, addressSort)
+    val data2 = preloadDataBitsFromCellWithoutChecks(cell2, dataPosition2, dataLeft2)
+
+    val shift = mkBvSubExpr(mkSizeExpr(MAX_DATA_LENGTH), dataLeft1).zeroExtendToSort(cellDataSort)
+    val shiftedData1 = mkBvShiftLeftExpr(data1, shift)
+    val shiftedData2 = mkBvShiftLeftExpr(data2, shift)
+
+    mkAnd(dataLeft1 eq dataLeft2, shiftedData1 eq shiftedData2)
+}

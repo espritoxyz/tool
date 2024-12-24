@@ -26,12 +26,6 @@ jobs:
 #          java-version: '17'
 #          cache: 'gradle'
 
-      - name: 'Build tvm disasm'
-        working-directory: ./tvm-disasm
-        run: |
-          npm i
-          npm run build
-
       - name: 'Build and run test'
         run: ./gradlew clean build
         env:

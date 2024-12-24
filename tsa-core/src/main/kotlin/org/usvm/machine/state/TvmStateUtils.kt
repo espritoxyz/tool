@@ -7,6 +7,7 @@ import org.ton.bytecode.TvmCodeBlock
 import org.ton.bytecode.TvmContractCode
 import org.ton.bytecode.TvmExceptionContinuation
 import org.ton.bytecode.TvmInst
+import org.ton.bytecode.TvmLambda
 import org.ton.bytecode.TvmMethod
 import org.ton.bytecode.TvmOrdContinuation
 import org.usvm.NULL_ADDRESS
@@ -20,7 +21,6 @@ import org.usvm.machine.TvmContext
 import org.usvm.machine.TvmContext.TvmInt257Sort
 import org.usvm.machine.TvmSizeSort
 import org.usvm.machine.TvmStepScopeManager
-import org.usvm.machine.mainMethodId
 import org.usvm.machine.types.TvmBuilderType
 import org.usvm.machine.types.TvmCellType
 import org.usvm.machine.types.TvmDataCellType
@@ -266,8 +266,7 @@ fun initializeContractExecutionMemory(
     allowInputStackValues: Boolean,
 ): TvmContractExecutionMemory {
     val contractCode = contractsCode[contractId]
-    val mainMethod = contractCode.methods[mainMethodId]
-        ?: error("No main method found")
+    val mainMethod = TvmLambda(contractCode.mainMethod.list.toMutableList())
     val ctx = state.ctx
     val firstElementOfC7 = state.contractIdToFirstElementOfC7[contractId]
         ?: error("First element of c7 for contract $contractId not found")

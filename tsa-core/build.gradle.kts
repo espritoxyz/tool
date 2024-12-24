@@ -4,6 +4,8 @@ plugins {
 }
 
 dependencies {
+    implementation(project(":tvm-disasm"))
+
     implementation("org.ton:ton-kotlin-crypto:0.3.1")
     implementation("org.ton:ton-kotlin-tvm:0.3.1")
     implementation("org.ton:ton-kotlin-tonapi-tl:0.3.1")
@@ -33,14 +35,8 @@ dependencies {
     }
 }
 
-val zipTvmDisasm by tasks.registering(Zip::class) {
-    from("../tvm-disasm")
-    archiveFileName.set("tvm-disasm.zip")
-    destinationDirectory.set(layout.buildDirectory.dir("zips"))
-}
+val pathToSpec = File(rootProject.projectDir, "tvm-spec/cp0.json")
 
 tasks.processResources {
-    from(zipTvmDisasm) {
-        into("lib")
-    }
+    from(pathToSpec)
 }

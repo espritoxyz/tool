@@ -9,6 +9,8 @@ plugins {
 dependencies {
     implementation(project(":tsa-core"))
     implementation(project(":tsa-sarif"))
+    implementation(project(":tsa-test-gen"))
+    implementation(project(":tvm-disasm"))
 
     implementation("org.ton:ton-kotlin-crypto:0.3.1")
     implementation("org.ton:ton-kotlin-tvm:0.3.1")
@@ -21,14 +23,9 @@ dependencies {
     implementation("org.ton:ton-kotlin-bitstring:0.3.1")
     implementation("org.ton:ton-kotlin-bigint:0.3.1")
 
+    implementation("org.jetbrains.kotlinx:kotlinx-collections-immutable-jvm:${Versions.collections}")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:${Versions.kotlinx_serialization}")
     implementation("ch.qos.logback:logback-classic:${Versions.logback}")
-
-    // todo: remove ksmt-core exclude after upgrading ksmt version in USVM
-    implementation(group = Packages.ksmtBv2Int, name = "ksmt-core", version = Versions.ksmtBv2Int)
-    implementation(group = Packages.usvm, name = "usvm-core", version = Versions.usvm) {
-        exclude(group = "io.ksmt", module = "ksmt-core")
-    }
 
     implementation("com.github.ajalt.clikt:clikt:${Versions.clikt}")
 }
@@ -60,3 +57,8 @@ tasks.withType<ShadowJar> {
     }
 }
 
+val pathToSpec = File(rootProject.projectDir, "tvm-spec/cp0.json")
+
+tasks.processResources {
+    from(pathToSpec)
+}
