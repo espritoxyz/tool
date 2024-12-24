@@ -2,8 +2,8 @@ title: TSA
 description: TON Symbolic Analyzer
 remote_theme: just-the-docs/just-the-docs
 
-domain: tsa.github.io       # if you want to force HTTPS, specify the domain without the http at the start, e.g. example.com
-url: https://tsa.github.io  # the base hostname and protocol for your site, e.g. http://example.com
+domain: tonan.tech       # if you want to force HTTPS, specify the domain without the http at the start, e.g. example.com
+url: https://tonan.tech  # the base hostname and protocol for your site, e.g. http://example.com
 baseurl: /tsa     # place folder name if the site is served in a subfolder
 
 plugins:
