@@ -10,7 +10,7 @@ object Versions {
     const val mockk = "1.13.4"
     const val junitParams = "5.9.3"
     const val logback = "1.4.8"
-    const val usvm = "0290d10672"
+    const val usvm = "aee926e88f31af801192239d8997d213f9145424"
 }
 
 object Packages {

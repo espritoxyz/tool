@@ -23,6 +23,8 @@ dependencies {
     implementation("org.ton:ton-kotlin-bitstring:0.3.1")
     implementation("org.ton:ton-kotlin-bigint:0.3.1")
 
+    implementation("io.github.microutils:kotlin-logging-jvm:3.0.5")
+
     implementation("org.jetbrains.kotlinx:kotlinx-collections-immutable-jvm:${Versions.collections}")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:${Versions.kotlinx_serialization}")
     implementation("ch.qos.logback:logback-classic:${Versions.logback}")

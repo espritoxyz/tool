@@ -67,7 +67,7 @@ fun TvmStepScopeManager.callMethod(
         val wrappedCC = TvmMethodReturnContinuation(methodToCall.id, currentContinuation)
         registersOfCurrentContract.c0 = C0Register(wrappedCC)
 
-        callStack.push(methodToCall, returnSite = null)
+        callStack.push(methodToCall, returnSite = stmt)
     }
 
     jump(nextContinuation)

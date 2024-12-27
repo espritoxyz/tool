@@ -1,6 +1,6 @@
 package org.ton.bytecode
 
-interface TvmContOperandInst : TvmInst
+sealed interface TvmContOperandInst : TvmInst
 
 interface TvmContOperand1Inst : TvmContOperandInst {
     val c: TvmInstList

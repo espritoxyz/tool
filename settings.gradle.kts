@@ -9,7 +9,6 @@ pluginManagement {
 
 include("tsa-core")
 include("tsa-cli")
-include("tsa-intellij")
 include("tsa-sarif")
 include("tsa-test-gen")
 include("tsa-safety-properties")

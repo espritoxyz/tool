@@ -46,12 +46,14 @@ fun tactCompileAndAnalyzeAllMethods(
     tactSourcesPath: Path,
     contractDataHex: String? = null,
     methodsBlackList: Set<MethodId> = hashSetOf(),
+    methodWhiteList: Set<MethodId>? = null,
     inputInfo: Map<MethodId, TvmInputInfo> = emptyMap(),
     tvmOptions: TvmOptions = TvmOptions(),
 ): TvmContractSymbolicTestResult = TactAnalyzer.analyzeAllMethods(
     tactSourcesPath,
     contractDataHex,
     methodsBlackList,
+    methodWhiteList,
     inputInfo,
     tvmOptions,
 )
@@ -60,6 +62,7 @@ fun funcCompileAndAnalyzeAllMethods(
     funcSourcesPath: Path,
     contractDataHex: String? = null,
     methodsBlackList: Set<MethodId> = hashSetOf(),
+    methodWhiteList: Set<MethodId>? = null,
     inputInfo: Map<MethodId, TvmInputInfo> = emptyMap(),
     tvmOptions: TvmOptions = TvmOptions(),
 ): TvmContractSymbolicTestResult = FuncAnalyzer(
@@ -69,6 +72,7 @@ fun funcCompileAndAnalyzeAllMethods(
     funcSourcesPath,
     contractDataHex,
     methodsBlackList,
+    methodWhiteList,
     inputInfo,
     tvmOptions,
 )
@@ -77,12 +81,14 @@ fun compileAndAnalyzeFift(
     fiftPath: Path,
     contractDataHex: String? = null,
     methodsBlackList: Set<MethodId> = hashSetOf(),
+    methodWhiteList: Set<MethodId>? = null,
     inputInfo: Map<MethodId, TvmInputInfo> = emptyMap(),
     tvmOptions: TvmOptions = TvmOptions(),
 ): TvmContractSymbolicTestResult = FiftAnalyzer(fiftStdlibPath = FIFT_STDLIB_RESOURCE).analyzeAllMethods(
     fiftPath,
     contractDataHex,
     methodsBlackList,
+    methodWhiteList,
     inputInfo,
     tvmOptions,
 )
@@ -107,9 +113,10 @@ fun analyzeAllMethods(
     bytecodePath: String,
     contractDataHex: String? = null,
     methodsBlackList: Set<MethodId> = hashSetOf(),
+    methodWhiteList: Set<MethodId>? = null,
     inputInfo: Map<MethodId, TvmInputInfo> = emptyMap(),
 ): TvmContractSymbolicTestResult =
-    BocAnalyzer.analyzeAllMethods(Path(bytecodePath), contractDataHex, methodsBlackList, inputInfo)
+    BocAnalyzer.analyzeAllMethods(Path(bytecodePath), contractDataHex, methodsBlackList, methodWhiteList, inputInfo)
 
 /**
  * Run method with [methodId].

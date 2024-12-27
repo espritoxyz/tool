@@ -17,6 +17,7 @@ import org.usvm.UConcreteHeapRef
 import org.usvm.UExpr
 import org.usvm.UHeapRef
 import org.usvm.UState
+import org.usvm.collections.immutable.internal.MutabilityOwnership
 import org.usvm.constraints.UPathConstraints
 import org.usvm.isStaticHeapRef
 import org.usvm.machine.TvmContext
@@ -35,6 +36,7 @@ typealias ContractId = Int
 
 class TvmState(
     ctx: TvmContext,
+    ownership: MutabilityOwnership,
     override val entrypoint: TvmCodeBlock,
 //    val registers: TvmRegisters, // TODO do we really need keep the registers this way?
     val emptyRefValue: TvmRefEmptyValue,
@@ -62,6 +64,7 @@ class TvmState(
     var additionalFlags: PersistentSet<String> = persistentHashSetOf(),
 ) : UState<TvmType, TvmCodeBlock, TvmInst, TvmContext, TvmTarget, TvmState>(
     ctx,
+    ownership,
     callStack,
     pathConstraints,
     memory,
@@ -122,17 +125,24 @@ class TvmState(
         }
 
     override fun clone(newConstraints: UPathConstraints<TvmType>?): TvmState {
-        val clonedConstraints = newConstraints ?: pathConstraints.clone()
+        val newThisOwnership = MutabilityOwnership()
+        val cloneOwnership = MutabilityOwnership()
+        val newPathConstraints = newConstraints?.also {
+            this.pathConstraints.changeOwnership(newThisOwnership)
+            it.changeOwnership(cloneOwnership)
+        } ?: pathConstraints.clone(newThisOwnership, cloneOwnership)
+        val newMemory = memory.clone(newPathConstraints.typeConstraints, newThisOwnership, cloneOwnership)
 
         return TvmState(
             ctx = ctx,
+            ownership = ownership,
             entrypoint = entrypoint,
             emptyRefValue = emptyRefValue,
             symbolicRefs = symbolicRefs,
             gasUsage = gasUsage,
             callStack = callStack.clone(),
-            pathConstraints = clonedConstraints,
-            memory = memory.clone(clonedConstraints.typeConstraints),
+            pathConstraints = newPathConstraints,
+            memory = newMemory,
             models = models,
             pathNode = pathNode,
             forkPoints = forkPoints,

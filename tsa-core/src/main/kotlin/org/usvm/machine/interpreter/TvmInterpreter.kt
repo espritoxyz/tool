@@ -3,7 +3,6 @@ package org.usvm.machine.interpreter
 import io.ksmt.expr.KInterpretedValue
 import io.ksmt.utils.BvUtils.bvMaxValueSigned
 import io.ksmt.utils.BvUtils.bvMinValueSigned
-import java.math.BigInteger
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toPersistentMap
 import mu.KLogging
@@ -81,6 +80,7 @@ import org.ton.bytecode.TvmConstDataInst
 import org.ton.bytecode.TvmConstDataPushcontInst
 import org.ton.bytecode.TvmConstDataPushcontShortInst
 import org.ton.bytecode.TvmConstDataPushrefInst
+import org.ton.bytecode.TvmConstDataPushrefcontInst
 import org.ton.bytecode.TvmConstDataPushrefsliceInst
 import org.ton.bytecode.TvmConstDataPushsliceInst
 import org.ton.bytecode.TvmConstDataPushsliceLongInst
@@ -94,6 +94,7 @@ import org.ton.bytecode.TvmConstIntPushnegpow2Inst
 import org.ton.bytecode.TvmConstIntPushpow2Inst
 import org.ton.bytecode.TvmConstIntPushpow2decInst
 import org.ton.bytecode.TvmContBasicCallrefInst
+import org.ton.bytecode.TvmContBasicCallxargsVarInst
 import org.ton.bytecode.TvmContBasicExecuteInst
 import org.ton.bytecode.TvmContBasicInst
 import org.ton.bytecode.TvmContBasicRetInst
@@ -138,6 +139,7 @@ import org.ton.bytecode.TvmInst
 import org.ton.bytecode.TvmInstList
 import org.ton.bytecode.TvmInstMethodLocation
 import org.ton.bytecode.TvmLambda
+import org.ton.bytecode.TvmMainMethodLocation
 import org.ton.bytecode.TvmOrdContinuation
 import org.ton.bytecode.TvmStackBasicInst
 import org.ton.bytecode.TvmStackBasicNopInst
@@ -196,6 +198,7 @@ import org.usvm.UInterpreter
 import org.usvm.api.makeSymbolicPrimitive
 import org.usvm.api.readField
 import org.usvm.api.writeField
+import org.usvm.collections.immutable.internal.MutabilityOwnership
 import org.usvm.constraints.UPathConstraints
 import org.usvm.forkblacklists.UForkBlackList
 import org.usvm.machine.MethodId
@@ -301,8 +304,7 @@ import org.usvm.mkSizeGeExpr
 import org.usvm.sizeSort
 import org.usvm.solver.USatResult
 import org.usvm.targets.UTargetsSet
-import org.ton.bytecode.TvmContBasicCallxargsVarInst
-import org.ton.bytecode.TvmMainMethodLocation
+import java.math.BigInteger
 
 // TODO there are a lot of `scope.calcOnState` and `scope.doWithState` invocations that are not inline - optimize it
 class TvmInterpreter(
@@ -365,12 +367,14 @@ class TvmInterpreter(
             ?: error("Contract $startContractId not found.")
         val method = contractCode.methods[methodId] ?: error("Unknown method $methodId")
 
-        val pathConstraints = UPathConstraints<TvmType>(ctx)
-        val memory = UMemory<TvmType, TvmCodeBlock>(ctx, pathConstraints.typeConstraints)
+        val initOwnership = MutabilityOwnership()
+        val pathConstraints = UPathConstraints<TvmType>(ctx, initOwnership)
+        val memory = UMemory<TvmType, TvmCodeBlock>(ctx, initOwnership, pathConstraints.typeConstraints)
         val refEmptyValue = memory.initializeEmptyRefValues()
 
         val state = TvmState(
             ctx = ctx,
+            ownership = initOwnership,
             entrypoint = method,
             memory = memory,
             pathConstraints = pathConstraints,
@@ -478,7 +482,7 @@ class TvmInterpreter(
         val initialGasUsage = state.gasUsage
         val globalStructuralConstraintsHolder = state.globalStructuralConstraintsHolder
 
-        val allowFailures = state.allowFailures
+        val allowFailures = state.allowFailures && !ctx.tvmOptions.excludeExecutionsWithFailures
         var scope = TvmStepScopeManager(state, forkBlackList, allowFailures)
 
         // handle exception firstly
@@ -916,6 +920,18 @@ class TvmInterpreter(
                     newStmt(stmt.nextStmt())
                 }
                 scope.consumeDefaultGas(stmt)
+            }
+            is TvmConstDataPushrefcontInst -> {
+                scope.doWithStateCtx {
+                    val continuationValue = TvmOrdContinuation(TvmLambda(stmt.c.toMutableList()))
+                    stack.addContinuation(continuationValue)
+
+                    newStmt(stmt.nextStmt())
+                }
+                scope.doWithState {
+                    // TODO: compex gas
+                    consumeGas(118)
+                }
             }
             is TvmConstDataPushsliceLongInst -> {
                 if (stmt.slice.refs.isNotEmpty()) {

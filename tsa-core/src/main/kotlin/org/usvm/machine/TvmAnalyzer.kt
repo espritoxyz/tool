@@ -44,6 +44,7 @@ sealed interface TvmAnalyzer {
         sourcesPath: Path,
         contractDataHex: String? = null,
         methodsBlackList: Set<MethodId> = hashSetOf(),
+        methodsWhiteList: Set<MethodId>? = null,
         inputInfo: Map<BigInteger, TvmInputInfo> = emptyMap(),
         tvmOptions: TvmOptions = TvmOptions(quietMode = true, timeout = 10.minutes),
     ): TvmContractSymbolicTestResult
@@ -55,6 +56,7 @@ data object TactAnalyzer : TvmAnalyzer {
         sourcesPath: Path,
         contractDataHex: String?,
         methodsBlackList: Set<MethodId>,
+        methodsWhiteList: Set<MethodId>?,
         inputInfo: Map<BigInteger, TvmInputInfo>,
         tvmOptions: TvmOptions,
     ): TvmContractSymbolicTestResult {
@@ -72,6 +74,7 @@ data object TactAnalyzer : TvmAnalyzer {
                 bocFile,
                 contractDataHex,
                 methodsBlackList,
+                methodsWhiteList,
                 inputInfo,
                 tvmOptions,
             )
@@ -239,6 +242,7 @@ class FuncAnalyzer(
         sourcesPath: Path,
         contractDataHex: String?,
         methodsBlackList: Set<MethodId>,
+        methodsWhiteList: Set<MethodId>?,
         inputInfo: Map<BigInteger, TvmInputInfo>,
         tvmOptions: TvmOptions,
     ): TvmContractSymbolicTestResult {
@@ -249,6 +253,7 @@ class FuncAnalyzer(
                 tmpBocFile,
                 contractDataHex,
                 methodsBlackList,
+                methodsWhiteList,
                 inputInfo,
                 tvmOptions,
             )
@@ -306,6 +311,7 @@ class FiftAnalyzer(
         sourcesPath: Path,
         contractDataHex: String?,
         methodsBlackList: Set<MethodId>,
+        methodsWhiteList: Set<MethodId>?,
         inputInfo: Map<BigInteger, TvmInputInfo>,
         tvmOptions: TvmOptions,
     ): TvmContractSymbolicTestResult {
@@ -316,6 +322,7 @@ class FiftAnalyzer(
                 tmpBocFile,
                 contractDataHex,
                 methodsBlackList,
+                methodsWhiteList,
                 inputInfo,
                 tvmOptions,
             )
@@ -476,11 +483,12 @@ data object BocAnalyzer : TvmAnalyzer {
         sourcesPath: Path,
         contractDataHex: String?,
         methodsBlackList: Set<MethodId>,
+        methodsWhiteList: Set<MethodId>?,
         inputInfo: Map<BigInteger, TvmInputInfo>,
         tvmOptions: TvmOptions,
     ): TvmContractSymbolicTestResult {
         val contract = loadContractFromBoc(sourcesPath)
-        return analyzeAllMethods(contract, methodsBlackList, contractDataHex, inputInfo, tvmOptions)
+        return analyzeAllMethods(contract, methodsBlackList, methodsWhiteList, contractDataHex, inputInfo, tvmOptions)
     }
 
     fun loadContractFromBoc(bocFilePath: Path): TvmContractCode {
@@ -564,6 +572,7 @@ fun analyzeInterContract(
 fun analyzeAllMethods(
     contract: TvmContractCode,
     methodsBlackList: Set<MethodId> = hashSetOf(),
+    methodWhitelist: Set<MethodId>? = null,
     contractDataHex: String? = null,
     inputInfo: Map<BigInteger, TvmInputInfo> = emptyMap(),
     tvmOptions: TvmOptions = TvmOptions(),
@@ -573,6 +582,9 @@ fun analyzeAllMethods(
     val machine = TvmMachine(tvmOptions = tvmOptions, options = machineOptions)
     val methodsExceptDictPushConst = contract.methods.filterKeys { it !in methodsBlackList }
     val methodStates = methodsExceptDictPushConst.values.associateWith { method ->
+        if (methodWhitelist?.let { method.id in it } == false) {
+            return@associateWith emptyList<TvmState>() to TvmMethodCoverage(0.0f, 0.0f)
+        }
         runAnalysisInCatchingBlock(
             contractIdForCoverageStats = 0,
             contract,

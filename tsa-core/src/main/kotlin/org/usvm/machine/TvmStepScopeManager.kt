@@ -7,6 +7,9 @@ import org.usvm.UBoolExpr
 import org.usvm.forkblacklists.UForkBlackList
 import org.usvm.isFalse
 import org.usvm.isTrue
+import org.usvm.machine.TvmStepScopeManager.TvmStepScope.StepScopeState.CANNOT_BE_PROCESSED
+import org.usvm.machine.TvmStepScopeManager.TvmStepScope.StepScopeState.CAN_BE_PROCESSED
+import org.usvm.machine.TvmStepScopeManager.TvmStepScope.StepScopeState.DEAD
 import org.usvm.machine.state.TvmState
 import org.usvm.machine.state.c2IsDefault
 import org.usvm.machine.types.TvmType
@@ -14,9 +17,6 @@ import org.usvm.solver.USatResult
 import org.usvm.solver.UUnknownResult
 import org.usvm.solver.UUnsatResult
 import org.usvm.uctx
-import org.usvm.machine.TvmStepScopeManager.TvmStepScope.StepScopeState.CANNOT_BE_PROCESSED
-import org.usvm.machine.TvmStepScopeManager.TvmStepScope.StepScopeState.CAN_BE_PROCESSED
-import org.usvm.machine.TvmStepScopeManager.TvmStepScope.StepScopeState.DEAD
 
 class TvmStepScopeManager(
     private val originalState: TvmState,
@@ -99,7 +99,12 @@ class TvmStepScopeManager(
         check(allowFailuresOnCurrentStep) {
             "[forkWithCheckerStatusKnowledge] should be called only with allowFailuresOnCurrentStep=true, but now it is false."
         }
-        return scope.forkWithCheckerStatusKnowledge(condition, blockOnUnknownTrueState, blockOnUnsatTrueState, blockOnFalseState)
+        return scope.forkWithCheckerStatusKnowledge(
+            condition,
+            blockOnUnknownTrueState = blockOnUnknownTrueState,
+            blockOnUnsatTrueState = blockOnUnsatTrueState,
+            blockOnFalseState = blockOnFalseState
+        )
     }
 
     // TODO what to return?
@@ -225,32 +230,7 @@ class TvmStepScopeManager(
         ): Unit? {
             check(canProcessFurtherOnCurrentStep)
 
-            val possibleForkPoint = originalState.pathNode
-
-            val (posState, negState) = ctx.statesForkProvider.fork(originalState, condition)
-
-            posState?.blockOnTrueState()
-
-            if (posState == null) {
-                stepScopeState = CANNOT_BE_PROCESSED
-                check(negState === originalState)
-            } else {
-                check(posState === originalState)
-            }
-
-            if (negState != null) {
-                negState.blockOnFalseState()
-
-                if (negState !== originalState) {
-                    forkedStates += negState
-
-                    originalState.forkPoints += possibleForkPoint
-                    negState.forkPoints += possibleForkPoint
-                }
-            }
-
-            // conversion of ExecutionState? to Unit?
-            return posState?.let { }
+            return forkWithCheckerStatusKnowledge(condition, blockOnTrueState = blockOnTrueState, blockOnFalseState = blockOnFalseState)
         }
 
         // TODO: I don't like this implementation, but that was the fastest way to do it without patching usvm
@@ -258,12 +238,26 @@ class TvmStepScopeManager(
             condition: UBoolExpr,
             blockOnUnknownTrueState: TvmState.() -> Unit = {},
             blockOnUnsatTrueState: TvmState.() -> Unit = {},
+            blockOnTrueState: TvmState.() -> Unit = {},
+            blockOnUnknownFalseState: TvmState.() -> Unit = {},
+            blockOnUnsatFalseState: TvmState.() -> Unit = {},
             blockOnFalseState: TvmState.() -> Unit = {},
         ): Unit? {
+            val possibleForkPoint = originalState.pathNode
+
             val clonedState = originalState.clone()
 
-            assert(condition, unsatBlock = blockOnUnsatTrueState, unknownBlock = blockOnUnknownTrueState)
-                ?: run {
+            var unknownHappened = false
+
+            assert(
+                condition,
+                unsatBlock = blockOnUnsatTrueState,
+                unknownBlock = {
+                    unknownHappened = true
+                    blockOnUnknownTrueState()
+                },
+                satBlock = blockOnTrueState
+            ) ?: run {
                     /**
                      * Hack: change [stepScopeState] to make assert with opposite constraint possible.
                      *
@@ -273,18 +267,38 @@ class TvmStepScopeManager(
                      * */
                     stepScopeState = CAN_BE_PROCESSED
                     assert(ctx.mkNot(condition), satBlock = blockOnFalseState)
+                        ?: error("Unexpected assert result on negation of $condition")
 
                     // fix current step scope
                     stepScopeState = CANNOT_BE_PROCESSED
+
+                    if (unknownHappened) {
+                        originalState.forkPoints += possibleForkPoint
+                    }
+
                     return null
                 }
 
             val clonedStepScope = TvmStepScope(clonedState, forkBlackList)
 
-            clonedStepScope.assert(ctx.mkNot(condition))
+            clonedStepScope.assert(
+                ctx.mkNot(condition),
+                satBlock = blockOnFalseState,
+                unknownBlock = {
+                    unknownHappened = true
+                    blockOnUnknownFalseState()
+                },
+                unsatBlock = blockOnUnsatFalseState,
+            )
             if (clonedStepScope.alive) {
-                clonedStepScope.originalState.blockOnFalseState()
-                forkedStates += clonedStepScope.originalState
+                val newState = clonedStepScope.originalState
+                forkedStates += newState
+                newState.forkPoints += possibleForkPoint
+                originalState.forkPoints += possibleForkPoint
+            }
+
+            if (unknownHappened) {
+                originalState.forkPoints += possibleForkPoint
             }
 
             return Unit

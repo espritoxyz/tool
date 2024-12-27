@@ -5,10 +5,14 @@ import org.ton.examples.checkAtLeastOneStateForAllMethods
 import org.ton.examples.funcCompileAndAnalyzeAllMethods
 import org.ton.runHardTestsRegex
 import org.ton.runHardTestsVar
+import org.usvm.machine.BocAnalyzer
 import org.usvm.machine.MethodId
+import org.usvm.machine.TvmOptions
+import org.usvm.machine.getResourcePath
 import kotlin.io.path.Path
 import kotlin.test.Ignore
 import kotlin.test.Test
+import kotlin.time.Duration.Companion.seconds
 
 class ContractsTest {
     private val nftItemPath: String = "/contracts/nft-item/nft-item.fc"
@@ -29,6 +33,23 @@ class ContractsTest {
     private val singleNominatorPath: String = "/contracts/single-nominator/single-nominator.fc"
     private val nominatorPoolPath: String = "/contracts/nominator-pool/pool.fc"
     private val stocksPath: String = "/contracts/stocks/stock_options.fc"
+    private val pumpersPath: String = "/contracts/EQCV_FsDSymN83YeKZKj_7sgwQHV0jJhCTvX5SkPHHxVOi0D.boc"
+
+    // TODO: implement the rest of instructions
+    @Ignore
+    @Test
+    fun testPumpersMaster() {
+        val bytecodeResourcePath = getResourcePath<ContractsTest>(pumpersPath)
+        BocAnalyzer.analyzeAllMethods(
+            sourcesPath = bytecodeResourcePath,
+            methodsWhiteList = hashSetOf(MethodId.ZERO),
+            inputInfo = emptyMap(),
+            tvmOptions = TvmOptions(
+                excludeExecutionsWithFailures = true,
+                timeout = 120.seconds,
+            )
+        )
+    }
 
     @Test
     fun testStocks() {

@@ -122,6 +122,12 @@ class TvmMachine(
         val observers = mutableListOf(statesCollector, stepsStatistics, coverageStatistics, timeStatistics)
         additionalObserver?.let { observers.add(it) }
 
+        if (logger.isDebugEnabled && contractsCode.size == 1) {
+            val code = contractsCode.single()
+            val profiler = getTvmDebugProfileObserver(code)
+            observers.add(profiler)
+        }
+
         run(
             interpreter,
             pathSelector,
