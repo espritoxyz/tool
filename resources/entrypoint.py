@@ -12,7 +12,7 @@ class TlbPath:
     pass
 
 parser = argparse.ArgumentParser(prog='ton-analysis', add_help=False)
-parser.add_argument('-c', '--safety_properties_checker', action='store_true', help='Run safety properties checker (instead of general analysis)')
+parser.add_argument('--checker', action='store_true', help='Run safety properties checker (instead of general analysis)')
 
 tlb_path_namespace = TlbPath()
 parser.add_argument('-t', '--tlb', help='The path to the file containing the TL-B scheme for the entrypoint')
@@ -26,7 +26,7 @@ if wrapper_args.tlb is not None:
         subprocess.run(tlb_parser_command_with_input_and_output, stdout=tlb_json_output_file)
     tsa_command_with_args += ["--tlb", tlb_json_output_name]
 
-if wrapper_args.safety_properties_checker:
+if wrapper_args.checker:
     subprocess.run(tsa_safety_properties_command + analysis_args)
 else:
     subprocess.run(tsa_command_with_args)
