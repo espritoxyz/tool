@@ -5,11 +5,14 @@ import org.ton.examples.checkAtLeastOneStateForAllMethods
 import org.ton.examples.funcCompileAndAnalyzeAllMethods
 import org.ton.runHardTestsRegex
 import org.ton.runHardTestsVar
+import org.usvm.machine.BocAnalyzer
 import org.usvm.machine.MethodId
-import org.usvm.machine.mainMethodId
+import org.usvm.machine.TvmOptions
+import org.usvm.machine.getResourcePath
 import kotlin.io.path.Path
 import kotlin.test.Ignore
 import kotlin.test.Test
+import kotlin.time.Duration.Companion.seconds
 
 class ContractsTest {
     private val nftItemPath: String = "/contracts/nft-item/nft-item.fc"
@@ -30,6 +33,23 @@ class ContractsTest {
     private val singleNominatorPath: String = "/contracts/single-nominator/single-nominator.fc"
     private val nominatorPoolPath: String = "/contracts/nominator-pool/pool.fc"
     private val stocksPath: String = "/contracts/stocks/stock_options.fc"
+    private val pumpersPath: String = "/contracts/EQCV_FsDSymN83YeKZKj_7sgwQHV0jJhCTvX5SkPHHxVOi0D.boc"
+
+    // TODO: implement the rest of instructions
+    @Ignore
+    @Test
+    fun testPumpersMaster() {
+        val bytecodeResourcePath = getResourcePath<ContractsTest>(pumpersPath)
+        BocAnalyzer.analyzeAllMethods(
+            sourcesPath = bytecodeResourcePath,
+            methodsWhiteList = hashSetOf(MethodId.ZERO),
+            inputInfo = emptyMap(),
+            tvmOptions = TvmOptions(
+                excludeExecutionsWithFailures = true,
+                timeout = 120.seconds,
+            )
+        )
+    }
 
     @Test
     fun testStocks() {
@@ -41,7 +61,7 @@ class ContractsTest {
         analyzeContract(walletV4Path, methodsNumber = 7)
     }
 
-    @EnabledIfEnvironmentVariable(named = runHardTestsVar, matches = runHardTestsRegex)
+    @Ignore("slow hash validation https://github.com/explyt/tsa/issues/112")
     @Test
     fun testWalletV5() {
         analyzeContract(walletV5Path, methodsNumber = 7)
@@ -99,14 +119,13 @@ class ContractsTest {
         analyzeContract(nominatorPoolPath, methodsNumber = 10)
     }
 
-    @EnabledIfEnvironmentVariable(named = runHardTestsVar, matches = runHardTestsRegex)
+    @Ignore("slow hash validation https://github.com/explyt/tsa/issues/112")
     @Test
     fun multisig() {
         analyzeContract(multisigPath, methodsNumber = 16)
     }
 
-    //@EnabledIfEnvironmentVariable(named = runHardTestsVar, matches = runHardTestsRegex)
-    @Ignore  // Pasha told me to do so for now
+    @Ignore("ksmt bug https://github.com/UnitTestBot/ksmt/issues/160")
     @Test
     fun bridgeMultisig() {
         analyzeContract(bridgeMultisigPath, methodsNumber = 18)
@@ -123,17 +142,16 @@ class ContractsTest {
         analyzeContract(vestingPath, methodsNumber = 9)
     }
 
-    @Ignore
+    @Ignore("PFXDICTGETQ is not supported")
     @Test
     fun universalLockupWallet() {
-        // TODO support PFXDICTGETQ instruction
         analyzeContract(universalLockupWalletPath, methodsNumber = 13)
     }
 
     private fun analyzeContract(
         contractPath: String,
         methodsNumber: Int,
-        methodsBlackList: Set<MethodId> = hashSetOf(mainMethodId),
+        methodsBlackList: Set<MethodId> = hashSetOf(),
     ) {
         val bytecodeResourcePath = this::class.java.getResource(contractPath)?.path?.let { Path(it) }
             ?: error("Cannot find resource bytecode $contractPath")

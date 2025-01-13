@@ -9,6 +9,7 @@ import io.ksmt.sort.KBvSort
 import io.ksmt.utils.BvUtils.bvMaxValueUnsigned
 import io.ksmt.utils.BvUtils.toBigIntegerSigned
 import io.ksmt.utils.asExpr
+import io.ksmt.utils.powerOfTwo
 import io.ksmt.utils.toBigInteger
 import java.math.BigInteger
 import org.ton.bytecode.TvmField
@@ -83,7 +84,6 @@ class TvmContext(
 
     val zeroSizeExpr: UExpr<TvmSizeSort> = mkSizeExpr(0)
     val oneSizeExpr: UExpr<TvmSizeSort> = mkSizeExpr(1)
-    val twoSizeExpr: UExpr<TvmSizeSort> = mkSizeExpr(2)
     val threeSizeExpr: UExpr<TvmSizeSort> = mkSizeExpr(3)
     val fourSizeExpr: UExpr<TvmSizeSort> = mkSizeExpr(4)
     val sixSizeExpr: UExpr<TvmSizeSort> = mkSizeExpr(6)
@@ -119,6 +119,8 @@ class TvmContext(
 
     val sendMsgActionTag = mkBvHex("0ec3c86d", 32u)
     val reserveActionTag = mkBvHex("36e6b809", 32u)
+
+    val sendMsgFeeEstimationFlag = powerOfTwo(10u).toBv257()
 
     fun UBoolExpr.toBv257Bool(): UExpr<TvmInt257Sort> = with(ctx) {
         mkIte(
@@ -224,6 +226,8 @@ class TvmContext(
 
         val RECEIVE_INTERNAL_ID: MethodId = 0.toMethodId()
         val RECEIVE_EXTERNAL_ID: MethodId = (-1).toMethodId()
+
+        const val OP_BITS: UInt = 32u
 
         val cellDataField: TvmField = TvmFieldImpl(TvmCellType, "data")
         val cellDataLengthField: TvmField = TvmFieldImpl(TvmCellType, "dataLength")

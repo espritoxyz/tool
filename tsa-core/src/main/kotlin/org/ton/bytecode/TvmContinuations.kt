@@ -84,13 +84,14 @@ data class TvmMethodReturnContinuation(
 data class TvmLoopEntranceContinuation(
     val loopBody: TvmContinuation,
     val id: UInt,
+    val parentLocation: TvmInstLocation,
     override val savelist: TvmRegisterSavelist = TvmRegisterSavelist()
 ) : TvmContinuation {
 
     val codeBlock = TvmLambda(
         mutableListOf(
-            TvmArtificialLoopEntranceInst(id, TvmInstLambdaLocation(0)),
-            TvmArtificialJmpToContInst(loopBody, TvmInstLambdaLocation(1)),
+            TvmArtificialLoopEntranceInst(id, TvmInstLambdaLocation(0).also { it.parent = parentLocation }),
+            TvmArtificialJmpToContInst(loopBody, TvmInstLambdaLocation(1).also { it.parent = parentLocation }),
         )
     )
 

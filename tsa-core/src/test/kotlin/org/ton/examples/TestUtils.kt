@@ -11,7 +11,6 @@ import org.usvm.machine.FiftInterpreterResult
 import org.usvm.machine.FuncAnalyzer
 import org.usvm.machine.MethodId
 import org.usvm.machine.TactAnalyzer
-import org.usvm.machine.mainMethodId
 import org.usvm.machine.TvmOptions
 import org.usvm.machine.intValue
 import org.usvm.machine.state.TvmStack
@@ -27,7 +26,12 @@ import org.usvm.test.resolver.TvmTestTupleValue
 import org.usvm.test.resolver.TvmTestValue
 import java.math.BigInteger
 import java.nio.file.Path
+import org.ton.TvmContractHandlers
+import org.usvm.machine.TvmContext
+import org.usvm.machine.analyzeInterContract
+import org.usvm.machine.state.ContractId
 import kotlin.io.path.Path
+import kotlin.io.path.deleteIfExists
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
@@ -39,16 +43,25 @@ private const val FIFT_STDLIB_PATH = "/fiftstdlib"
 private val FIFT_STDLIB_RESOURCE: Path = object {}.javaClass.getResource(FIFT_STDLIB_PATH)?.path?.let { Path(it) }
     ?: error("Cannot find fift stdlib in $FIFT_STDLIB_PATH")
 
+// Options for tests with fift concrete execution
+val testFiftOptions = TvmOptions(turnOnTLBParsingChecks = false, enableInternalArgsConstraints = false)
+
+fun extractResource(resourcePath: String) =
+    object {}.javaClass.getResource(resourcePath)?.path?.let { Path(it) }
+        ?: error("Cannot find resource bytecode $resourcePath")
+
 fun tactCompileAndAnalyzeAllMethods(
     tactSourcesPath: Path,
     contractDataHex: String? = null,
-    methodsBlackList: Set<MethodId> = hashSetOf(mainMethodId),
+    methodsBlackList: Set<MethodId> = hashSetOf(),
+    methodWhiteList: Set<MethodId>? = null,
     inputInfo: Map<MethodId, TvmInputInfo> = emptyMap(),
     tvmOptions: TvmOptions = TvmOptions(),
 ): TvmContractSymbolicTestResult = TactAnalyzer.analyzeAllMethods(
     tactSourcesPath,
     contractDataHex,
     methodsBlackList,
+    methodWhiteList,
     inputInfo,
     tvmOptions,
 )
@@ -56,13 +69,18 @@ fun tactCompileAndAnalyzeAllMethods(
 fun funcCompileAndAnalyzeAllMethods(
     funcSourcesPath: Path,
     contractDataHex: String? = null,
-    methodsBlackList: Set<MethodId> = hashSetOf(mainMethodId),
+    methodsBlackList: Set<MethodId> = hashSetOf(),
+    methodWhiteList: Set<MethodId>? = null,
     inputInfo: Map<MethodId, TvmInputInfo> = emptyMap(),
     tvmOptions: TvmOptions = TvmOptions(),
-): TvmContractSymbolicTestResult = FuncAnalyzer(funcStdlibPath = FUNC_STDLIB_RESOURCE, fiftStdlibPath = FIFT_STDLIB_RESOURCE).analyzeAllMethods(
+): TvmContractSymbolicTestResult = FuncAnalyzer(
+    funcStdlibPath = FUNC_STDLIB_RESOURCE,
+    fiftStdlibPath = FIFT_STDLIB_RESOURCE,
+).analyzeAllMethods(
     funcSourcesPath,
     contractDataHex,
     methodsBlackList,
+    methodWhiteList,
     inputInfo,
     tvmOptions,
 )
@@ -70,13 +88,15 @@ fun funcCompileAndAnalyzeAllMethods(
 fun compileAndAnalyzeFift(
     fiftPath: Path,
     contractDataHex: String? = null,
-    methodsBlackList: Set<MethodId> = hashSetOf(mainMethodId),
+    methodsBlackList: Set<MethodId> = hashSetOf(),
+    methodWhiteList: Set<MethodId>? = null,
     inputInfo: Map<MethodId, TvmInputInfo> = emptyMap(),
     tvmOptions: TvmOptions = TvmOptions(),
 ): TvmContractSymbolicTestResult = FiftAnalyzer(fiftStdlibPath = FIFT_STDLIB_RESOURCE).analyzeAllMethods(
     fiftPath,
     contractDataHex,
     methodsBlackList,
+    methodWhiteList,
     inputInfo,
     tvmOptions,
 )
@@ -87,19 +107,52 @@ fun compileAndAnalyzeFift(
 fun compileFiftCodeBlocksContract(
     fiftWorkDir: Path,
     codeBlocks: List<String>,
-): TvmContractCode = FiftAnalyzer(fiftStdlibPath = FIFT_STDLIB_RESOURCE).compileFiftCodeBlocksContract(fiftWorkDir, codeBlocks)
+): TvmContractCode = FiftAnalyzer(
+    fiftStdlibPath = FIFT_STDLIB_RESOURCE,
+).compileFiftCodeBlocksContract(fiftWorkDir, codeBlocks)
 
 fun compileFuncToFift(funcSourcesPath: Path, fiftFilePath: Path) =
-    FuncAnalyzer(funcStdlibPath = FUNC_STDLIB_RESOURCE, fiftStdlibPath = FIFT_STDLIB_RESOURCE)
-        .compileFuncSourceToFift(funcSourcesPath, fiftFilePath)
+    FuncAnalyzer(
+        funcStdlibPath = FUNC_STDLIB_RESOURCE,
+        fiftStdlibPath = FIFT_STDLIB_RESOURCE,
+    ).compileFuncSourceToFift(funcSourcesPath, fiftFilePath)
 
 fun analyzeAllMethods(
     bytecodePath: String,
     contractDataHex: String? = null,
-    methodsBlackList: Set<MethodId> = hashSetOf(mainMethodId),
+    methodsBlackList: Set<MethodId> = hashSetOf(),
+    methodWhiteList: Set<MethodId>? = null,
     inputInfo: Map<MethodId, TvmInputInfo> = emptyMap(),
 ): TvmContractSymbolicTestResult =
-    BocAnalyzer.analyzeAllMethods(Path(bytecodePath), contractDataHex, methodsBlackList, inputInfo)
+    BocAnalyzer.analyzeAllMethods(Path(bytecodePath), contractDataHex, methodsBlackList, methodWhiteList, inputInfo)
+
+fun analyzeFuncIntercontract(
+    sources: List<Path>,
+    startContract: ContractId = 0,
+    communicationScheme: Map<ContractId, TvmContractHandlers>,
+    options: TvmOptions,
+): TvmContractSymbolicTestResult {
+    val contracts = sources.map { getFuncContract(it, FUNC_STDLIB_RESOURCE, FIFT_STDLIB_RESOURCE) }
+
+    return analyzeInterContract(
+        contracts = contracts,
+        startContractId = startContract,
+        methodId = TvmContext.RECEIVE_INTERNAL_ID,
+        communicationScheme = communicationScheme,
+        options = options,
+    )
+}
+
+fun getFuncContract(path: Path, funcStdlibPath: Path, fiftStdlibPath: Path): TvmContractCode {
+    val tmpBocFile = kotlin.io.path.createTempFile(suffix = ".boc")
+    try {
+        FuncAnalyzer(funcStdlibPath, fiftStdlibPath)
+            .compileFuncSourceToBoc(path, tmpBocFile)
+        return BocAnalyzer.loadContractFromBoc(tmpBocFile)
+    } finally {
+        tmpBocFile.deleteIfExists()
+    }
+}
 
 /**
  * Run method with [methodId].
@@ -107,16 +160,21 @@ fun analyzeAllMethods(
  * Note: the result Gas usage includes additional runvmx cost.
  * */
 fun runFiftMethod(fiftPath: Path, methodId: Int): FiftInterpreterResult =
-    FiftAnalyzer(fiftStdlibPath = FIFT_STDLIB_RESOURCE).runFiftMethod(fiftPath, methodId)
+    FiftAnalyzer(
+        fiftStdlibPath = FIFT_STDLIB_RESOURCE,
+    ).runFiftMethod(fiftPath, methodId)
 
 /**
  * [codeBlock] -- block of FIFT instructions, surrounded with <{ ... }>
  * */
 fun runFiftCodeBlock(fiftWorkDir: Path, codeBlock: String): FiftInterpreterResult =
-    FiftAnalyzer(fiftStdlibPath = FIFT_STDLIB_RESOURCE).runFiftCodeBlock(fiftWorkDir, codeBlock)
+    FiftAnalyzer(
+        fiftStdlibPath = FIFT_STDLIB_RESOURCE,
+    ).runFiftCodeBlock(fiftWorkDir, codeBlock)
 
 internal fun TvmStack.loadIntegers(n: Int) = List(n) {
-    takeLast(TvmIntegerType) { error("Impossible") }.intValue.intValue()
+    takeLast(TvmIntegerType) { error("Impossible") }.intValue?.intValue()
+        ?: error("Unexpected entry type")
 }.reversed()
 
 internal fun TvmSymbolicTest.executionCode(): Int? =

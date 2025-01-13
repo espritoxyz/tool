@@ -3,9 +3,11 @@ package org.usvm.machine.interpreter
 import io.ksmt.expr.KInterpretedValue
 import io.ksmt.utils.BvUtils.bvMaxValueSigned
 import io.ksmt.utils.BvUtils.bvMinValueSigned
+import java.math.BigInteger
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toPersistentMap
 import mu.KLogging
+import org.ton.TvmContractHandlers
 import org.ton.TvmInputInfo
 import org.ton.bytecode.TvmAliasInst
 import org.ton.bytecode.TvmAppActionsInst
@@ -29,8 +31,6 @@ import org.ton.bytecode.TvmArithmDivInst
 import org.ton.bytecode.TvmArithmLogicalAbsInst
 import org.ton.bytecode.TvmArithmLogicalAndInst
 import org.ton.bytecode.TvmArithmLogicalBitsizeInst
-import org.ton.bytecode.TvmArithmLogicalChkbitAliasInst
-import org.ton.bytecode.TvmArithmLogicalChkboolAliasInst
 import org.ton.bytecode.TvmArithmLogicalFitsInst
 import org.ton.bytecode.TvmArithmLogicalFitsxInst
 import org.ton.bytecode.TvmArithmLogicalInst
@@ -81,11 +81,11 @@ import org.ton.bytecode.TvmConstDataInst
 import org.ton.bytecode.TvmConstDataPushcontInst
 import org.ton.bytecode.TvmConstDataPushcontShortInst
 import org.ton.bytecode.TvmConstDataPushrefInst
+import org.ton.bytecode.TvmConstDataPushrefcontInst
 import org.ton.bytecode.TvmConstDataPushrefsliceInst
 import org.ton.bytecode.TvmConstDataPushsliceInst
 import org.ton.bytecode.TvmConstDataPushsliceLongInst
 import org.ton.bytecode.TvmConstIntInst
-import org.ton.bytecode.TvmConstIntOneAliasInst
 import org.ton.bytecode.TvmConstIntPushint16Inst
 import org.ton.bytecode.TvmConstIntPushint4Inst
 import org.ton.bytecode.TvmConstIntPushint8Inst
@@ -94,11 +94,8 @@ import org.ton.bytecode.TvmConstIntPushnanInst
 import org.ton.bytecode.TvmConstIntPushnegpow2Inst
 import org.ton.bytecode.TvmConstIntPushpow2Inst
 import org.ton.bytecode.TvmConstIntPushpow2decInst
-import org.ton.bytecode.TvmConstIntTenAliasInst
-import org.ton.bytecode.TvmConstIntTrueAliasInst
-import org.ton.bytecode.TvmConstIntTwoAliasInst
-import org.ton.bytecode.TvmConstIntZeroAliasInst
 import org.ton.bytecode.TvmContBasicCallrefInst
+import org.ton.bytecode.TvmContBasicCallxargsVarInst
 import org.ton.bytecode.TvmContBasicExecuteInst
 import org.ton.bytecode.TvmContBasicInst
 import org.ton.bytecode.TvmContBasicRetInst
@@ -143,6 +140,7 @@ import org.ton.bytecode.TvmInst
 import org.ton.bytecode.TvmInstList
 import org.ton.bytecode.TvmInstMethodLocation
 import org.ton.bytecode.TvmLambda
+import org.ton.bytecode.TvmMainMethodLocation
 import org.ton.bytecode.TvmOrdContinuation
 import org.ton.bytecode.TvmStackBasicInst
 import org.ton.bytecode.TvmStackBasicNopInst
@@ -178,10 +176,7 @@ import org.ton.bytecode.TvmStackComplexPuxcInst
 import org.ton.bytecode.TvmStackComplexPuxcpuInst
 import org.ton.bytecode.TvmStackComplexReverseInst
 import org.ton.bytecode.TvmStackComplexRevxInst
-import org.ton.bytecode.TvmStackComplexRollAliasInst
-import org.ton.bytecode.TvmStackComplexRollrevAliasInst
 import org.ton.bytecode.TvmStackComplexRollxInst
-import org.ton.bytecode.TvmStackComplexRot2AliasInst
 import org.ton.bytecode.TvmStackComplexRotInst
 import org.ton.bytecode.TvmStackComplexRotrevInst
 import org.ton.bytecode.TvmStackComplexSwap2Inst
@@ -204,23 +199,27 @@ import org.usvm.UInterpreter
 import org.usvm.api.makeSymbolicPrimitive
 import org.usvm.api.readField
 import org.usvm.api.writeField
+import org.usvm.collections.immutable.internal.MutabilityOwnership
 import org.usvm.constraints.UPathConstraints
 import org.usvm.forkblacklists.UForkBlackList
 import org.usvm.machine.MethodId
 import org.usvm.machine.TvmContext
+import org.usvm.machine.TvmContext.Companion.ADDRESS_TAG_BITS
 import org.usvm.machine.TvmContext.Companion.MAX_DATA_LENGTH
+import org.usvm.machine.TvmContext.Companion.RECEIVE_INTERNAL_ID
+import org.usvm.machine.TvmContext.Companion.STD_ADDRESS_TAG
 import org.usvm.machine.TvmContext.Companion.cellDataField
 import org.usvm.machine.TvmContext.Companion.cellDataLengthField
 import org.usvm.machine.TvmContext.Companion.cellRefsLengthField
 import org.usvm.machine.TvmContext.Companion.sliceCellField
 import org.usvm.machine.TvmContext.Companion.sliceDataPosField
 import org.usvm.machine.TvmContext.Companion.sliceRefPosField
+import org.usvm.machine.TvmContext.Companion.stdMsgAddrSize
 import org.usvm.machine.TvmContext.TvmInt257Sort
 import org.usvm.machine.TvmStepScopeManager
 import org.usvm.machine.bigIntValue
 import org.usvm.machine.extractMethodId
 import org.usvm.machine.intValue
-import org.usvm.machine.mainMethodId
 import org.usvm.machine.state.C0Register
 import org.usvm.machine.state.C1Register
 import org.usvm.machine.state.C2Register
@@ -231,7 +230,6 @@ import org.usvm.machine.state.ContractId
 import org.usvm.machine.state.TvmInitialStateData
 import org.usvm.machine.state.TvmMethodResult
 import org.usvm.machine.state.TvmRefEmptyValue
-import org.usvm.machine.state.TvmRegisters
 import org.usvm.machine.state.TvmStack.TvmStackTupleValueConcreteNew
 import org.usvm.machine.state.TvmState
 import org.usvm.machine.state.addContinuation
@@ -252,6 +250,7 @@ import org.usvm.machine.state.checkOverflow
 import org.usvm.machine.state.checkUnderflow
 import org.usvm.machine.state.consumeDefaultGas
 import org.usvm.machine.state.consumeGas
+import org.usvm.machine.state.contractEpilogue
 import org.usvm.machine.state.defineC0
 import org.usvm.machine.state.defineC1
 import org.usvm.machine.state.defineC2
@@ -269,6 +268,7 @@ import org.usvm.machine.state.doXchg
 import org.usvm.machine.state.doXchg2
 import org.usvm.machine.state.doXchg3
 import org.usvm.machine.state.generateSymbolicCell
+import org.usvm.machine.state.getBalance
 import org.usvm.machine.state.getSliceRemainingBitsCount
 import org.usvm.machine.state.getSliceRemainingRefsCount
 import org.usvm.machine.state.initContractInfo
@@ -281,10 +281,11 @@ import org.usvm.machine.state.nextStmt
 import org.usvm.machine.state.returnAltFromContinuation
 import org.usvm.machine.state.returnFromContinuation
 import org.usvm.machine.state.signedIntegerFitsBits
-import org.usvm.machine.state.slicePreloadDataBits
+import org.usvm.machine.state.slicesAreEqual
 import org.usvm.machine.state.switchToContinuation
 import org.usvm.machine.state.takeLastCell
 import org.usvm.machine.state.takeLastContinuation
+import org.usvm.machine.state.takeLastIntOrNull
 import org.usvm.machine.state.takeLastIntOrThrowTypeError
 import org.usvm.machine.state.takeLastSlice
 import org.usvm.machine.state.takeLastTuple
@@ -304,7 +305,6 @@ import org.usvm.mkSizeGeExpr
 import org.usvm.sizeSort
 import org.usvm.solver.USatResult
 import org.usvm.targets.UTargetsSet
-import java.math.BigInteger
 
 // TODO there are a lot of `scope.calcOnState` and `scope.doWithState` invocations that are not inline - optimize it
 class TvmInterpreter(
@@ -313,6 +313,7 @@ class TvmInterpreter(
     val typeSystem: TvmTypeSystem,
     private val inputInfo: TvmInputInfo,
     var forkBlackList: UForkBlackList<TvmState, TvmInst> = UForkBlackList.createDefault(),
+    communicationScheme: Map<ContractId, TvmContractHandlers> = mapOf(),
 ) : UInterpreter<TvmState>() {
     companion object {
         val logger = object : KLogging() {}.logger
@@ -331,8 +332,8 @@ class TvmInterpreter(
     private val cryptoInterpreter = TvmCryptoInterpreter(ctx)
     private val gasInterpreter = TvmGasInterpreter(ctx)
     private val globalsInterpreter = TvmGlobalsInterpreter(ctx)
-    private val transactionInterpreter = TvmTransactionInterpreter(ctx)
-    private val tsaCheckerFunctionsInterpreter = TsaCheckerFunctionsInterpreter(contractsCode, transactionInterpreter)
+    private val transactionInterpreter = TvmTransactionInterpreter(ctx, communicationScheme)
+    private val tsaCheckerFunctionsInterpreter = TsaCheckerFunctionsInterpreter(contractsCode)
 
     fun getInitialState(
         startContractId: ContractId,
@@ -367,12 +368,14 @@ class TvmInterpreter(
             ?: error("Contract $startContractId not found.")
         val method = contractCode.methods[methodId] ?: error("Unknown method $methodId")
 
-        val pathConstraints = UPathConstraints<TvmType>(ctx)
-        val memory = UMemory<TvmType, TvmCodeBlock>(ctx, pathConstraints.typeConstraints)
+        val initOwnership = MutabilityOwnership()
+        val pathConstraints = UPathConstraints<TvmType>(ctx, initOwnership)
+        val memory = UMemory<TvmType, TvmCodeBlock>(ctx, initOwnership, pathConstraints.typeConstraints)
         val refEmptyValue = memory.initializeEmptyRefValues()
 
         val state = TvmState(
             ctx = ctx,
+            ownership = initOwnership,
             entrypoint = method,
             memory = memory,
             pathConstraints = pathConstraints,
@@ -381,6 +384,7 @@ class TvmInterpreter(
             targets = UTargetsSet.from(targets),
             typeSystem = typeSystem,
             currentContract = startContractId,
+            intercontractPath = persistentListOf(startContractId),
         )
 
         state.contractIdToC4Register = (0..<contractsCode.size).associateWith {
@@ -389,7 +393,7 @@ class TvmInterpreter(
         state.contractIdToFirstElementOfC7 = (0..<contractsCode.size).associateWith {
             state.initContractInfo()
         }.toPersistentMap()
-        state.contractIdToInitialData = (0..<contractsCode.size).associateWith {
+        state.contractIdToInitialData = contractsCode.indices.associateWith {
             val c4 = state.contractIdToC4Register[it]
                 ?: error("c4 for contract $it not found")
             val c7 = state.contractIdToFirstElementOfC7[it]
@@ -398,16 +402,7 @@ class TvmInterpreter(
         }
         val executionMemory = initializeContractExecutionMemory(contractsCode, state, startContractId, allowInputStackValues = true)
         state.stack = executionMemory.stack
-        state.registersOfCurrentContract = TvmRegisters(
-            ctx,
-            c0 = executionMemory.c0,
-            c1 = executionMemory.c1,
-            c2 = executionMemory.c2,
-            c3 = executionMemory.c3,
-            c4 = state.contractIdToC4Register[startContractId] ?: error("Didn't find c4 of contract $startContractId"),
-            c5 = executionMemory.c5,
-            c7 = executionMemory.c7,
-        )
+        state.registersOfCurrentContract = executionMemory.registers
 
         val excludeInputsThatDoNotMatchGivenScheme = ctx.tvmOptions.excludeInputsThatDoNotMatchGivenScheme
 
@@ -434,7 +429,6 @@ class TvmInterpreter(
         state.newStmt(method.instList.first())
 
         state.stateInitialized = true
-
         return state
     }
 
@@ -481,7 +475,7 @@ class TvmInterpreter(
         val initialGasUsage = state.gasUsage
         val globalStructuralConstraintsHolder = state.globalStructuralConstraintsHolder
 
-        val allowFailures = state.allowFailures
+        val allowFailures = state.allowFailures && !ctx.tvmOptions.excludeExecutionsWithFailures
         var scope = TvmStepScopeManager(state, forkBlackList, allowFailures)
 
         // handle exception firstly
@@ -493,7 +487,16 @@ class TvmInterpreter(
 
         tryCatchIf(
             condition = ctx.tvmOptions.quietMode,
-            body = { visit(scope, stmt) },
+            body = {
+                recvInternalPreprocessing(scope, stmt)
+                    ?: return@tryCatchIf
+                visit(scope, stmt)
+
+                globalStructuralConstraintsHolder.applyTo(scope)
+                    ?: error("Could not apply structural constraints")  // TODO: add special exit for that
+
+                processExitFromContract(scope)
+            },
             exceptionHandler = {
                 logger.debug(it) {
                     "Exception is thrown during the interpretation of $stmt instruction, dropping the state."
@@ -505,11 +508,6 @@ class TvmInterpreter(
             }
         )
 
-        globalStructuralConstraintsHolder.applyTo(scope)
-            ?: error("Could not apply structural constraints")  // TODO: add special exit for that
-
-        processExitFromContract(scope)
-
         return scope.stepResult().apply {
             if (state.gasUsage === initialGasUsage || forkedStates.any { it.gasUsage === initialGasUsage }) {
                 TODO("Gas usage was not updated after: $stmt")
@@ -518,43 +516,182 @@ class TvmInterpreter(
     }
 
     private fun processExitFromContract(scope: TvmStepScopeManager) {
+        if (ctx.tvmOptions.enableIntercontract) {
+            processIntercontractExit(scope)
+        } else {
+            processCheckerExit(scope)
+        }
+    }
+
+    private fun processIntercontractExit(scope: TvmStepScopeManager) {
+        // TODO forked states ? maybe introduce artificial inst for post-processing
+        // TODO stop at failure state or at state without commitedState
+        scope.doWithState {
+            // TODO maybe refactor canBeProcessed check, again can be solved with artificial instruction
+            if (methodResult == TvmMethodResult.NoCall ||
+                entrypoint.id != RECEIVE_INTERNAL_ID ||
+                !scope.canBeProcessed
+            ) {
+                return@doWithState
+            }
+
+            processNewMessages(scope)
+                ?: return@doWithState
+
+            if (messageQueue.isEmpty()) {
+                return@doWithState
+            }
+
+            contractEpilogue()
+
+            val (nextContract, message) = messageQueue.first()
+            val nextContractCode = contractsCode.getOrNull(nextContract)
+                ?: error("Contract with id $nextContract was not found")
+            val nextMethod = nextContractCode.methods[RECEIVE_INTERNAL_ID]
+                ?: error("recv_internal in contract $nextContract was not found.")
+
+            messageQueue = messageQueue.removeAt(0)
+            intercontractPath = intercontractPath.add(nextContract)
+
+            val prevStack = stack
+            val newMemory = initializeContractExecutionMemory(contractsCode, this, currentContract, allowInputStackValues = false)
+            currentContract = nextContract
+            stack = newMemory.stack
+            stack.copyInputValues(prevStack)
+            registersOfCurrentContract = newMemory.registers
+
+            // TODO update balance using message value
+            val balance = getBalance()
+                ?: error("Unexpected incorrect config balance value")
+
+            stack.addInt(balance)
+            stack.addInt(message.msgValue)
+            addOnStack(message.fullMsgCell, TvmCellType)
+            addOnStack(message.msgBodySlice, TvmSliceType)
+
+            newStmt(nextMethod.instList.first())
+        }
+    }
+
+    private fun processNewMessages(scope: TvmStepScopeManager): Unit? = scope.calcOnState {
+        lastCommitedStateOfContracts[currentContract]
+            ?: return@calcOnState null
+
+        // TODO workaround, since `makeSliceTypeLoad` filters out terminated states
+        val prevResult = methodResult
+        methodResult = TvmMethodResult.NoCall
+        val messageDestinations = transactionInterpreter.parseActionsToDestinations(scope)
+            ?: return@calcOnState null
+        methodResult = prevResult
+
+        messageQueue = messageQueue.addAll(messageDestinations)
+    }
+
+    private fun processCheckerExit(scope: TvmStepScopeManager) {
         scope.doWithState {
             // TODO: process dead states
             // TODO: case of committed state of TvmFailure
             if (methodResult is TvmMethodResult.TvmSuccess && contractStack.isNotEmpty()) {
                 val (prevContractId, prevInst, prevMem, expectedNumberOfOutputItems) = contractStack.last()
 
-                val stackFromOtherContract = stack
                 // update global c4 and c7
-                val c4FromCommitedState = lastCommitedStateOfContracts[currentContract]
+                lastCommitedStateOfContracts[currentContract]
                     ?: error("Did not find commited state of contract $currentContract")
-                contractIdToC4Register = contractIdToC4Register.put(currentContract, c4FromCommitedState.c4)
-                // TODO: process possible errors
-                contractIdToFirstElementOfC7 = contractIdToFirstElementOfC7.put(
-                    currentContract,
-                    registersOfCurrentContract.c7.value[0, stackFromOtherContract].cell(stackFromOtherContract) as TvmStackTupleValueConcreteNew
-                )
+                contractEpilogue()
+
+                val stackFromOtherContract = stack
 
                 contractStack = contractStack.removeAt(contractStack.size - 1)
                 currentContract = prevContractId
-                methodResult = TvmMethodResult.NoCall
 
                 val prevStack = prevMem.stack
                 stack = prevStack.clone()  // we should not touch stack from contractStack, as it is contained in other states
                 stack.takeValuesFromOtherStack(stackFromOtherContract, expectedNumberOfOutputItems)
-                registersOfCurrentContract = TvmRegisters(
-                    ctx,
-                    c0 = prevMem.c0,
-                    c1 = prevMem.c1,
-                    c2 = prevMem.c2,
-                    c3 = prevMem.c3,
-                    c4 = contractIdToC4Register[currentContract] ?: error("Didn't find c4 of contract $currentContract"),
-                    c5 = prevMem.c5,
-                    c7 = prevMem.c7.copy(), // we should not touch c7 from contractStack, as it is contained in other states
-                )
+                registersOfCurrentContract = prevMem.registers
                 newStmt(prevInst.nextStmt())
             }
         }
+    }
+
+    private fun recvInternalPreprocessing(scope: TvmStepScopeManager, stmt: TvmInst): Unit? {
+        val location = stmt.location as? TvmInstMethodLocation
+        val isFirstRecvInternalInst = location?.methodId == RECEIVE_INTERNAL_ID && location.index == 0
+
+        if (!isFirstRecvInternalInst) {
+            return Unit
+        }
+
+        saveRecvInternalMsgBody(scope)
+        return addRecvInternalConstraints(scope)
+    }
+
+    private fun saveRecvInternalMsgBody(scope: TvmStepScopeManager) {
+        if (!ctx.tvmOptions.enableIntercontract) {
+            return
+        }
+
+        scope.doWithState {
+            val msgBody = stack.takeLastSlice()
+                ?: error("Unexpected null msg_body")
+
+            lastMsgBody = msgBody
+            addOnStack(msgBody, TvmSliceType)
+        }
+    }
+
+    private fun addRecvInternalConstraints(scope: TvmStepScopeManager): Unit? {
+        if (!ctx.tvmOptions.enableInternalArgsConstraints) {
+            return Unit
+        }
+
+        val constraints = scope.calcOnStateCtx {
+            val msgBody = stack.takeLastSlice()
+            val fullMsg = takeLastCell()
+            val msgValue = takeLastIntOrNull()
+            val balance = takeLastIntOrNull()
+
+            require(msgBody != null && fullMsg != null && msgValue != null && balance != null) {
+                "Unexpected incorrect stack entry type"
+            }
+
+            val fullMsgData = memory.readField(fullMsg, cellDataField, cellDataSort)
+            val fullMsgLength = memory.readField(fullMsg, cellDataLengthField, sizeSort)
+            val fullMsgTag = mkBvExtractExpr(MAX_DATA_LENGTH - 1, MAX_DATA_LENGTH - 1, fullMsgData)
+            val srcAddressTag = mkBvExtractExpr(MAX_DATA_LENGTH - 5, MAX_DATA_LENGTH - 6, fullMsgData)
+            val minFullMsgLength = 4 + stdMsgAddrSize * 2 + 4 + 4 + 4 + 64 + 32 + 1 + 1
+            val fullMsgConstraints = mkAnd(
+                fullMsgTag eq zeroBit,
+                srcAddressTag eq mkBv(STD_ADDRESS_TAG, ADDRESS_TAG_BITS),
+                mkBvSignedGreaterOrEqualExpr(fullMsgLength, mkSizeExpr(minFullMsgLength))
+            )
+
+            val msgValueConstraints = mkAnd(
+                mkBvSignedLessOrEqualExpr(minMessageCurrencyValue, msgValue),
+                mkBvSignedLessOrEqualExpr(msgValue, maxMessageCurrencyValue)
+            )
+
+            val configBalance = getBalance()
+                ?: error("Unexpected incorrect config balance value")
+            val initialBalance = mkBvSubExpr(balance, msgValue)
+            val balanceConstraints = mkAnd(
+                mkBvSignedLessOrEqualExpr(minMessageCurrencyValue, balance),
+                mkBvSignedLessOrEqualExpr(balance, maxMessageCurrencyValue),
+                mkBvSignedLessOrEqualExpr(minMessageCurrencyValue, initialBalance),
+                balance eq configBalance,
+            )
+
+            stack.addInt(balance)
+            stack.addInt(msgValue)
+            addOnStack(fullMsg, TvmCellType)
+            addOnStack(msgBody, TvmSliceType)
+
+            fullMsgConstraints and msgValueConstraints and balanceConstraints
+        }
+
+        return scope.assert(
+            constraint = constraints,
+            unsatBlock = { error("Cannot assert recv_internal constraints") }
+        )
     }
 
     private fun visit(scope: TvmStepScopeManager, stmt: TvmInst) {
@@ -762,11 +899,6 @@ class TvmInterpreter(
             is TvmStackComplexChkdepthInst -> TODO("Cannot implement stack depth yet (TvmStackComplexChkdepthInst)")
             is TvmStackComplexOnlytopxInst -> TODO("??")
             is TvmStackComplexOnlyxInst -> TODO("??")
-
-            // aliases (there are todos in their resolveAlias):
-            is TvmStackComplexRollAliasInst -> TODO()
-            is TvmStackComplexRollrevAliasInst -> TODO()
-            is TvmStackComplexRot2AliasInst -> TODO()
         }
 
         scope.doWithState {
@@ -813,11 +945,6 @@ class TvmInterpreter(
                 // todo: nothing in docs about nan
                 (BigInteger.valueOf(2).pow(x + 1) - BigInteger.ONE).toBv257()
             }
-            is TvmConstIntTenAliasInst -> resolveAlias().bv257value(ctx)
-            is TvmConstIntTrueAliasInst -> resolveAlias().bv257value(ctx)
-            is TvmConstIntTwoAliasInst -> resolveAlias().bv257value(ctx)
-            is TvmConstIntOneAliasInst -> resolveAlias().bv257value(ctx)
-            is TvmConstIntZeroAliasInst -> resolveAlias().bv257value(ctx)
         }
     }
 
@@ -866,6 +993,18 @@ class TvmInterpreter(
                     newStmt(stmt.nextStmt())
                 }
                 scope.consumeDefaultGas(stmt)
+            }
+            is TvmConstDataPushrefcontInst -> {
+                scope.doWithStateCtx {
+                    val continuationValue = TvmOrdContinuation(TvmLambda(stmt.c.toMutableList()))
+                    stack.addContinuation(continuationValue)
+
+                    newStmt(stmt.nextStmt())
+                }
+                scope.doWithState {
+                    // TODO: compex gas
+                    consumeGas(118)
+                }
             }
             is TvmConstDataPushsliceLongInst -> {
                 if (stmt.slice.refs.isNotEmpty()) {
@@ -1319,9 +1458,6 @@ class TvmInterpreter(
 
                 symbolicSizeBits
             }
-
-            is TvmArithmLogicalChkbitAliasInst -> return visitArithmeticLogicalInst(scope, stmt.resolveAlias())
-            is TvmArithmLogicalChkboolAliasInst -> return visitArithmeticLogicalInst(scope, stmt.resolveAlias())
         }
 
         scope.doWithState {
@@ -1519,17 +1655,8 @@ class TvmInterpreter(
             return
         }
 
-        val dataLeft1 = scope.calcOnState { getSliceRemainingBitsCount(slice1) }
-        val dataLeft2 = scope.calcOnState { getSliceRemainingBitsCount(slice2) }
-
-        val data1 = scope.slicePreloadDataBits(slice1, dataLeft1) ?: return
-        val data2 = scope.slicePreloadDataBits(slice2, dataLeft2) ?: return
-
-        val shift = mkBvSubExpr(mkSizeExpr(MAX_DATA_LENGTH), dataLeft1).zeroExtendToSort(cellDataSort)
-        val shiftedData1 = mkBvShiftLeftExpr(data1, shift)
-        val shiftedData2 = mkBvShiftLeftExpr(data2, shift)
-
-        val result = mkAnd(dataLeft1 eq dataLeft2, shiftedData1 eq shiftedData2).toBv257Bool()
+        val constraint = scope.calcOnState { slicesAreEqual(slice1, slice2) }
+        val result = constraint.toBv257Bool()
 
         scope.doWithState {
             stack.addInt(result)
@@ -1570,9 +1697,12 @@ class TvmInterpreter(
             is TvmContRegistersComposInst -> {
                 scope.consumeDefaultGas(stmt)
 
-                scope.doWithState {
-                    val (next, cont) = stack.takeLastContinuation() to stack.takeLastContinuation()
+                val next = scope.calcOnState { stack.takeLastContinuation() }
+                    ?: return scope.doWithState(ctx.throwTypeCheckError)
+                val cont = scope.calcOnState { stack.takeLastContinuation() }
+                    ?: return scope.doWithState(ctx.throwTypeCheckError)
 
+                scope.doWithState {
                     stack.addContinuation(cont.defineC0(next))
                     newStmt(stmt.nextStmt())
                 }
@@ -1580,9 +1710,12 @@ class TvmInterpreter(
             is TvmContRegistersComposaltInst -> {
                 scope.consumeDefaultGas(stmt)
 
-                scope.doWithState {
-                    val (next, cont) = stack.takeLastContinuation() to stack.takeLastContinuation()
+                val next = scope.calcOnState { stack.takeLastContinuation() }
+                    ?: return scope.doWithState(ctx.throwTypeCheckError)
+                val cont = scope.calcOnState { stack.takeLastContinuation() }
+                    ?: return scope.doWithState(ctx.throwTypeCheckError)
 
+                scope.doWithState {
                     stack.addContinuation(cont.defineC1(next))
                     newStmt(stmt.nextStmt())
                 }
@@ -1590,9 +1723,12 @@ class TvmInterpreter(
             is TvmContRegistersComposbothInst -> {
                 scope.consumeDefaultGas(stmt)
 
-                scope.doWithState {
-                    val (next, cont) = stack.takeLastContinuation() to stack.takeLastContinuation()
+                val next = scope.calcOnState { stack.takeLastContinuation() }
+                    ?: return scope.doWithState(ctx.throwTypeCheckError)
+                val cont = scope.calcOnState { stack.takeLastContinuation() }
+                    ?: return scope.doWithState(ctx.throwTypeCheckError)
 
+                scope.doWithState {
                     stack.addContinuation(cont.defineC0(next).defineC1(next))
                     newStmt(stmt.nextStmt())
                 }
@@ -1645,11 +1781,24 @@ class TvmInterpreter(
         scope.consumeDefaultGas(stmt)
 
         val cont = stack.takeLastContinuation()
+            ?: return@doWithStateCtx throwTypeCheckError(this)
 
         val updatedCont = when (stmt.i) {
-            0 -> cont.defineC0(stack.takeLastContinuation())
-            1 -> cont.defineC1(stack.takeLastContinuation())
-            2 -> cont.defineC2(stack.takeLastContinuation())
+            0 -> {
+                val contToStore = stack.takeLastContinuation()
+                    ?: return@doWithStateCtx throwTypeCheckError(this)
+                cont.defineC0(contToStore)
+            }
+            1 -> {
+                val contToStore = stack.takeLastContinuation()
+                    ?: return@doWithStateCtx throwTypeCheckError(this)
+                cont.defineC1(contToStore)
+            }
+            2 -> {
+                val contToStore = stack.takeLastContinuation()
+                    ?: return@doWithStateCtx throwTypeCheckError(this)
+                cont.defineC2(contToStore)
+            }
             4 -> {
                 val cell = takeLastCell()
                     ?: return@doWithStateCtx throwTypeCheckError(this)
@@ -1684,14 +1833,17 @@ class TvmInterpreter(
         when (registerIndex) {
             0 -> {
                 val cont = stack.takeLastContinuation()
+                    ?: return@doWithStateCtx throwTypeCheckError(this)
                 registers.c0 = C0Register(cont)
             }
             1 -> {
                 val cont = stack.takeLastContinuation()
+                    ?: return@doWithStateCtx throwTypeCheckError(this)
                 registers.c1 = C1Register(cont)
             }
             2 -> {
                 val cont = stack.takeLastContinuation()
+                    ?: return@doWithStateCtx throwTypeCheckError(this)
                 registers.c2 = C2Register(cont)
             }
             4 -> {
@@ -1784,6 +1936,8 @@ class TvmInterpreter(
                 scope.consumeDefaultGas(stmt)
 
                 val continuationValue = scope.calcOnState { stack.takeLastContinuation() }
+                    ?: return scope.doWithState(ctx.throwTypeCheckError)
+
                 scope.switchToContinuation(stmt, continuationValue, returnToTheNextStmt = true)
             }
             is TvmContBasicRetInst, is TvmArtificialImplicitRetInst -> {
@@ -1812,6 +1966,17 @@ class TvmInterpreter(
                 scope.consumeDefaultGas(stmt)
 
                 scope.switchToContinuation(stmt, stmt.cont, returnToTheNextStmt = true)
+            }
+            is TvmContBasicCallxargsVarInst -> {
+                scope.consumeDefaultGas(stmt)
+
+                // TODO correct implementation
+                // if instructions for manual continuation registers handling are not used (POPCTR, SETCONTCTR, ...),
+                // then this instruction is equivalent to `EXECUTE`
+
+                val continuationValue = scope.calcOnState { stack.takeLastContinuation() }
+                    ?: return scope.doWithState(ctx.throwTypeCheckError)
+                scope.switchToContinuation(stmt, continuationValue, returnToTheNextStmt = true)
             }
             else -> TODO("$stmt")
         }
@@ -1862,6 +2027,8 @@ class TvmInterpreter(
         scope.consumeDefaultGas(stmt)
 
         val continuation = scope.calcOnState { stack.takeLastContinuation() }
+            ?: return scope.doWithState(ctx.throwTypeCheckError)
+
         return scope.doIf(continuation, stmt, invertCondition, isJmp = false)
     }
 
@@ -1879,7 +2046,9 @@ class TvmInterpreter(
 
         scope.doWithState {
             val secondContinuation = stack.takeLastContinuation()
+                ?: return@doWithState ctx.throwTypeCheckError(this)
             val firstContinuation = stack.takeLastContinuation()
+                ?: return@doWithState ctx.throwTypeCheckError(this)
 
             scope.doIfElse(firstContinuation, secondContinuation, stmt)
         }
@@ -1902,6 +2071,7 @@ class TvmInterpreter(
 
             val firstContinuation = TvmOrdContinuation(TvmLambda(stmt.c.list.toMutableList()))
             val secondContinuation = stack.takeLastContinuation()
+                ?: return@doWithState ctx.throwTypeCheckError(this)
 
             scope.doIfElse(firstContinuation, secondContinuation, stmt)
         }
@@ -1912,6 +2082,7 @@ class TvmInterpreter(
             consumeGas(26) // TODO complex gas "26/126/51"
 
             val firstContinuation = stack.takeLastContinuation()
+                ?: return@doWithState ctx.throwTypeCheckError(this)
             val secondContinuation = TvmOrdContinuation(TvmLambda(stmt.c.list.toMutableList()))
 
             scope.doIfElse(firstContinuation, secondContinuation, stmt)
@@ -1975,6 +2146,8 @@ class TvmInterpreter(
         scope.consumeDefaultGas(stmt)
 
         val continuation = scope.calcOnState { stack.takeLastContinuation() }
+            ?: return scope.doWithState(ctx.throwTypeCheckError)
+
         scope.doIf(continuation, stmt, invertCondition, isJmp = true)
     }
 
@@ -2038,9 +2211,7 @@ class TvmInterpreter(
 
         when (stmt) {
             is TvmDictSpecialDictigetjmpzInst -> {
-                val statementMethod = (stmt.location as? TvmInstMethodLocation)?.methodId
-                val selectorMethodId = mainMethodId
-                require(statementMethod == selectorMethodId) {
+                require(stmt.location is TvmMainMethodLocation) {
                     "The general case is not supported: $stmt"
                 }
 

@@ -8,6 +8,7 @@ import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.persistentMapOf
 import org.ton.bytecode.TvmCodeBlock
 import org.ton.bytecode.TvmInst
+import org.ton.bytecode.TvmMethod
 import org.ton.targets.TvmTarget
 import org.usvm.PathNode
 import org.usvm.UBv32Sort
@@ -17,9 +18,11 @@ import org.usvm.UConcreteHeapRef
 import org.usvm.UExpr
 import org.usvm.UHeapRef
 import org.usvm.UState
+import org.usvm.collections.immutable.internal.MutabilityOwnership
 import org.usvm.constraints.UPathConstraints
 import org.usvm.isStaticHeapRef
 import org.usvm.machine.TvmContext
+import org.usvm.machine.interpreter.OutMessage
 import org.usvm.machine.state.TvmStack.TvmStackTupleValueConcreteNew
 import org.usvm.machine.types.GlobalStructuralConstraintsHolder
 import org.usvm.machine.types.TvmDataCellInfoStorage
@@ -35,7 +38,8 @@ typealias ContractId = Int
 
 class TvmState(
     ctx: TvmContext,
-    override val entrypoint: TvmCodeBlock,
+    ownership: MutabilityOwnership,
+    override val entrypoint: TvmMethod,
 //    val registers: TvmRegisters, // TODO do we really need keep the registers this way?
     val emptyRefValue: TvmRefEmptyValue,
     private var symbolicRefs: PersistentSet<UConcreteHeapAddress> = persistentHashSetOf(),
@@ -58,8 +62,15 @@ class TvmState(
     var contractStack: PersistentList<TvmContractPosition> = persistentListOf(),
     var currentContract: ContractId,
     var addressToHash: PersistentMap<UHeapRef, UExpr<TvmContext.TvmInt257Sort>> = persistentMapOf(),
+    var fetchedValues: PersistentMap<Int, TvmStack.TvmStackEntry> = persistentMapOf(),
+    var additionalFlags: PersistentSet<String> = persistentHashSetOf(),
+    // inter-contract fields
+    var messageQueue: PersistentList<Pair<ContractId, OutMessage>> = persistentListOf(),
+    var lastMsgBody: UHeapRef? = null,
+    var intercontractPath: PersistentList<ContractId> = persistentListOf(),
 ) : UState<TvmType, TvmCodeBlock, TvmInst, TvmContext, TvmTarget, TvmState>(
     ctx,
+    ownership,
     callStack,
     pathConstraints,
     memory,
@@ -120,17 +131,24 @@ class TvmState(
         }
 
     override fun clone(newConstraints: UPathConstraints<TvmType>?): TvmState {
-        val clonedConstraints = newConstraints ?: pathConstraints.clone()
+        val newThisOwnership = MutabilityOwnership()
+        val cloneOwnership = MutabilityOwnership()
+        val newPathConstraints = newConstraints?.also {
+            this.pathConstraints.changeOwnership(newThisOwnership)
+            it.changeOwnership(cloneOwnership)
+        } ?: pathConstraints.clone(newThisOwnership, cloneOwnership)
+        val newMemory = memory.clone(newPathConstraints.typeConstraints, newThisOwnership, cloneOwnership)
 
         return TvmState(
             ctx = ctx,
+            ownership = ownership,
             entrypoint = entrypoint,
             emptyRefValue = emptyRefValue,
             symbolicRefs = symbolicRefs,
             gasUsage = gasUsage,
             callStack = callStack.clone(),
-            pathConstraints = clonedConstraints,
-            memory = memory.clone(clonedConstraints.typeConstraints),
+            pathConstraints = newPathConstraints,
+            memory = newMemory,
             models = models,
             pathNode = pathNode,
             forkPoints = forkPoints,
@@ -144,7 +162,12 @@ class TvmState(
             allowFailures = allowFailures,
             contractStack = contractStack,
             currentContract = currentContract,
-            addressToHash = persistentMapOf(),
+            addressToHash = addressToHash,
+            fetchedValues = fetchedValues,
+            additionalFlags = additionalFlags,
+            messageQueue = messageQueue,
+            lastMsgBody = lastMsgBody,
+            intercontractPath = intercontractPath,
         ).also { newState ->
             newState.dataCellInfoStorage = dataCellInfoStorage.clone()
             newState.contractIdToInitialData = contractIdToInitialData
@@ -193,10 +216,5 @@ data class TvmContractPosition(
 
 data class TvmContractExecutionMemory(
     val stack: TvmStack,
-    val c0: C0Register,
-    val c1: C1Register,
-    val c2: C2Register,
-    val c3: C3Register,
-    val c5: C5Register,
-    val c7: C7Register,
+    val registers: TvmRegisters,
 )

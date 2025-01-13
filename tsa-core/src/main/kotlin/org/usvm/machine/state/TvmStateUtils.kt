@@ -7,6 +7,7 @@ import org.ton.bytecode.TvmCodeBlock
 import org.ton.bytecode.TvmContractCode
 import org.ton.bytecode.TvmExceptionContinuation
 import org.ton.bytecode.TvmInst
+import org.ton.bytecode.TvmLambda
 import org.ton.bytecode.TvmMethod
 import org.ton.bytecode.TvmOrdContinuation
 import org.usvm.NULL_ADDRESS
@@ -20,7 +21,6 @@ import org.usvm.machine.TvmContext
 import org.usvm.machine.TvmContext.TvmInt257Sort
 import org.usvm.machine.TvmSizeSort
 import org.usvm.machine.TvmStepScopeManager
-import org.usvm.machine.mainMethodId
 import org.usvm.machine.types.TvmBuilderType
 import org.usvm.machine.types.TvmCellType
 import org.usvm.machine.types.TvmDataCellType
@@ -36,6 +36,7 @@ import org.usvm.mkSizeLeExpr
 import org.usvm.sizeSort
 import org.usvm.types.USingleTypeStream
 import java.math.BigInteger
+import org.usvm.machine.state.TvmStack.TvmStackTupleValueConcreteNew
 
 val TvmState.lastStmt get() = pathNode.statement
 fun TvmState.newStmt(stmt: TvmInst) {
@@ -259,8 +260,6 @@ fun TvmStepScopeManager.killCurrentState() = doWithCtx {
     }
 }
 
-fun TvmCodeBlock.isReceiveInternal() = this is TvmMethod && id == TvmContext.RECEIVE_INTERNAL_ID
-
 fun initializeContractExecutionMemory(
     contractsCode: List<TvmContractCode>,
     state: TvmState,
@@ -268,18 +267,38 @@ fun initializeContractExecutionMemory(
     allowInputStackValues: Boolean,
 ): TvmContractExecutionMemory {
     val contractCode = contractsCode[contractId]
-    val mainMethod = contractCode.methods[mainMethodId]
-        ?: error("No main method found")
+    val mainMethod = TvmLambda(contractCode.mainMethod.list.toMutableList())
     val ctx = state.ctx
+    val c4 = state.contractIdToC4Register[contractId]
+        ?: error("c4 for contract $contractId is not found")
     val firstElementOfC7 = state.contractIdToFirstElementOfC7[contractId]
         ?: error("First element of c7 for contract $contractId not found")
     return TvmContractExecutionMemory(
         TvmStack(ctx, allowInputValues = allowInputStackValues),
-        C0Register(ctx.quit0Cont),
-        C1Register(ctx.quit1Cont),
-        C2Register(TvmExceptionContinuation),
-        C3Register(TvmOrdContinuation(mainMethod)),
-        C5Register(TvmCellValue(state.allocEmptyCell())),
-        C7Register(state.initC7(firstElementOfC7)),
+        TvmRegisters(
+            ctx,
+            C0Register(ctx.quit0Cont),
+            C1Register(ctx.quit1Cont),
+            C2Register(TvmExceptionContinuation),
+            C3Register(TvmOrdContinuation(mainMethod)),
+            c4,
+            C5Register(TvmCellValue(state.allocEmptyCell())),
+            C7Register(state.initC7(firstElementOfC7)),
+        )
     )
+}
+
+fun TvmState.contractEpilogue() {
+    contractIdToFirstElementOfC7 = contractIdToFirstElementOfC7.put(
+        currentContract,
+        registersOfCurrentContract.c7.value[0, stack].cell(stack) as TvmStackTupleValueConcreteNew
+    )
+    lastMsgBody = null
+    methodResult = TvmMethodResult.NoCall
+
+    val commitedState = lastCommitedStateOfContracts[currentContract]
+        ?: return
+
+    contractIdToC4Register = contractIdToC4Register.put(currentContract, commitedState.c4)
+    lastCommitedStateOfContracts = lastCommitedStateOfContracts.remove(currentContract)
 }

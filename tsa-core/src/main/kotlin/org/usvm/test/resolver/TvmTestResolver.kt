@@ -5,6 +5,7 @@ import org.ton.bytecode.TvmInst
 import org.ton.bytecode.TvmMethod
 import org.usvm.machine.MethodId
 import org.usvm.machine.interpreter.TvmInterpreter.Companion.logger
+import org.usvm.machine.state.ContractId
 import org.usvm.machine.tryCatchIf
 import org.usvm.machine.state.TvmMethodResult.TvmFailure
 import org.usvm.machine.state.TvmState
@@ -18,6 +19,7 @@ data object TvmTestResolver {
 
         val usedParameters = stateResolver.resolveParameters()
         val contractAddress = stateResolver.resolveContractAddress()
+        val contractBalance = stateResolver.resolveContractBalance()
         val initialData = stateResolver.resolveInitialData()
         val result = stateResolver.resolveResultStack()
         val gasUsage = stateResolver.resolveGasUsage()
@@ -26,10 +28,13 @@ data object TvmTestResolver {
             methodId = method.id,
             contractAddress = contractAddress,
             initialData = initialData,
+            contractBalance = contractBalance,
             usedParameters = usedParameters,
             result = result,
             stackTrace = state.continuationStack,
-            gasUsage = gasUsage
+            gasUsage = gasUsage,
+            additionalFlags = state.additionalFlags,
+            intercontractPath = state.intercontractPath,
         )
     }
 
@@ -76,11 +81,14 @@ data class TvmMethodCoverage(
 data class TvmSymbolicTest(
     val methodId: MethodId,
     val contractAddress: TvmTestDataCellValue,
+    val contractBalance: TvmTestIntegerValue,
     val initialData: TvmTestCellValue,
     val usedParameters: List<TvmTestValue>,
     val result: TvmMethodSymbolicResult,
     val stackTrace: List<TvmInst>,
-    val gasUsage: Int
+    val gasUsage: Int,
+    val additionalFlags: Set<String>,
+    val intercontractPath: List<ContractId>,
 )
 
 sealed interface TvmMethodSymbolicResult {

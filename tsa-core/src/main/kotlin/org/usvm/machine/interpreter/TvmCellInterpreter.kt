@@ -2,6 +2,7 @@ package org.usvm.machine.interpreter
 
 import org.ton.Endian
 import org.ton.bytecode.TvmAliasInst
+import org.ton.bytecode.TvmCellBuildBbitsInst
 import org.ton.bytecode.TvmCellBuildEndcInst
 import org.ton.bytecode.TvmCellBuildInst
 import org.ton.bytecode.TvmCellBuildNewcInst
@@ -116,6 +117,7 @@ import org.usvm.machine.state.builderStoreDataBits
 import org.usvm.machine.state.builderStoreInt
 import org.usvm.machine.state.builderStoreNextRef
 import org.usvm.machine.state.builderStoreSlice
+import org.usvm.machine.state.builderToCell
 import org.usvm.machine.state.checkCellDataUnderflow
 import org.usvm.machine.state.checkCellOverflow
 import org.usvm.machine.state.checkCellRefsUnderflow
@@ -266,6 +268,7 @@ class TvmCellInterpreter(
             is TvmCellBuildStiInst -> visitStoreIntInst(scope, stmt, stmt.c + 1, true)
             is TvmCellBuildStuxInst -> visitStoreIntXInst(scope, stmt, false)
             is TvmCellBuildStixInst -> visitStoreIntXInst(scope, stmt, true)
+            is TvmCellBuildBbitsInst -> visitBuilderBitsInst(scope, stmt)
             is TvmCellBuildStsliceInst -> {
                 scope.consumeDefaultGas(stmt)
 
@@ -1101,6 +1104,20 @@ class TvmCellInterpreter(
         }
     }
 
+    private fun visitBuilderBitsInst(scope: TvmStepScopeManager, stmt: TvmCellBuildBbitsInst) = with(ctx) {
+        scope.consumeDefaultGas(stmt)
+
+        val builder = scope.calcOnState { stack.takeLastBuilder() }
+            ?: return scope.doWithState(ctx.throwTypeCheckError)
+
+        scope.doWithState {
+            val dataLength = memory.readField(builder, cellDataLengthField, sizeSort)
+
+            stack.addInt(dataLength.signedExtendToInteger())
+            newStmt(stmt.nextStmt())
+        }
+    }
+
     private fun visitNewCellInst(scope: TvmStepScopeManager, stmt: TvmCellBuildNewcInst) {
         scope.consumeDefaultGas(stmt)
 
@@ -1121,14 +1138,9 @@ class TvmCellInterpreter(
             return
         }
 
-        val cell = scope.calcOnState {
-            // TODO static or concrete
-            memory.allocConcrete(TvmDataCellType).also { builderCopy(builder, it) }
-        }
+        val cell = scope.builderToCell(builder)
 
         scope.doWithState {
-            dataCellInfoStorage.mapper.setCellInfoFromBuilder(builder, cell)
-
             addOnStack(cell, TvmCellType)
             newStmt(stmt.nextStmt())
         }

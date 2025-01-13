@@ -1,6 +1,15 @@
 package org.usvm.machine.interpreter
 
+import org.ton.bytecode.ACTIONS_PARAMETER_IDX
+import org.ton.bytecode.ADDRESS_PARAMETER_IDX
+import org.ton.bytecode.BALANCE_PARAMETER_IDX
+import org.ton.bytecode.BLOCK_TIME_PARAMETER_IDX
+import org.ton.bytecode.CONFIG_PARAMETER_IDX
+import org.ton.bytecode.MSGS_SENT_PARAMETER_IDX
+import org.ton.bytecode.SEED_PARAMETER_IDX
+import org.ton.bytecode.TAG_PARAMETER_IDX
 import org.ton.bytecode.TIME_PARAMETER_IDX
+import org.ton.bytecode.TRANSACTION_TIME_PARAMETER_IDX
 import org.ton.bytecode.TvmAppConfigConfigoptparamInst
 import org.ton.bytecode.TvmAppConfigGetparamInst
 import org.ton.bytecode.TvmAppConfigInst
@@ -15,8 +24,10 @@ import org.usvm.machine.state.allocSliceFromCell
 import org.usvm.machine.state.configContainsParam
 import org.usvm.machine.state.consumeDefaultGas
 import org.usvm.machine.state.doWithStateCtx
+import org.usvm.machine.state.getCellContractInfoParam
 import org.usvm.machine.state.getConfigParam
 import org.usvm.machine.state.getContractInfoParam
+import org.usvm.machine.state.getIntContractInfoParam
 import org.usvm.machine.state.newStmt
 import org.usvm.machine.state.nextStmt
 import org.usvm.machine.state.setContractInfoParam
@@ -41,21 +52,28 @@ class TvmConfigInterpreter(private val ctx: TvmContext) {
             val i = stmt.i
 
             when (i) {
-                0 -> { // TAG
-                    val tag = getContractInfoParam(i).intValue
+                TAG_PARAMETER_IDX -> { // TAG
+                    val tag = scope.getIntContractInfoParam(i)
+                        ?: return@doWithStateCtx
+
                     stack.addInt(tag)
                 }
-                1 -> { // ACTIONS
-                    val actionNum = getContractInfoParam(i).intValue
+                ACTIONS_PARAMETER_IDX -> { // ACTIONS
+                    val actionNum = scope.getIntContractInfoParam(i)
+                        ?: return@doWithStateCtx
+
                     stack.addInt(actionNum)
                 }
-                2 -> { // MSGS_SENT
-                    val messagesSent = getContractInfoParam(i).intValue
+                MSGS_SENT_PARAMETER_IDX -> { // MSGS_SENT
+                    val messagesSent = scope.getIntContractInfoParam(i)
+                        ?: return@doWithStateCtx
+
                     stack.addInt(messagesSent)
                 }
                 TIME_PARAMETER_IDX -> { // NOW
                     val now = makeSymbolicPrimitive(int257sort)
-                    val previousValue = getContractInfoParam(i).intValue
+                    val previousValue = scope.getIntContractInfoParam(i)
+                        ?: return@doWithStateCtx
 
                     scope.assert(
                         mkBvSignedGreaterExpr(now, previousValue),
@@ -70,8 +88,9 @@ class TvmConfigInterpreter(private val ctx: TvmContext) {
                     setContractInfoParam(i, TvmStackIntValue(now).toStackEntry())
                     stack.addInt(now)
                 }
-                4 -> { // BLOCK_LTIME
-                    val blockLogicalTime = getContractInfoParam(i).intValue
+                BLOCK_TIME_PARAMETER_IDX -> { // BLOCK_LTIME
+                    val blockLogicalTime = scope.getIntContractInfoParam(i)
+                        ?: return@doWithStateCtx
 
                     scope.assert(
                         mkBvSignedGreaterExpr(maxTimestampValue, blockLogicalTime),
@@ -80,8 +99,9 @@ class TvmConfigInterpreter(private val ctx: TvmContext) {
 
                     stack.addInt(blockLogicalTime)
                 }
-                5 -> { // LTIME
-                    val logicalTime = getContractInfoParam(i).intValue
+                TRANSACTION_TIME_PARAMETER_IDX -> { // LTIME
+                    val logicalTime = scope.getIntContractInfoParam(i)
+                        ?: return@doWithStateCtx
 
                     scope.assert(
                         mkBvSignedGreaterExpr(maxTimestampValue, logicalTime),
@@ -90,25 +110,28 @@ class TvmConfigInterpreter(private val ctx: TvmContext) {
 
                     stack.addInt(logicalTime)
                 }
-                6 -> { // RAND_SEED
-                    val randomSeed = getContractInfoParam(i).intValue
+                SEED_PARAMETER_IDX -> { // RAND_SEED
+                    val randomSeed = scope.getIntContractInfoParam(i)
+                        ?: return@doWithStateCtx
+
                     stack.addInt(randomSeed)
                 }
-                7 -> { // BALANCE
+                BALANCE_PARAMETER_IDX -> { // BALANCE
                     val balanceValue = getContractInfoParam(i).tupleValue
+                        ?: return@doWithStateCtx ctx.throwTypeCheckError(this)
 
                     stack.addTuple(balanceValue)
                 }
-                8 -> { // MYADDR
-                    val cell = getContractInfoParam(i).cellValue
-                        ?: error("Unexpected address value")
+                ADDRESS_PARAMETER_IDX -> { // MYADDR
+                    val cell = scope.getCellContractInfoParam(i)
+                        ?: return@doWithStateCtx
 
                     val slice = scope.calcOnState { allocSliceFromCell(cell) }
                     addOnStack(slice, TvmSliceType)
                 }
-                9 -> { // GLOBAL_CONFIG
-                    val cell = getContractInfoParam(i).cellValue
-                        ?: error("Unexpected config value")
+                CONFIG_PARAMETER_IDX -> { // GLOBAL_CONFIG
+                    val cell = scope.getCellContractInfoParam(i)
+                        ?: return@doWithStateCtx
 
                     addOnStack(cell, TvmCellType)
                 }

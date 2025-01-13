@@ -2,9 +2,10 @@ package org.ton.examples.ints
 
 import org.junit.jupiter.api.Test
 import org.ton.examples.compareSymbolicAndConcreteResults
-import org.ton.examples.funcCompileAndAnalyzeAllMethods
 import org.ton.examples.compileAndAnalyzeFift
+import org.ton.examples.funcCompileAndAnalyzeAllMethods
 import org.ton.examples.runFiftMethod
+import org.ton.examples.testFiftOptions
 import org.usvm.test.resolver.TvmTestIntegerValue
 import kotlin.io.path.Path
 import kotlin.test.assertEquals
@@ -18,7 +19,7 @@ class IntComparisonExample {
         val sourceResourcePath = this::class.java.getResource(sourcesPath)?.path?.let { Path(it) }
             ?: error("Cannot find resource source $sourcesPath")
 
-        val symbolicResult = funcCompileAndAnalyzeAllMethods(sourceResourcePath)
+        val symbolicResult = funcCompileAndAnalyzeAllMethods(sourceResourcePath, tvmOptions = testFiftOptions)
         symbolicResult.forEach { (methodId, _, tests) ->
             if (methodId.toInt() == 0)
                 return@forEach
@@ -34,7 +35,7 @@ class IntComparisonExample {
         val fiftResourcePath = this::class.java.getResource(fiftPath)?.path?.let { Path(it) }
             ?: error("Cannot find resource fift $sourcesPath")
 
-        val symbolicResult = compileAndAnalyzeFift(fiftResourcePath)
+        val symbolicResult = compileAndAnalyzeFift(fiftResourcePath, tvmOptions = testFiftOptions)
 
         val methodIds = (0..13).toSet()
         compareSymbolicAndConcreteResults(methodIds, symbolicResult) { methodId ->

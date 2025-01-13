@@ -1,12 +1,12 @@
 package org.ton.examples.gas
 
+import java.nio.file.FileVisitResult
+import java.nio.file.Path
 import org.ton.examples.compileFiftCodeBlocksContract
 import org.ton.examples.executionCode
 import org.ton.examples.runFiftCodeBlock
-import org.usvm.machine.TvmOptions
+import org.ton.examples.testFiftOptions
 import org.usvm.machine.analyzeAllMethods
-import java.nio.file.FileVisitResult
-import java.nio.file.Path
 import kotlin.io.path.ExperimentalPathApi
 import kotlin.io.path.Path
 import kotlin.io.path.exists
@@ -31,7 +31,7 @@ class GasTest {
 
         val symbolicResult = analyzeAllMethods(
             contract,
-            tvmOptions = TvmOptions(turnOnTLBParsingChecks = false)
+            tvmOptions = testFiftOptions
         )
 
         for ((methodId, _, tests) in symbolicResult) {

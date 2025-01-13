@@ -3,28 +3,33 @@ package org.ton
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.core.NoOpCliktCommand
 import com.github.ajalt.clikt.core.subcommands
-import com.github.ajalt.clikt.parameters.arguments.argument
-import com.github.ajalt.clikt.parameters.arguments.multiple
-import com.github.ajalt.clikt.parameters.arguments.unique
 import com.github.ajalt.clikt.parameters.groups.OptionGroup
 import com.github.ajalt.clikt.parameters.groups.provideDelegate
+import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.help
+import com.github.ajalt.clikt.parameters.options.multiple
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
+import com.github.ajalt.clikt.parameters.options.transformValues
 import com.github.ajalt.clikt.parameters.options.validate
+import com.github.ajalt.clikt.parameters.types.enum
+import com.github.ajalt.clikt.parameters.types.int
 import com.github.ajalt.clikt.parameters.types.path
+import java.math.BigInteger
+import java.nio.file.Path
 import org.ton.sarif.toSarifReport
 import org.ton.test.gen.generateTests
 import org.ton.tlb.readFromJson
 import org.usvm.machine.BocAnalyzer
 import org.usvm.machine.FiftAnalyzer
 import org.usvm.machine.FuncAnalyzer
-import org.usvm.machine.InterContractAnalyzer
 import org.usvm.machine.TactAnalyzer
 import org.usvm.machine.TvmOptions
-import java.math.BigInteger
-import java.nio.file.Path
+import org.usvm.machine.analyzeInterContract
+import org.usvm.machine.state.ContractId
+import org.usvm.machine.toMethodId
 import kotlin.io.path.exists
+import kotlin.io.path.readText
 
 class ContractProperties : OptionGroup("Contract properties") {
     val contractData by option("-d", "--data").help("The serialized contract persistent data")
@@ -183,25 +188,100 @@ class BocAnalysis : CliktCommand(name = "boc", help = "Options for analyzing a s
     }
 }
 
-class InterContractAnalysis : CliktCommand(name = "inter", help = "Options for analyzing multiple smart contracts with inter-communication") {
-    private val funcSourcesPath by argument(name = "inputs", help = "The paths to the FunC sources of the smart contract (in the order of their communication)")
-        .path(mustExist = true, canBeFile = true, canBeDir = false)
-        .multiple(required = true) // TODO support cyclic messages?
-        .unique()
-
+class InterContractAnalysis : CliktCommand(
+    name = "inter-contract",
+    help = "Options for analyzing inter-contract communication of smart contracts",
+) {
     private val fiftOptions by FiftOptions()
     private val funcOptions by FuncOptions()
 
-    override fun run() {
-        InterContractAnalyzer(
+    private val fiftAnalyzer by lazy {
+        FiftAnalyzer(
+            fiftStdlibPath = fiftOptions.fiftStdlibPath
+        )
+    }
+
+    private val funcAnalyzer by lazy {
+        FuncAnalyzer(
             funcStdlibPath = funcOptions.funcStdlibPath,
             fiftStdlibPath = fiftOptions.fiftStdlibPath
-        ).analyzeInternalMessagesWithInterContract(
-            funcSourcesPath,
-            TvmOptions(turnOnTLBParsingChecks = false),
-        ).let {
-            echo(it.toSarifReport(methodsMapping = emptyMap()))
+        )
+    }
+
+    private val interContractSchemePath by option("-s", "--scheme")
+        .path(mustExist = true, canBeFile = true, canBeDir = false)
+        .required()
+        .help("Scheme of the inter-contract communication.")
+
+    private enum class ContractType {
+        Tact,
+        Func,
+        Fift,
+        Boc,
+    }
+
+    private val pathOptionDescriptor = option().path(mustExist = true, canBeFile = true, canBeDir = false)
+    private val typeOptionDescriptor = option().enum<ContractType>(ignoreCase = true)
+
+    private val contractPaths by option("-c", "--contract")
+        .help(
+            """
+                Contracts to analyze. Must be a pair <contract-type> <path>.
+                <contract-type> can be Tact, Func, Fift or Boc.
+                This option should be used for each analyzed contract separately.
+                Example: -c func jetton-wallet.fc
+            """.trimIndent()
+        )
+        .transformValues(nvalues = 2) { (typeRaw, pathRaw) ->
+            val type = typeOptionDescriptor.transformValue(this, typeRaw)
+            val path = pathOptionDescriptor.transformValue(this, pathRaw)
+            type to path
         }
+        .multiple()
+        .validate { args ->
+            require(args.isNotEmpty()) {
+                "At least one contract must be given"
+            }
+        }
+
+    private fun extractScheme(): Map<ContractId, TvmContractHandlers> {
+        val jsonContent = interContractSchemePath.readText()
+        return communicationSchemeFromJson(jsonContent)
+    }
+
+    private val startContractId: Int by option("-r", "--root")
+        .int()
+        .default(0)
+        .help("Id of the root contract (numeration is by order of -c options).")
+
+    private val methodId: Int by option("-m", "--method")
+        .int()
+        .default(0)
+        .help("Id of the starting method in the root contract.")
+
+    override fun run() {
+        println(contractPaths)
+        val contracts = contractPaths.map { (type, path) ->
+            val analyzer = when (type) {
+                ContractType.Boc -> BocAnalyzer
+                ContractType.Func -> funcAnalyzer
+                ContractType.Fift -> fiftAnalyzer
+                ContractType.Tact -> TactAnalyzer
+            }
+            analyzer.convertToTvmContractCode(path)
+        }
+
+        val communicationScheme = extractScheme()
+
+        val result = analyzeInterContract(
+            contracts = contracts,
+            startContractId = startContractId,
+            methodId = methodId.toMethodId(),
+            communicationScheme = communicationScheme,
+            options = TvmOptions(enableIntercontract = true),
+        )
+
+        echo(result.toSarifReport(methodsMapping = emptyMap()))
     }
 }
 

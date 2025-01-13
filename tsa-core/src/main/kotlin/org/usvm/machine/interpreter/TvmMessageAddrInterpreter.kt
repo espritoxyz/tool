@@ -16,6 +16,7 @@ import org.usvm.machine.TvmContext.Companion.sliceDataPosField
 import org.usvm.machine.TvmStepScopeManager
 import org.usvm.machine.state.addInt
 import org.usvm.machine.state.addOnStack
+import org.usvm.machine.state.checkCellDataUnderflow
 import org.usvm.machine.state.consumeDefaultGas
 import org.usvm.machine.state.doWithStateCtx
 import org.usvm.machine.state.getSliceRemainingBitsCount
@@ -75,6 +76,10 @@ class TvmMessageAddrInterpreter(
                 memory.writeField(addrCell, cellDataLengthField, sizeSort, addrDataLength, guard = trueExpr)
                 // new refs length to ensure that the remaining slice refs count is equal to 0
                 memory.writeField(addrCell, cellRefsLengthField, sizeSort, addrRefPos, guard = trueExpr)
+
+                val originalCell = memory.readField(slice, sliceCellField, addressSort)
+                checkCellDataUnderflow(this, originalCell, addrDataLength)
+                    ?: return@makeSliceTypeLoad
 
                 addOnStack(addrSlice, TvmSliceType)
                 addOnStack(updatedSlice, TvmSliceType)

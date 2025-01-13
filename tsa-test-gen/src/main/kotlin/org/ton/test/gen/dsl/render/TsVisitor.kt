@@ -17,6 +17,7 @@ import org.ton.test.gen.dsl.models.TsDataCellValue
 import org.ton.test.gen.dsl.models.TsDeclaration
 import org.ton.test.gen.dsl.models.TsDictValue
 import org.ton.test.gen.dsl.models.TsEmptyLine
+import org.ton.test.gen.dsl.models.TsEquals
 import org.ton.test.gen.dsl.models.TsExpectToEqual
 import org.ton.test.gen.dsl.models.TsExpectToHaveTransaction
 import org.ton.test.gen.dsl.models.TsFieldRead
@@ -25,6 +26,7 @@ import org.ton.test.gen.dsl.models.TsIntValue
 import org.ton.test.gen.dsl.models.TsMethodCall
 import org.ton.test.gen.dsl.models.TsNum
 import org.ton.test.gen.dsl.models.TsNumAdd
+import org.ton.test.gen.dsl.models.TsNumDiv
 import org.ton.test.gen.dsl.models.TsNumSub
 import org.ton.test.gen.dsl.models.TsReference
 import org.ton.test.gen.dsl.models.TsSandboxContract
@@ -89,8 +91,10 @@ interface TsVisitor<R> {
     fun visit(element: TsDictValue): R
     fun visit(element: TsSliceValue): R
     fun visit(element: TsBuilderValue): R
+    fun <T : TsType> visit(element: TsEquals<T>): R
 
     /* arithmetic */
     fun <T : TsNum> visit(element: TsNumAdd<T>): R
     fun <T : TsNum> visit(element: TsNumSub<T>): R
+    fun <T : TsNum> visit(element: TsNumDiv<T>): R
 }

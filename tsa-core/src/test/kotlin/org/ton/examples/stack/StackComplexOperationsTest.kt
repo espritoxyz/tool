@@ -4,10 +4,10 @@ import org.ton.examples.compareSymbolicAndConcreteResults
 import org.ton.examples.compileAndAnalyzeFift
 import org.ton.examples.loadIntegers
 import org.ton.examples.runFiftMethod
+import org.ton.examples.testFiftOptions
 import org.usvm.machine.TvmComponents
 import org.usvm.machine.TvmContext
 import org.usvm.machine.TvmMachine
-import org.usvm.machine.TvmOptions
 import org.usvm.machine.state.TvmStack
 import org.usvm.machine.state.addInt
 import kotlin.io.path.Path
@@ -15,7 +15,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class StackComplexOperationsTest {
-    private val ctx = TvmContext(TvmOptions(), TvmComponents(TvmMachine.defaultOptions))
+    private val ctx = TvmContext(testFiftOptions, TvmComponents(TvmMachine.defaultOptions))
 
     private val stackComplexFiftPath: String = "/stack/StackComplex.fif"
     private val stackNullChecksFiftPath: String = "/stack/NullChecks.fif"
@@ -36,11 +36,11 @@ class StackComplexOperationsTest {
     }
 
     @Test
-    fun testStackNullChecks(): Unit = with(ctx) {
+    fun testStackNullChecks() {
         val fiftResourcePath = this::class.java.getResource(stackNullChecksFiftPath)?.path?.let { Path(it) }
             ?: error("Cannot find resource fift $stackNullChecksFiftPath")
 
-        val symbolicResult = compileAndAnalyzeFift(fiftResourcePath)
+        val symbolicResult = compileAndAnalyzeFift(fiftResourcePath, tvmOptions = testFiftOptions)
 
         val methodIds = (0..15).toSet()
         compareSymbolicAndConcreteResults(methodIds, symbolicResult) { methodId ->
@@ -49,11 +49,11 @@ class StackComplexOperationsTest {
     }
 
     @Test
-    fun testStackComplexFift(): Unit = with(ctx) {
+    fun testStackComplexFift() {
         val fiftResourcePath = this::class.java.getResource(stackComplexFiftPath)?.path?.let { Path(it) }
             ?: error("Cannot find resource fift $stackComplexFiftPath")
 
-        val symbolicResult = compileAndAnalyzeFift(fiftResourcePath)
+        val symbolicResult = compileAndAnalyzeFift(fiftResourcePath, tvmOptions = testFiftOptions)
 
         val methodIds = (0..30).toSet()
         compareSymbolicAndConcreteResults(methodIds, symbolicResult) { methodId ->

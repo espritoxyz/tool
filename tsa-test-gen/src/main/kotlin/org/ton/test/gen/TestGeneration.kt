@@ -34,7 +34,7 @@ fun generateTests(
     analysisResult: TvmContractSymbolicTestResult,
     projectPath: Path,
     sourceRelativePath: Path,
-) {
+): String {
     val entryTests = analysisResult.testSuites
         .single { it.methodId == TvmContext.RECEIVE_INTERNAL_ID }
         .filter { it.result is TvmMethodFailure }
@@ -46,6 +46,7 @@ fun generateTests(
     val renderedTests = TsRenderer(ctx).renderTests(test)
 
     writeRenderedTest(projectPath, renderedTests)
+    return renderedTests.fileName
 }
 
 private fun TsContext.recvInternalTests(
@@ -81,7 +82,7 @@ private fun TsContext.recvInternalTests(
             it("test-$idx") {
                 val data = newVar("data", test.initialData.toTsValue())
                 val contractAddr = newVar("contractAddr", parseAddress(input.address))
-                val contractBalance = newVar("contractBalance", input.balance.toTsValue())
+                val contractBalance = newVar("contractBalance", input.initialBalance.toTsValue())
 
                 emptyLine()
 
@@ -123,11 +124,9 @@ private fun resolveReceiveInternalInput(test: TvmSymbolicTest): TvmReceiveIntern
         ?: TvmTestSliceValue()
     val fullMsg = args.getOrNull(1)
         ?: TvmTestDataCellValue()
-    val defaultCurrency = TvmTestIntegerValue(BigInteger.valueOf(TvmContext.MIN_MESSAGE_CURRENCY))
+    val defaultCurrency = BigInteger.valueOf(TvmContext.MIN_MESSAGE_CURRENCY)
     val msgCurrency = args.getOrNull(2)
-        ?: defaultCurrency
-    val balance = args.getOrNull(3)
-        ?: defaultCurrency
+        ?: TvmTestIntegerValue(defaultCurrency)
 
     require(msgBody is TvmTestSliceValue) {
         "Unexpected recv_internal arg at index 0: $msgBody"
@@ -138,9 +137,9 @@ private fun resolveReceiveInternalInput(test: TvmSymbolicTest): TvmReceiveIntern
     require(msgCurrency is TvmTestIntegerValue) {
         "Unexpected recv_internal arg at index 2: $msgCurrency"
     }
-    require(balance is TvmTestIntegerValue) {
-        "Unexpected recv_internal arg at index 3: $balance"
-    }
+
+    val balance = test.contractBalance
+    val initialBalance = TvmTestIntegerValue(balance.value - msgCurrency.value)
 
     val msgBits = fullMsg.data
     val contractAddress = extractAddress(test.contractAddress.data)
@@ -160,7 +159,7 @@ private fun resolveReceiveInternalInput(test: TvmSymbolicTest): TvmReceiveIntern
         truncateSliceCell(msgBody),
         fullMsg,
         msgCurrency,
-        balance,
+        initialBalance,
         contractAddress,
         srcAddress,
         bounce,
@@ -173,7 +172,7 @@ private data class TvmReceiveInternalInput(
     val msgBody: TvmTestDataCellValue,
     val fullMsg: TvmTestDataCellValue,
     val msgCurrency: TvmTestIntegerValue,
-    val balance: TvmTestIntegerValue,
+    val initialBalance: TvmTestIntegerValue,
     val address: String,
     val srcAddress: String,
     val bounce: Boolean,

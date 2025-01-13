@@ -7,9 +7,10 @@ import org.usvm.machine.MethodId
 
 @Serializable
 sealed class TvmInstLocation {
-//    val methodId: Int // TODO replace it with real TvmMethod
     abstract val index: Int
     abstract var codeBlock: TvmCodeBlock
+
+    abstract fun increment(): TvmInstLocation
 }
 
 @Serializable
@@ -21,6 +22,10 @@ data class TvmInstMethodLocation(
     @kotlinx.serialization.Transient
     override lateinit var codeBlock: TvmCodeBlock
 
+    override fun increment() = TvmInstMethodLocation(methodId, index + 1).also {
+        it.codeBlock = codeBlock
+    }
+
     override fun toString(): String {
         return "$methodId:#$index"
     }
@@ -28,11 +33,34 @@ data class TvmInstMethodLocation(
 
 @Serializable
 @SerialName("TvmInstLambdaLocation")
-data class TvmInstLambdaLocation(override val index: Int) : TvmInstLocation() {
+class TvmInstLambdaLocation(override val index: Int) : TvmInstLocation() {
     @kotlinx.serialization.Transient
     override lateinit var codeBlock: TvmCodeBlock
 
+    @kotlinx.serialization.Transient
+    lateinit var parent: TvmInstLocation
+
+    override fun increment() = TvmInstLambdaLocation(index + 1).also {
+        it.codeBlock = codeBlock
+        it.parent = parent
+    }
+
     override fun toString(): String {
         return "Lambda:#$index"
+    }
+}
+
+@Serializable
+@SerialName("TvmMainMethodLocation")
+data class TvmMainMethodLocation(override val index: Int) : TvmInstLocation() {
+    @kotlinx.serialization.Transient
+    override lateinit var codeBlock: TvmCodeBlock
+
+    override fun increment() = TvmMainMethodLocation(index + 1).also {
+        it.codeBlock = codeBlock
+    }
+
+    override fun toString(): String {
+        return "MainMethod:#$index"
     }
 }

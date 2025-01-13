@@ -1,12 +1,12 @@
 package org.ton.examples.registers
 
+import java.math.BigInteger
 import org.ton.examples.compareSymbolicAndConcreteResults
 import org.ton.examples.compileAndAnalyzeFift
 import org.ton.examples.compileFuncToFift
 import org.ton.examples.runFiftMethod
+import org.ton.examples.testFiftOptions
 import org.usvm.machine.MethodId
-import org.usvm.machine.mainMethodId
-import java.math.BigInteger
 import kotlin.io.path.Path
 import kotlin.io.path.createTempFile
 import kotlin.io.path.deleteIfExists
@@ -22,13 +22,13 @@ class RegistersTest {
 
     @Test
     fun testC0Register() {
-        val methodsBlackList = hashSetOf(mainMethodId, BigInteger.ONE)
+        val methodsBlackList = hashSetOf(BigInteger.ONE)
         analyzeContract(registerC0TestPath, methodsBlackList)
     }
 
     @Test
     fun testC1Register() {
-        val methodsBlackList = hashSetOf(mainMethodId, BigInteger.ONE)
+        val methodsBlackList = hashSetOf(BigInteger.ONE)
         analyzeContract(registerC1TestPath, methodsBlackList)
     }
 
@@ -54,7 +54,7 @@ class RegistersTest {
 
     private fun analyzeContract(
         contractPath: String,
-        methodsBlackList: Set<MethodId> = hashSetOf(mainMethodId),
+        methodsBlackList: Set<MethodId> = hashSetOf(),
     ) {
         val resourcePath = this::class.java.getResource(contractPath)?.path?.let { Path(it) }
             ?: error("Cannot find resource bytecode $contractPath")
@@ -63,7 +63,11 @@ class RegistersTest {
         try {
             compileFuncToFift(resourcePath, tmpFiftFile)
 
-            val symbolicResult = compileAndAnalyzeFift(tmpFiftFile, methodsBlackList = methodsBlackList)
+            val symbolicResult = compileAndAnalyzeFift(
+                tmpFiftFile,
+                methodsBlackList = methodsBlackList,
+                tvmOptions = testFiftOptions
+            )
 
             compareSymbolicAndConcreteResults(setOf(0), symbolicResult) { methodId ->
                 runFiftMethod(tmpFiftFile, methodId)
